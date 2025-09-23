@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "725499712144",
+    "project_id": "desarrollomovil-e1114",
+    "storage_bucket": "desarrollomovil-e1114.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725499712144:android:0b6c1f526715df699e3e15",
+        "android_client_info": {
+          "package_name": "com.stiven.desarrollomovil"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "725499712144-frq4q4jvtuil6i7qacqqbucklbn0jl9c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stiven.desarrollomovil",
+            "certificate_hash": "ec57eee9d1098cb93eaee01b0906b9f9bfd5261b"
+          }
+        },
+        {
+          "client_id": "725499712144-kp4t2qoml0lmcs2h3ms2q421k8r1r9ou.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxpur3wf32-JY5V_Pup_vTjgUCHMBA92s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "725499712144-kp4t2qoml0lmcs2h3ms2q421k8r1r9ou.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

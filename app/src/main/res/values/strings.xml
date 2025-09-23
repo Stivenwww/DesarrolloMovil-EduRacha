@@ -1,0 +1,50 @@
+<resources>
+    <string name="app_name">DesarrolloMovil</string>
+
+
+    <string name="email">Correo electrónico</string>
+    <string name="password">Contraseña</string>
+    <string name="login">Iniciar sesión</string>
+    <string name="register">Registrarse</string>
+
+
+    <!-- Login strings -->
+    <string name="login_title">Iniciar Sesión</string>
+    <string name="register_title">Crear Cuenta</string>
+    <string name="welcome_back">Bienvenido de vuelta</string>
+    <string name="email_hint">Correo electrónico</string>
+    <string name="password_hint">Contraseña</string>
+    <string name="confirm_password_hint">Confirmar contraseña</string>
+    <string name="login_button">Iniciar Sesión</string>
+    <string name="register_button">Crear Cuenta</string>
+    <string name="google_signin_button">Continuar con Google</string>
+    <string name="no_account">¿No tienes cuenta? Regístrate</string>
+    <string name="have_account">¿Ya tienes cuenta? Inicia sesión</string>
+    <string name="or_text">o</string>
+
+    <!-- Main activity strings -->
+
+    <string name="welcome">¡Bienvenido!</string>
+    <string name="profile_button">Mi Perfil</string>
+    <string name="settings_button">Configuración</string>
+    <string name="help_button">Ayuda</string>
+    <string name="logout_button">Cerrar Sesión</string>
+    <string name="app_version">Versión 1.0.0</string>
+
+    <!-- Error messages -->
+    <string name="email_required">El email es requerido</string>
+    <string name="invalid_email">Email inválido</string>
+    <string name="password_required">La contraseña es requerida</string>
+    <string name="password_length">La contraseña debe tener al menos 6 caracteres</string>
+    <string name="passwords_not_match">Las contraseñas no coinciden</string>
+    <string name="google_signin_error">Error en el inicio de sesión con Google</string>
+    <string name="auth_error">Error de autenticación</string>
+    <string name="register_error">Error en el registro</string>
+    <string name="register_success">Registro exitoso</string>
+
+    <!-- Content descriptions -->
+    <string name="app_logo_desc">Logo de la aplicación</string>
+    <string name="user_photo_desc">Foto de perfil del usuario</string>
+    <string name="default_web_client_id">725499712144-kp4t2qoml0lmcs2h3ms2q421k8r1r9ou.apps.googleusercontent.com</string>
+
+</resources>
