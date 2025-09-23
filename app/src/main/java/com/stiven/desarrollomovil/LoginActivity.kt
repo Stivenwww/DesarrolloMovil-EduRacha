@@ -136,7 +136,12 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun goToMain() {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = if (userType == "teacher") {
+            Intent(this, PanelDocenteActivity::class.java)
+        } else {
+            Intent(this, MainActivity::class.java)
+        }
+
         intent.putExtra("user_type", userType)
         startActivity(intent)
         finish()

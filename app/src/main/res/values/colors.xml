@@ -1,40 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- PALETA EDURACHA - UNIAUTÓNOMA -->
+    <!-- Basada en los colores institucionales de la Corporación Universitaria Autónoma del Cauca -->
 
-    <color name="background">#F5F5F5</color>
-    <color name="primary">#6200EE</color>
-    <color name="secondary">#03DAC5</color>
-    <color name="primaryText">#212121</color>
+    <!-- Colores Primarios (Azul Institucional) -->
+    <color name="primary">#003D82</color>              <!-- Azul UNIAUTÓNOMA principal -->
+    <color name="primary_variant">#002A5C</color>      <!-- Azul más oscuro -->
+    <color name="primary_light">#1565C0</color>        <!-- Azul claro -->
 
-    <!-- Colores principales -->
-    <color name="primary_color">#2196F3</color>
-    <color name="primary_variant">#1976D2</color>
-    <color name="secondary_color">#FF4081</color>
-    <color name="secondary_variant">#F50057</color>
+    <!-- Colores Secundarios (Dorado/Amarillo Académico) -->
+    <color name="secondary">#FFB300</color>            <!-- Dorado académico -->
+    <color name="secondary_variant">#FF8F00</color>    <!-- Dorado oscuro -->
+    <color name="secondary_light">#FFC107</color>      <!-- Amarillo claro -->
 
-    <!-- Colores de fondo -->
-    <color name="background_color">#FAFAFA</color>
-    <color name="surface_color">#FFFFFF</color>
+    <!-- Colores de Acento (Celeste Educativo) -->
+    <color name="accent">#42A5F5</color>               <!-- Celeste vibrante -->
+    <color name="accent_light">#81D4FA</color>         <!-- Celeste claro -->
 
-    <!-- Colores de texto -->
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
+    <!-- Colores de Estado -->
+    <color name="success">#2E7D32</color>              <!-- Verde éxito -->
+    <color name="warning">#FF6F00</color>              <!-- Naranja advertencia -->
+    <color name="error">#D32F2F</color>                <!-- Rojo error -->
+    <color name="info">#1976D2</color>                 <!-- Azul información -->
 
-    <!-- Colores del sistema -->
-    <color name="error_color">#F44336</color>
-    <color name="success_color">#4CAF50</color>
-    <color name="warning_color">#FF9800</color>
+    <!-- Colores de Superficie y Fondo -->
+    <color name="background">#F8F9FA</color>           <!-- Fondo principal (gris muy claro) -->
+    <color name="surface">#FFFFFF</color>              <!-- Superficie cards/botones -->
+    <color name="surface_variant">#F1F3F4</color>      <!-- Superficie alternativa -->
 
-    <!-- Colores de bordes y divisores -->
-    <color name="border_color">#E0E0E0</color>
-    <color name="divider_color">#BDBDBD</color>
+    <!-- Colores de Texto -->
+    <color name="on_primary">#FFFFFF</color>           <!-- Texto sobre azul primario -->
+    <color name="on_secondary">#FFFFFF</color>         <!-- Texto sobre dorado -->
+    <color name="on_background">#1A1A1A</color>        <!-- Texto sobre fondo -->
+    <color name="on_surface">#1A1A1A</color>           <!-- Texto sobre superficie -->
+    <color name="text_primary">#1A1A1A</color>         <!-- Texto principal -->
+    <color name="text_secondary">#5F6368</color>       <!-- Texto secundario -->
+    <color name="text_hint">#9AA0A6</color>            <!-- Texto de ayuda -->
 
-    <!-- Colores predeterminados de Material Design -->
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Colores Específicos de EduRacha UNIAUTÓNOMA -->
+    <!-- Gamificación -->
+    <color name="streak_fire">#FF5722</color>          <!-- Racha activa (naranja fuego) -->
+    <color name="xp_bar">#42A5F5</color>               <!-- Barra XP (celeste) -->
+    <color name="level_bronze">#8D6E63</color>         <!-- Nivel bronce -->
+    <color name="level_silver">#90A4AE</color>         <!-- Nivel plata -->
+    <color name="level_gold">#FFB300</color>           <!-- Nivel oro (dorado institucional) -->
+    <color name="level_platinum">#E1F5FE</color>       <!-- Nivel platino (celeste muy claro) -->
+
+    <!-- Quiz y Aprendizaje -->
+    <color name="quiz_correct">#2E7D32</color>         <!-- Respuesta correcta (verde) -->
+    <color name="quiz_incorrect">#D32F2F</color>       <!-- Respuesta incorrecta (rojo) -->
+    <color name="quiz_neutral">#E3F2FD</color>         <!-- Estado neutral (azul muy claro) -->
+    <color name="ai_explanation">#E8F4FD</color>       <!-- Fondo explicaciones IA (azul suave) -->
+
+    <!-- Calendario -->
+    <color name="calendar_today">#FFB300</color>       <!-- Día actual (dorado) -->
+    <color name="calendar_completed">#42A5F5</color>   <!-- Día completado (celeste) -->
+    <color name="calendar_pending">#81D4FA</color>     <!-- Día pendiente (celeste claro) -->
+    <color name="calendar_extended">#78909C</color>    <!-- Día extendido (gris azulado) -->
+
+    <!-- Niveles de Progreso Académico -->
+    <color name="progress_beginner">#81D4FA</color>    <!-- Principiante (celeste claro) -->
+    <color name="progress_intermediate">#42A5F5</color><!-- Intermedio (celeste) -->
+    <color name="progress_advanced">#1976D2</color>    <!-- Avanzado (azul) -->
+    <color name="progress_expert">#003D82</color>      <!-- Experto (azul UNIAUTÓNOMA) -->
+
+    <!-- Colores por Asignatura (Paleta Académica) -->
+    <color name="subject_math">#1976D2</color>         <!-- Matemáticas - Azul -->
+    <color name="subject_science">#00796B</color>      <!-- Ciencias - Verde azulado -->
+    <color name="subject_language">#C2185B</color>     <!-- Idiomas - Rosa académico -->
+    <color name="subject_history">#5D4037</color>      <!-- Historia - Marrón -->
+    <color name="subject_art">#7B1FA2</color>          <!-- Arte - Púrpura -->
+    <color name="subject_engineering">#FF6F00</color>  <!-- Ingeniería - Naranja -->
+    <color name="subject_business">#388E3C</color>     <!-- Administración - Verde -->
+    <color name="subject_health">#E53935</color>       <!-- Salud - Rojo -->
+    <color name="subject_default">#546E7A</color>      <!-- Por defecto - Gris azulado -->
+
+    <!-- Colores de Transparencia -->
+    <color name="overlay_light">#80FFFFFF</color>      <!-- Overlay claro -->
+    <color name="overlay_dark">#80000000</color>       <!-- Overlay oscuro -->
+    <color name="shadow">#1A000000</color>             <!-- Sombras -->
+    <color name="university_shadow">#1A003D82</color>  <!-- Sombra azul institucional -->
+
+    <!-- Estados de Interacción -->
+    <color name="ripple_light">#1FFFFFFF</color>       <!-- Ripple claro -->
+    <color name="ripple_dark">#1F000000</color>        <!-- Ripple oscuro -->
+    <color name="ripple_primary">#1F003D82</color>     <!-- Ripple azul institucional -->
+
+    <!-- Colores Especiales UNIAUTÓNOMA -->
+    <color name="university_blue">#003D82</color>      <!-- Azul oficial UNIAUTÓNOMA -->
+    <color name="academic_gold">#FFB300</color>        <!-- Dorado académico -->
+    <color name="knowledge_blue">#42A5F5</color>       <!-- Azul del conocimiento -->
+    <color name="wisdom_light">#E8F4FD</color>         <!-- Luz de la sabiduría -->
+
+    <!-- Gradientes (para uso en drawables) -->
+    <color name="gradient_start">#003D82</color>       <!-- Inicio gradiente principal -->
+    <color name="gradient_end">#1565C0</color>         <!-- Final gradiente principal -->
+    <color name="gradient_accent_start">#42A5F5</color><!-- Inicio gradiente acento -->
+    <color name="gradient_accent_end">#81D4FA</color>  <!-- Final gradiente acento -->
+
+    <color name="primaryText">@color/text_primary</color>
+    <color name="secondaryText">@color/text_secondary</color>
+
 </resources>

@@ -2,7 +2,11 @@ package com.stiven.desarrollomovil
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.desarrollomovil.databinding.ActivityMainBinding
 
@@ -11,6 +15,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var auth: FirebaseAuth
     private var userType: String = "student"
+    private var selectedFilter: String = "theory"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,8 +25,19 @@ class MainActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         userType = intent.getStringExtra("user_type") ?: "student"
 
+        setupViews()
         loadUserData()
         setupClickListeners()
+        setupSearchFunctionality()
+        setupFilterButtons()
+    }
+
+    private fun setupViews() {
+        // Configurar la racha inicial
+        updateStreakDisplay(10) // Ejemplo: 10 días de racha
+
+        // Seleccionar filtro por defecto (Teórico)
+        selectFilter("theory")
     }
 
     private fun loadUserData() {
@@ -30,43 +46,158 @@ class MainActivity : AppCompatActivity() {
             val displayName = user.displayName
             val email = user.email
 
-            // Extraer información del displayName si está disponible
-            var fullName = "Usuario"
+            // Extraer información del displayName
+            var firstName = "Estudiante"
             var username = ""
-            var roleText = if (userType == "teacher") "Docente" else "Estudiante"
 
             if (!displayName.isNullOrEmpty()) {
-                // Si el displayName contiene información completa (nombre (username) - rol)
-                if (displayName.contains(" - ")) {
-                    val parts = displayName.split(" - ")
-                    val nameAndUsername = parts[0]
-                    roleText = parts[1]
+                when {
+                    displayName.contains(" - ") -> {
+                        val parts = displayName.split(" - ")
+                        val nameAndUsername = parts[0]
 
-                    if (nameAndUsername.contains("(") && nameAndUsername.contains(")")) {
-                        val nameParts = nameAndUsername.split("(")
-                        fullName = nameParts[0].trim()
-                        username = nameParts[1].replace(")", "").trim()
-                    } else {
-                        fullName = nameAndUsername
+                        if (nameAndUsername.contains("(") && nameAndUsername.contains(")")) {
+                            val nameParts = nameAndUsername.split("(")
+                            firstName = nameParts[0].trim().split(" ")[0] // Solo el primer nombre
+                            username = nameParts[1].replace(")", "").trim()
+                        } else {
+                            firstName = nameAndUsername.split(" ")[0] // Solo el primer nombre
+                        }
                     }
-                } else {
-                    fullName = displayName
+                    else -> {
+                        firstName = displayName.split(" ")[0] // Solo el primer nombre
+                    }
                 }
             }
 
-            binding.tvWelcome.text = "¡Bienvenido, $fullName!"
+            // Actualizar UI
+            binding.tvGreeting.text = "Hola, $firstName"
 
-            var userInfo = "Perfil: $roleText\nCorreo: $email"
+            // Actualizar el nombre en el ranking (simulado)
             if (username.isNotEmpty()) {
-                userInfo = "Perfil: $roleText\nUsuario: @$username\nCorreo: $email"
+                binding.tvUserRanking.text = username.uppercase()
+            } else {
+                binding.tvUserRanking.text = firstName.uppercase()
             }
 
-            binding.tvUserInfo.text = userInfo
-            title = "$roleText - $email"
+            // Configurar título de la actividad
+            title = "EduRacha - Estudiante"
+        }
+    }
+
+    private fun updateStreakDisplay(days: Int) {
+        binding.tvStreak.text = days.toString()
+    }
+
+    private fun setupSearchFunctionality() {
+        binding.etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s.toString().trim()
+                // Aquí puedes implementar la lógica de búsqueda
+                filterCourses(query)
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    private fun filterCourses(query: String) {
+        // Implementar filtrado de cursos basado en la búsqueda
+        // Por ahora solo un placeholder
+        if (query.isNotEmpty()) {
+            // Lógica de filtrado
+        }
+    }
+
+    private fun setupFilterButtons() {
+        binding.btnFilterAll.setOnClickListener { selectFilter("all") }
+        binding.btnFilterTheory.setOnClickListener { selectFilter("theory") }
+        binding.btnFilterPractical.setOnClickListener { selectFilter("practical") }
+        binding.btnFilterTheoryPractical.setOnClickListener { selectFilter("theory_practical") }
+    }
+
+    private fun selectFilter(filterType: String) {
+        selectedFilter = filterType
+
+        // Resetear todos los botones
+        resetFilterButtons()
+
+        // Aplicar estilo al botón seleccionado
+        when (filterType) {
+            "all" -> {
+                binding.btnFilterAll.backgroundTintList =
+                    ContextCompat.getColorStateList(this, R.color.knowledge_blue)
+                binding.btnFilterAll.setTextColor(
+                    ContextCompat.getColor(this, R.color.on_primary)
+                )
+            }
+            "theory" -> {
+                binding.btnFilterTheory.backgroundTintList =
+                    ContextCompat.getColorStateList(this, R.color.knowledge_blue)
+                binding.btnFilterTheory.setTextColor(
+                    ContextCompat.getColor(this, R.color.on_primary)
+                )
+            }
+            "practical" -> {
+                binding.btnFilterPractical.backgroundTintList =
+                    ContextCompat.getColorStateList(this, R.color.knowledge_blue)
+                binding.btnFilterPractical.setTextColor(
+                    ContextCompat.getColor(this, R.color.on_primary)
+                )
+            }
+            "theory_practical" -> {
+                binding.btnFilterTheoryPractical.backgroundTintList =
+                    ContextCompat.getColorStateList(this, R.color.knowledge_blue)
+                binding.btnFilterTheoryPractical.setTextColor(
+                    ContextCompat.getColor(this, R.color.on_primary)
+                )
+            }
+        }
+
+        // Aplicar filtro a los cursos
+        applyCourseFilter(filterType)
+    }
+
+    private fun resetFilterButtons() {
+        val buttons = listOf(
+            binding.btnFilterAll,
+            binding.btnFilterTheory,
+            binding.btnFilterPractical,
+            binding.btnFilterTheoryPractical
+        )
+
+        buttons.forEach { button ->
+            button.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.surface_variant)
+            button.setTextColor(
+                ContextCompat.getColor(this, R.color.primaryText)
+            )
+        }
+    }
+
+    private fun applyCourseFilter(filterType: String) {
+        // Implementar lógica de filtrado de cursos
+        // Por ahora solo un placeholder para mostrar/ocultar cursos
+        when (filterType) {
+            "all" -> {
+                // Mostrar todos los cursos
+            }
+            "theory" -> {
+                // Mostrar solo cursos teóricos
+            }
+            "practical" -> {
+                // Mostrar solo cursos prácticos
+            }
+            "theory_practical" -> {
+                // Mostrar solo cursos teórico-prácticos
+            }
         }
     }
 
     private fun setupClickListeners() {
+        // Logout
         binding.btnLogout.setOnClickListener {
             auth.signOut()
             val intent = Intent(this, WelcomeActivity::class.java)
@@ -74,5 +205,47 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
             finish()
         }
+
+        // Configuración/Settings
+        binding.btnSettings.setOnClickListener {
+            // Navegar a configuración
+            // val intent = Intent(this, SettingsActivity::class.java)
+            // startActivity(intent)
+        }
+
+        // Card de ranking
+        binding.cardRanking.setOnClickListener {
+            // Navegar a pantalla de ranking completo
+            // val intent = Intent(this, RankingActivity::class.java)
+            // startActivity(intent)
+        }
+
+        // Ver todos los cursos
+        binding.btnViewAll.setOnClickListener {
+            // Navegar a vista completa de cursos
+            // val intent = Intent(this, AllCoursesActivity::class.java)
+            // startActivity(intent)
+        }
+
+        // Click en la racha para ver detalles
+        binding.cardStreak.setOnClickListener {
+            // Mostrar detalles de la racha o historial
+            // val intent = Intent(this, StreakDetailsActivity::class.java)
+            // startActivity(intent)
+        }
     }
+
+    // Método para actualizar la racha (puede ser llamado desde otras partes de la app)
+    fun updateStreak(newStreakDays: Int) {
+        updateStreakDisplay(newStreakDays)
+
+        // Aquí puedes agregar animaciones o efectos visuales
+        // cuando la racha se actualiza
+    }
+
+    // Método para simular completar una actividad y aumentar la racha
+    private fun completeStudyActivity() {
+        val currentStreak = binding.tvStreak.text.toString().toIntOrNull() ?: 0
+        updateStreak(currentStreak+1)
+        }
 }
