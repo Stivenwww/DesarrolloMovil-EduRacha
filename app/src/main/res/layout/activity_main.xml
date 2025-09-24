@@ -1,28 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
     tools:context=".MainActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="16dp">
 
         <!-- Header con saludo y configuración -->
         <LinearLayout
-
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -31,132 +28,61 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/tvGreeting"
+                    android:id="@+id/tv_greeting"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Hola, Estudiante"
-                    android:textColor="@color/primaryText"
+                    android:text="Hola, Valentina"
                     android:textSize="24sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
 
                 <TextView
-                    android:id="@+id/tvSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
                     android:text="¿Qué deseas aprender el día de hoy?"
-                    android:textColor="@color/secondaryText"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="4dp" />
 
             </LinearLayout>
 
             <ImageButton
-                android:id="@+id/btnSettings"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:id="@+id/btn_settings"
+                android:layout_width="37dp"
+                android:layout_height="41dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_manage"
-                android:contentDescription="Configuración"/>
+                android:contentDescription="Configuración"
+                android:src="@drawable/ic_settingss"
+                 />
 
         </LinearLayout>
 
-        <!-- Racha de estudio -->
+        <!-- Card de Racha -->
         <androidx.cardview.widget.CardView
-            android:id="@+id/cardStreak"
-            android:layout_width="wrap_content"
+            android:id="@+id/card_streak"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardCornerRadius="20dp"
+            android:layout_marginBottom="20dp"
+            app:cardCornerRadius="12dp"
             app:cardElevation="4dp"
-            app:cardBackgroundColor="@color/academic_gold"
-            app:layout_constraintStart_toStartOf="parent">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="12dp"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🔥"
-                    android:textSize="18sp"/>
-
-                <TextView
-                    android:id="@+id/tvStreak"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="10"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/on_secondary"
-                    android:layout_marginStart="6dp"/>
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Barra de búsqueda -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardSearch"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardCornerRadius="25dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@android:color/white"
-            app:layout_constraintTop_toBottomOf="@id/cardStreak"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            android:backgroundTint="@color/surface"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
+                android:padding="16dp"
+                android:gravity="center_vertical">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@android:drawable/ic_menu_search"
-                    android:alpha="0.6"/>
-
-                <EditText
-                    android:id="@+id/etSearch"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:hint="Busca por asignatura"
-                    android:textSize="16sp"
-                    android:layout_marginStart="12dp"/>
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Ranking de estudiantes -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardRanking"
-            android:layout_width="0dp"
-            android:layout_height="120dp"
-            android:layout_marginTop="20dp"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="6dp"
-            app:cardBackgroundColor="@color/university_blue"
-            app:layout_constraintTop_toBottomOf="@id/cardSearch"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_fire"
+                    app:tint="@color/streak_fire"
+                    android:layout_marginEnd="12dp" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -167,184 +93,256 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🏆 Ranking de estudiantes"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/on_primary"/>
+                        android:text="Racha actual"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_secondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ve tu posición entre todos los estudiantes"
+                        android:text="¡Sigue así!"
                         android:textSize="12sp"
-                        android:textColor="@color/on_primary"
-                        android:alpha="0.8"
-                        android:layout_marginTop="4dp"/>
+                        android:textColor="@color/text_hint"
+                        android:layout_marginTop="2dp" />
 
                 </LinearLayout>
 
-                <androidx.cardview.widget.CardView
+                <TextView
+                    android:id="@+id/tv_streak"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/academic_gold">
+                    android:text="10"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/streak_fire" />
 
-                    <TextView
-                        android:id="@+id/tvUserRanking"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="JULIAN ALEJANDRO"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/on_secondary"
-                        android:padding="8dp"/>
-
-                </androidx.cardview.widget.CardView>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="días"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginTop="8dp" />
 
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>
 
-        <!-- Sección Cursos inscritos -->
+        <!-- Buscador -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            app:startIconDrawable="@drawable/ic_search"
+            app:startIconTint="@color/text_hint"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/text_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_search"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Buscar por asignatura"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Card de Ranking -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_ranking"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="6dp"
+            android:backgroundTint="@color/knowledge_blue"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ranking de estudiantes"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/on_primary"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tv_user_ranking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VALENTINA"
+                    android:textSize="14sp"
+                    android:textColor="@color/on_primary"
+                    android:alpha="0.9" />
+
+                <View
+                    android:layout_width="40dp"
+                    android:layout_height="4dp"
+                    android:background="@color/secondary"
+                    android:layout_marginTop="12dp"
+                    android:alpha="0.8" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Header de Cursos -->
         <LinearLayout
-            android:id="@+id/coursesHeader"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="24dp"
-            app:layout_constraintTop_toBottomOf="@id/cardRanking"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            android:layout_marginBottom="16dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Cursos inscritos"
-                android:textSize="20sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="@color/primaryText"/>
+                android:textColor="@color/text_primary" />
 
             <TextView
-                android:id="@+id/btnViewAll"
+                android:id="@+id/btn_view_all"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="VER TODOS"
+                android:text="VER TODOS >"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="@color/university_blue"
-                android:clickable="true"
-                android:focusable="true"
+                android:textColor="@color/knowledge_blue"
+                android:padding="8dp"
                 android:background="?attr/selectableItemBackground"
-                android:padding="8dp"/>
+                android:clickable="true"
+                android:focusable="true" />
 
         </LinearLayout>
 
-        <!-- Filtros de cursos -->
+        <!-- Filtros de Curso -->
         <HorizontalScrollView
-            android:id="@+id/filtersScroll"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:scrollbars="none"
-            app:layout_constraintTop_toBottomOf="@id/coursesHeader"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:paddingEnd="16dp">
+                android:paddingHorizontal="4dp">
 
-                <Button
-                    android:id="@+id/btnFilterAll"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_filter_all"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:text="Todos"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:cornerRadius="18dp"
                     android:backgroundTint="@color/surface_variant"
-                    android:textColor="@color/primaryText"
-                    android:layout_marginEnd="8dp"/>
+                    android:textColor="@color/primaryText" />
 
-                <Button
-                    android:id="@+id/btnFilterTheory"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_filter_theory"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:text="Teórico"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:cornerRadius="18dp"
                     android:backgroundTint="@color/knowledge_blue"
-                    android:textColor="@color/on_primary"
-                    android:layout_marginEnd="8dp"/>
+                    android:textColor="@color/on_primary" />
 
-                <Button
-                    android:id="@+id/btnFilterPractical"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_filter_practical"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:text="Práctico"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:cornerRadius="18dp"
                     android:backgroundTint="@color/surface_variant"
-                    android:textColor="@color/primaryText"
-                    android:layout_marginEnd="8dp"/>
+                    android:textColor="@color/primaryText" />
 
-                <Button
-                    android:id="@+id/btnFilterTheoryPractical"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_filter_theory_practical"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:text="Teórico-práctico"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:cornerRadius="18dp"
                     android:backgroundTint="@color/surface_variant"
-                    android:textColor="@color/primaryText"/>
+                    android:textColor="@color/primaryText" />
 
             </LinearLayout>
 
         </HorizontalScrollView>
 
-        <!-- Lista de cursos -->
+        <!-- Lista de Cursos -->
         <LinearLayout
-            android:id="@+id/coursesContainer"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="16dp"
-            app:layout_constraintTop_toBottomOf="@id/filtersScroll"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent">
+            android:orientation="vertical">
 
-            <!-- Curso 1 - Teoría de la computación -->
+            <!-- Curso 1: Teoría de la computación -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@android:color/black">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                android:backgroundTint="@color/surface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:background="@color/subject_math"
+                        android:layout_marginEnd="16dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="bottom">
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Teórico"
-                            android:textSize="12sp"
-                            android:textColor="@color/knowledge_blue"
-                            android:textStyle="bold"/>
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/subject_math"
+                            android:background="@drawable/badge_background"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="2dp"
+                            android:layout_marginBottom="4dp" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -352,40 +350,37 @@
                             android:text="Teoría de la computación"
                             android:textSize="16sp"
                             android:textStyle="bold"
-                            android:textColor="@android:color/white"
-                            android:layout_marginTop="4dp"/>
+                            android:textColor="@color/text_primary"
+                            android:layout_marginBottom="4dp" />
 
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
+                            android:gravity="center_vertical">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="3 CR"
                                 android:textSize="12sp"
-                                android:textColor="@android:color/white"
-                                android:alpha="0.8"/>
+                                android:textColor="@color/text_secondary"
+                                android:layout_marginEnd="12dp" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="4.2"
+                                android:text="⭐ 4.2"
                                 android:textSize="12sp"
-                                android:textColor="@color/academic_gold"
-                                android:textStyle="bold"
-                                android:layout_marginStart="16dp"/>
+                                android:textColor="@color/text_secondary"
+                                android:layout_marginEnd="12dp" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="6 semestre"
                                 android:textSize="12sp"
-                                android:textColor="@android:color/white"
-                                android:alpha="0.8"
-                                android:layout_marginStart="16dp"/>
+                                android:textColor="@color/text_secondary" />
 
                         </LinearLayout>
 
@@ -394,78 +389,103 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@android:drawable/btn_star_big_on"
-                        android:layout_gravity="top|end"/>
+                        android:src="@drawable/ic_bookmark_filled"
+                        app:tint="@color/secondary" />
 
                 </LinearLayout>
 
             </androidx.cardview.widget.CardView>
 
-            <!-- Curso 2 - Desarrollo de software -->
+            <!-- Curso 2: Desarrollo Móvil -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@android:color/black">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                android:backgroundTint="@color/surface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:background="@color/subject_engineering"
+                        android:layout_marginEnd="16dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="bottom">
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Práctico"
-                            android:textSize="12sp"
-                            android:textColor="@color/knowledge_blue"
-                            android:textStyle="bold"/>
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/subject_engineering"
+                            android:background="@drawable/badge_background"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="2dp"
+                            android:layout_marginBottom="4dp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Desarrollo de software"
+                            android:text="Desarrollo Móvil"
                             android:textSize="16sp"
                             android:textStyle="bold"
-                            android:textColor="@android:color/white"
-                            android:layout_marginTop="4dp"/>
+                            android:textColor="@color/text_primary"
+                            android:layout_marginBottom="4dp" />
 
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
+                            android:gravity="center_vertical">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="$42"
+                                android:text="4 CR"
                                 android:textSize="12sp"
-                                android:textColor="@color/academic_gold"
-                                android:textStyle="bold"/>
+                                android:textColor="@color/text_secondary"
+                                android:layout_marginEnd="12dp" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="4.8"
+                                android:text="⭐ 4.8"
                                 android:textSize="12sp"
-                                android:textColor="@color/academic_gold"
-                                android:textStyle="bold"
-                                android:layout_marginStart="16dp"/>
+                                android:textColor="@color/text_secondary"
+                                android:layout_marginEnd="12dp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="8 semestre"
+                                android:textSize="12sp"
+                                android:textColor="@color/text_secondary" />
 
                         </LinearLayout>
 
                     </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_bookmark_outlined"
+                        app:tint="@color/text_hint" />
 
                 </LinearLayout>
 
@@ -473,22 +493,17 @@
 
         </LinearLayout>
 
-        <!-- Botón de logout (más discreto) -->
-        <Button
-            android:id="@+id/btnLogout"
-            android:layout_width="wrap_content"
-            android:layout_height="48dp"
+        <!-- Botón de logout (temporal) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_logout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Cerrar Sesión"
-            android:textSize="14sp"
-            android:backgroundTint="@android:color/transparent"
-            android:textColor="@android:color/holo_red_light"
+            android:textColor="@color/on_primary"
+            android:backgroundTint="@color/error"
             android:layout_marginTop="32dp"
-            android:layout_marginBottom="24dp"
-            app:layout_constraintTop_toBottomOf="@id/coursesContainer"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"/>
+            app:cornerRadius="8dp" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
@@ -206,33 +205,45 @@ class MainActivity : AppCompatActivity() {
             finish()
         }
 
-        // Configuración/Settings
+        // Configuración/Settings - NUEVA FUNCIONALIDAD
         binding.btnSettings.setOnClickListener {
-            // Navegar a configuración
-            // val intent = Intent(this, SettingsActivity::class.java)
-            // startActivity(intent)
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
 
-        // Card de ranking
+        // Card de ranking - NUEVA FUNCIONALIDAD
         binding.cardRanking.setOnClickListener {
-            // Navegar a pantalla de ranking completo
-            // val intent = Intent(this, RankingActivity::class.java)
-            // startActivity(intent)
+            val intent = Intent(this, RankingActivity::class.java)
+            startActivity(intent)
         }
 
-        // Ver todos los cursos
+        // Ver todos los cursos - REDIRIGE AL RANKING
         binding.btnViewAll.setOnClickListener {
-            // Navegar a vista completa de cursos
-            // val intent = Intent(this, AllCoursesActivity::class.java)
-            // startActivity(intent)
+            val intent = Intent(this, RankingActivity::class.java)
+            startActivity(intent)
         }
 
-        // Click en la racha para ver detalles
+        // Click en la racha para ver detalles - FUNCIONALIDAD MEJORADA
         binding.cardStreak.setOnClickListener {
-            // Mostrar detalles de la racha o historial
-            // val intent = Intent(this, StreakDetailsActivity::class.java)
-            // startActivity(intent)
+            // Mostrar información de la racha con animación
+            showStreakDetails()
         }
+    }
+
+    private fun showStreakDetails() {
+        // Crear un diálogo simple para mostrar detalles de la racha
+        val builder = androidx.appcompat.app.AlertDialog.Builder(this)
+        builder.setTitle("🔥 Racha de Estudio")
+        builder.setMessage("¡Excelente trabajo!\n\nHas mantenido tu racha durante ${binding.tvStreak.text} días consecutivos.\n\n¡Sigue así para seguir subiendo en el ranking!")
+        builder.setPositiveButton("¡Continúa estudiando!") { dialog, _ ->
+            dialog.dismiss()
+        }
+        builder.setNeutralButton("Ver Ranking") { dialog, _ ->
+            val intent = Intent(this, RankingActivity::class.java)
+            startActivity(intent)
+            dialog.dismiss()
+        }
+        builder.show()
     }
 
     // Método para actualizar la racha (puede ser llamado desde otras partes de la app)
@@ -241,11 +252,32 @@ class MainActivity : AppCompatActivity() {
 
         // Aquí puedes agregar animaciones o efectos visuales
         // cuando la racha se actualiza
+        if (newStreakDays > 0) {
+            // Mostrar una pequeña animación o notificación
+            showStreakIncrementNotification(newStreakDays)
+        }
+    }
+
+    private fun showStreakIncrementNotification(days: Int) {
+        // Crear una pequeña notificación cuando la racha aumenta
+        val builder = androidx.appcompat.app.AlertDialog.Builder(this)
+        builder.setTitle("🔥 ¡Racha Aumentada!")
+        builder.setMessage("¡Felicidades! Tu racha ahora es de $days días.")
+        builder.setPositiveButton("¡Genial!") { dialog, _ ->
+            dialog.dismiss()
+        }
+        builder.show()
     }
 
     // Método para simular completar una actividad y aumentar la racha
     private fun completeStudyActivity() {
         val currentStreak = binding.tvStreak.text.toString().toIntOrNull() ?: 0
-        updateStreak(currentStreak+1)
-        }
+        updateStreak(currentStreak + 1)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Recargar datos del usuario cuando se vuelve a la actividad
+        loadUserData()
+    }
 }
