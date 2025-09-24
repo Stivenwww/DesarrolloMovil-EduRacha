@@ -1,5 +1,6 @@
 package com.stiven.desarrollomovil
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -35,7 +36,8 @@ class PanelDocenteActivity : AppCompatActivity() {
 
         // Eventos en las cards
         binding.cardCrearAsignatura.setOnClickListener {
-            // TODO: abrir actividad o mostrar un toast
+            val intent = Intent(this, CrearAsignatura::class.java)
+            startActivity(intent)
         }
 
         binding.cardValidacionIa.setOnClickListener {

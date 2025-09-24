@@ -12,6 +12,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DesarrolloMovil">
         <activity
+            android:name=".CrearAsignatura"
+            android:exported="false" />
+        <activity
             android:name=".PanelDocenteActivity"
             android:exported="false" />
         <activity

@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".CrearAsignatura">
+
+        <!-- Toolbar con botón de regreso -->
+        <LinearLayout
+            android:id="@+id/toolbar"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@color/surface"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_arrow_back"
+                android:contentDescription="Regresar"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Crear asignatura"
+                android:textSize="20sp"
+                android:textColor="@color/text_primary"
+                android:fontFamily="sans-serif-medium" />
+
+        </LinearLayout>
+
+        <!-- Ícono de imagen -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardImageIcon"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="40dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/surface"
+            app:layout_constraintTop_toBottomOf="@id/toolbar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <ImageView
+                android:id="@+id/imgSubjectIcon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_image_placeholder"
+                android:scaleType="centerInside"
+                app:tint="@color/text_secondary" />
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Label "Nombre de la asignatura" -->
+        <TextView
+            android:id="@+id/lblNombreAsignatura"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginStart="24dp"
+            android:text="Nombre de la asignatura"
+            android:textSize="14sp"
+            android:textColor="@color/secondary"
+            android:fontFamily="sans-serif-medium"
+            app:layout_constraintTop_toBottomOf="@id/cardImageIcon"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <!-- Sección: Información de la asignatura -->
+        <TextView
+            android:id="@+id/lblInfoAsignatura"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:layout_marginStart="24dp"
+            android:text="Información de la asignatura"
+            android:textSize="18sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-medium"
+            app:layout_constraintTop_toBottomOf="@id/lblNombreAsignatura"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <!-- Campo: Código Asignatura -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilCodigoAsignatura"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:hint="Código Asignatura"
+            app:boxBackgroundMode="filled"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="2dp"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/text_hint"
+            app:layout_constraintTop_toBottomOf="@id/lblInfoAsignatura"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/edtCodigoAsignatura"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:inputType="text"
+                android:maxLines="1" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Campo: Semestre -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilSemestre"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:hint="Semestre"
+            app:boxBackgroundMode="filled"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="2dp"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/text_hint"
+            app:layout_constraintTop_toBottomOf="@id/tilCodigoAsignatura"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/edtSemestre"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:inputType="number"
+                android:maxLines="1" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Campo: Modalidad -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilModalidad"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:hint="Modalidad"
+            app:boxBackgroundMode="filled"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="2dp"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/text_hint"
+            app:endIconMode="dropdown_menu"
+            app:layout_constraintTop_toBottomOf="@id/tilSemestre"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <AutoCompleteTextView
+                android:id="@+id/actvModalidad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:inputType="none"
+                android:focusable="false"
+                android:maxLines="1" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Sección: Plan de aula -->
+        <TextView
+            android:id="@+id/lblPlanAula"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:layout_marginStart="24dp"
+            android:text="Plan de aula"
+            android:textSize="18sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-medium"
+            app:layout_constraintTop_toBottomOf="@id/tilModalidad"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <!-- Campo: Plan de aula (textarea) -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPlanAula"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:hint="Escribe aquí"
+            app:boxBackgroundMode="filled"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="2dp"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/text_hint"
+            app:counterEnabled="true"
+            app:counterMaxLength="500"
+            app:counterTextColor="@color/text_hint"
+            app:layout_constraintTop_toBottomOf="@id/lblPlanAula"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etPlanAula"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:inputType="textMultiLine"
+                android:maxLength="500"
+                android:gravity="top|start"
+                android:scrollbars="vertical" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Botón Agregar -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAgregar"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="32dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:text="Agregar"
+            android:textColor="@color/on_primary"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:backgroundTint="@color/primary"
+            app:cornerRadius="12dp"
+            app:elevation="4dp"
+            app:icon="@drawable/ic_arrow_forward"
+            app:iconGravity="end"
+            app:iconTint="@color/on_primary"
+            app:rippleColor="@color/ripple_light"
+            app:layout_constraintTop_toBottomOf="@id/tilPlanAula"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintVertical_bias="1.0" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
