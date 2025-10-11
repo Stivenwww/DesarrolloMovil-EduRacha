@@ -92,4 +92,17 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+
+    //dependencias para consumir APIs
+    implementation("io.ktor:ktor-client-core:2.3.3")
+    implementation("io.ktor:ktor-client-cio:2.3.3")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.3")
+    //retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
 }
