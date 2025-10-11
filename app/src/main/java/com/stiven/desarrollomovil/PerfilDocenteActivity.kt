@@ -3,6 +3,7 @@ package com.stiven.desarrollomovil
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -26,14 +27,18 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.desarrollomovil.ui.theme.*
 import com.stiven.desarrollomovil.ui.theme.components.*
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 
 class PerfilDocenteActivity : ComponentActivity() {
+
+    private val cursoViewModel: CursoViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             EduRachaTheme {
                 PerfilDocenteScreen(
+                    viewModel = cursoViewModel,
                     onBackClick = { finish() }
                 )
             }
@@ -46,16 +51,27 @@ class PerfilDocenteActivity : ComponentActivity() {
 // ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PerfilDocenteScreen(onBackClick: () -> Unit) {
+fun PerfilDocenteScreen(
+    viewModel: CursoViewModel,
+    onBackClick: () -> Unit
+) {
     // Obtener datos reales de Firebase
     val user = FirebaseAuth.getInstance().currentUser
     val userName = user?.displayName ?: "Docente"
     val userEmail = user?.email ?: "correo@uniautonoma.edu.co"
 
-    // CORRECCIÓN: Se usa CrearCursoObject en lugar de CrearCurso
-    val totalCursos = CrearCursoObject.cursosGuardados.size
-    val cursosActivos = CrearCursoObject.cursosGuardados.count { it.estado == "activo" }
-    val cursosBorrador = CrearCursoObject.cursosGuardados.count { it.estado == "borrador" }
+    // Observar datos del ViewModel
+    val cursos by viewModel.cursos.collectAsState()
+
+    // Cargar cursos al iniciar
+    LaunchedEffect(Unit) {
+        viewModel.obtenerCursos()
+    }
+
+    // Calcular estadísticas desde la API
+    val totalCursos = cursos.size
+    val cursosActivos = cursos.count { it.estado == "activo" }
+    val cursosBorrador = cursos.count { it.estado == "borrador" }
 
     Scaffold(
         containerColor = EduRachaColors.Background

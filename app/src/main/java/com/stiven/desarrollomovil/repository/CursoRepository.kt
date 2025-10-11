@@ -26,10 +26,17 @@ class CursoRepository {
     suspend fun obtenerCursos(): Result<List<Curso>> {
         return try {
             val response = api.obtenerCursos()
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
+            if (response.isSuccessful) {
+                val lista = response.body() ?: emptyList()
+
+                if (lista.isEmpty()) {
+                    Log.w("CursoRepository", "No se encontraron cursos en el backend todavía.")
+                    Result.success(emptyList()) // Retorna lista vacía para no romper la UI
+                } else {
+                    Result.success(lista)
+                }
             } else {
-                Result.failure(Exception("Error al obtener cursos: ${response.code()}"))
+                Result.failure(Exception("Error al obtener cursos: ${response.code()} ${response.message()}"))
             }
         } catch (e: Exception) {
             Log.e("CursoRepository", "Error al obtener cursos", e)

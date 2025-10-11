@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -26,9 +27,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.stiven.desarrollomovil.models.Curso
 import androidx.compose.ui.unit.sp
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 import kotlinx.coroutines.delay
 
 // ============================================
@@ -36,11 +39,14 @@ import kotlinx.coroutines.delay
 // ============================================
 class GestionGruposActivity : ComponentActivity() {
 
-    override fun onResume() {
-        super.onResume()
+    private val cursoViewModel: CursoViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
         setContent {
             EduRachaTheme {
                 GestionGruposScreen(
+                    viewModel = cursoViewModel,
                     onNavigateBack = {
                         val intent = Intent(this, PanelDocenteActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -50,6 +56,7 @@ class GestionGruposActivity : ComponentActivity() {
                         val intent = Intent(this, AsignarEstudiantesActivity::class.java)
                         intent.putExtra("CURSO_TITULO", curso.titulo)
                         intent.putExtra("CURSO_CODIGO", curso.codigo)
+                        intent.putExtra("CURSO_ID", curso.id)
                         startActivity(intent)
                     },
                     onCrearCurso = {
@@ -67,56 +74,136 @@ class GestionGruposActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GestionGruposScreen(
+    viewModel: CursoViewModel,
     onNavigateBack: () -> Unit,
     onCursoClick: (Curso) -> Unit,
     onCrearCurso: () -> Unit
 ) {
-    // CORRECCIÓN: Usar CrearCursoObject para acceder a la lista de cursos guardados
-    val cursos by remember(CrearCursoObject.cursosGuardados.size) {
-        mutableStateOf(CrearCursoObject.cursosGuardados.toList())
+    // Observar los estados del ViewModel
+    val cursos by viewModel.cursos.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.error.collectAsState()
+
+    // Cargar cursos al iniciar
+    LaunchedEffect(Unit) {
+        viewModel.obtenerCursos()
     }
 
     Scaffold(
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            GestionGruposHeader(onNavigateBack = onNavigateBack)
-
-            if (cursos.isEmpty()) {
-                EmptyStateGrupos(onCrearCurso = onCrearCurso)
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    EstadisticasGruposCard(
-                        totalCursos = cursos.size,
-                        modifier = Modifier.padding(20.dp)
-                    )
-
-                    SectionHeaderGrupos(
-                        title = "CURSOS DISPONIBLES",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                    )
-
-                    LazyColumn(
+            when {
+                isLoading -> {
+                    Column(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 20.dp,
-                            end = 20.dp,
-                            bottom = 20.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        items(
-                            items = cursos,
-                            key = { it.codigo } // Usar código único
-                        ) { curso ->
-                            CursoGrupoCard(
-                                curso = curso,
-                                onClick = { onCursoClick(curso) }
+                        CircularProgressIndicator(color = EduRachaColors.Primary)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Cargando cursos...", color = EduRachaColors.TextSecondary)
+                    }
+                }
+
+                errorMessage != null -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        GestionGruposHeader(onNavigateBack = onNavigateBack)
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                tint = EduRachaColors.Error,
+                                modifier = Modifier.size(80.dp)
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Error al cargar",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = errorMessage ?: "Error desconocido",
+                                fontSize = 14.sp,
+                                color = EduRachaColors.TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = { viewModel.obtenerCursos() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = EduRachaColors.Primary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Reintentar")
+                            }
+                        }
+                    }
+                }
+
+                cursos.isEmpty() -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        GestionGruposHeader(onNavigateBack = onNavigateBack)
+                        EmptyStateGrupos(onCrearCurso = onCrearCurso)
+                    }
+                }
+
+                else -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        GestionGruposHeader(onNavigateBack = onNavigateBack)
+
+                        EstadisticasGruposCard(
+                            totalCursos = cursos.size,
+                            modifier = Modifier.padding(20.dp)
+                        )
+
+                        SectionHeaderGrupos(
+                            title = "CURSOS DISPONIBLES",
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                        )
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 20.dp,
+                                end = 20.dp,
+                                bottom = 20.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(
+                                items = cursos,
+                                key = { it.id ?: it.codigo }
+                            ) { curso ->
+                                CursoGrupoCard(
+                                    curso = curso,
+                                    onClick = { onCursoClick(curso) }
+                                )
+                            }
                         }
                     }
                 }
@@ -293,13 +380,6 @@ fun CursoGrupoCard(
     curso: Curso,
     onClick: () -> Unit
 ) {
-    // Contar estudiantes asignados (si tienes un repositorio)
-    val estudiantesAsignados = remember(curso.codigo) {
-        // TODO: Implementar conteo real desde tu repositorio
-        // GruposRepository.obtenerEstudiantesPorCurso(curso.codigo).size
-        0
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -399,28 +479,6 @@ fun CursoGrupoCard(
                                 else -> EduRachaColors.TextSecondary
                             },
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                // Estudiantes asignados
-                if (estudiantesAsignados > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.People,
-                            contentDescription = null,
-                            tint = EduRachaColors.Accent,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "$estudiantesAsignados estudiantes",
-                            fontSize = 12.sp,
-                            color = EduRachaColors.Accent,
-                            fontWeight = FontWeight.Medium
                         )
                     }
                 }

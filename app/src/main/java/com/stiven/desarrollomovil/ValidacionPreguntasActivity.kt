@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.stiven.desarrollomovil.ui.theme.*
 import com.stiven.desarrollomovil.ui.theme.components.*
 import com.google.firebase.auth.FirebaseAuth
+import com.stiven.desarrollomovil.models.Curso
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*

@@ -1,5 +1,6 @@
 package com.stiven.desarrollomovil
 
+import com.stiven.desarrollomovil.models.Curso
 import kotlinx.serialization.Serializable
 
 // Enum para estados de validación

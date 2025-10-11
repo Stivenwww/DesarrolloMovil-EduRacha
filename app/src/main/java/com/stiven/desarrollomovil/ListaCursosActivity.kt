@@ -1,11 +1,14 @@
 package com.stiven.desarrollomovil
 
-import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import com.stiven.desarrollomovil.models.Curso
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,19 +27,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 
 class ListaCursosActivity : ComponentActivity() {
+
+    private val cursoViewModel: CursoViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +48,7 @@ class ListaCursosActivity : ComponentActivity() {
         setContent {
             EduRachaTheme {
                 ListaCursosScreen(
+                    viewModel = cursoViewModel,
                     onNavigateBack = { finish() }
                 )
             }
@@ -54,224 +59,141 @@ class ListaCursosActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListaCursosScreen(
+    viewModel: CursoViewModel,
     onNavigateBack: () -> Unit
 ) {
-    // CORRECCIÓN: Usar CrearCursoObject en lugar de CrearCurso
-    val cursos = remember { CrearCursoObject.cursosGuardados }
-    var selectedCurso by remember { mutableStateOf<Curso?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf<String?>(null) }
+    // Observar los estados del ViewModel
+    val cursos by viewModel.cursos.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.error.collectAsState()
 
-    val cursosFiltrados = remember(searchQuery, selectedFilter) {
-        cursos.filter { curso ->
-            val matchesSearch = curso.titulo.contains(searchQuery, ignoreCase = true) ||
-                    curso.codigo.contains(searchQuery, ignoreCase = true)
-            val matchesFilter = selectedFilter == null || curso.estado == selectedFilter
-            matchesSearch && matchesFilter
+    var cursoSeleccionado by remember { mutableStateOf<Curso?>(null) }
+
+    // Cargar cursos cuando se inicia
+    LaunchedEffect(Unit) {
+        viewModel.obtenerCursos()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Cursos Creados") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(EduRachaColors.Background)
+        ) {
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = EduRachaColors.Primary
+                    )
+                }
+
+                errorMessage != null -> {
+                    ErrorMessage(
+                        message = errorMessage ?: "Error desconocido",
+                        onRetry = { viewModel.obtenerCursos() }
+                    )
+                }
+
+                cursos.isEmpty() -> {
+                    EmptyCursosState()
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        itemsIndexed(cursos) { index, curso ->
+                            AnimatedCursoCard(
+                                curso = curso,
+                                index = index,
+                                onClick = { cursoSeleccionado = curso }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Mostrar detalles del curso si se selecciona
+            cursoSeleccionado?.let { curso ->
+                CursoDetailDialog(
+                    curso = curso,
+                    viewModel = viewModel,
+                    onDismiss = { cursoSeleccionado = null }
+                )
+            }
         }
     }
+}
 
-    val estados = remember {
-        cursos.map { it.estado }.distinct()
-    }
-
-    Box(
+@Composable
+fun ErrorMessage(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(EduRachaColors.Background)
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header con gradiente
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary,
-                                EduRachaColors.PrimaryLight
-                            )
-                        )
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 40.dp, bottom = 24.dp)
-                ) {
-                    // Toolbar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = Color.White
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp)
-                        ) {
-                            Text(
-                                text = "Mis Cursos",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-
-                            if (cursos.isNotEmpty()) {
-                                Text(
-                                    text = "${cursos.size} ${if (cursos.size == 1) "curso" else "cursos"}",
-                                    fontSize = 14.sp,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
-                            }
-                        }
-
-                        // Badge con número total
-                        if (cursos.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${cursos.size}",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-
-                    // Barra de búsqueda
-                    if (cursos.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            placeholder = {
-                                Text(
-                                    "Buscar cursos...",
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Outlined.Search,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.9f)
-                                )
-                            },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(
-                                            Icons.Default.Clear,
-                                            contentDescription = "Limpiar",
-                                            tint = Color.White.copy(alpha = 0.9f)
-                                        )
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color.White.copy(alpha = 0.5f),
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                                cursorColor = Color.White
-                            )
-                        )
-                    }
-                }
-            }
-
-            // Filtros por estado
-            if (cursos.isNotEmpty() && estados.size > 1) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = selectedFilter == null,
-                        onClick = { selectedFilter = null },
-                        label = { Text("Todos") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = EduRachaColors.Primary,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-
-                    estados.forEach { estado ->
-                        FilterChip(
-                            selected = selectedFilter == estado,
-                            onClick = {
-                                selectedFilter = if (selectedFilter == estado) null else estado
-                            },
-                            label = { Text(estado.replaceFirstChar { it.uppercase() }) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = obtenerColorEstado(estado),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
-            }
-
-            // Contenido principal
-            if (cursos.isEmpty()) {
-                EmptyCursosState()
-            } else if (cursosFiltrados.isEmpty()) {
-                EmptySearchState(onClearSearch = { searchQuery = "" })
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    itemsIndexed(
-                        items = cursosFiltrados,
-                        key = { _, curso -> curso.id ?: curso.codigo }
-                    ) { index, curso ->
-                        AnimatedCursoCard(
-                            curso = curso,
-                            index = index,
-                            onClick = { selectedCurso = curso }
-                        )
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-            }
-        }
-    }
-
-    // Diálogo de detalles
-    if (selectedCurso != null) {
-        CursoDetailDialog(
-            curso = selectedCurso!!,
-            onDismiss = { selectedCurso = null }
+        Icon(
+            imageVector = Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = EduRachaColors.Error,
+            modifier = Modifier.size(80.dp)
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Oops, algo salió mal",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = message,
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = EduRachaColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Reintentar")
+        }
     }
 }
 
@@ -461,148 +383,259 @@ fun AnimatedCursoCard(
 @Composable
 fun CursoDetailDialog(
     curso: Curso,
+    viewModel: CursoViewModel,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // Estados para edición
+    var modoEdicion by remember { mutableStateOf(false) }
+    var titulo by remember { mutableStateOf(curso.titulo) }
+    var descripcion by remember { mutableStateOf(curso.descripcion) }
+    var duracionDias by remember { mutableStateOf(curso.duracionDias.toString()) }
+    var estado by remember { mutableStateOf(curso.estado) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.MenuBook,
-                        contentDescription = null,
-                        tint = obtenerColorEstado(curso.estado),
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = curso.titulo,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = obtenerColorEstado(estado),
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = if (modoEdicion) "Editar curso" else curso.titulo,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                DetailRow(
-                    label = "Código",
-                    value = curso.codigo,
-                    icon = Icons.Outlined.Tag,
-                    color = EduRachaColors.Primary
-                )
+            if (modoEdicion) {
+                // Modo edición
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = titulo,
+                        onValueChange = { titulo = it },
+                        label = { Text("Título del curso") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                DetailRow(
-                    label = "Duración",
-                    value = "${curso.duracionDias} días",
-                    icon = Icons.Outlined.CalendarMonth,
-                    color = EduRachaColors.Accent
-                )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = descripcion,
+                        onValueChange = { descripcion = it },
+                        label = { Text("Descripción") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
 
-                DetailRow(
-                    label = "Estado",
-                    value = curso.estado.replaceFirstChar { it.uppercase() },
-                    icon = obtenerIconoEstado(curso.estado),
-                    color = obtenerColorEstado(curso.estado)
-                )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = duracionDias,
+                        onValueChange = { duracionDias = it.filter { c -> c.isDigit() } },
+                        label = { Text("Duración (días)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                DetailRow(
-                    label = "ID Docente",
-                    value = curso.docenteId,
-                    icon = Icons.Outlined.Person,
-                    color = EduRachaColors.Secondary
-                )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                if (curso.descripcion.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Divider(color = EduRachaColors.Background)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Description,
-                            contentDescription = null,
-                            tint = EduRachaColors.Secondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Descripción",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = curso.descripcion,
-                                fontSize = 13.sp,
-                                color = EduRachaColors.TextSecondary,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
+                    // Selector de estado
+                    Text("Estado", fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    DropdownMenuEstado(
+                        estadoSeleccionado = estado,
+                        onEstadoSeleccionado = { estado = it }
+                    )
                 }
 
-                // Mostrar temas si existen
-                if (curso.temas?.isNotEmpty() == true) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Divider(color = EduRachaColors.Background)
-                    Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                // Vista de detalles normal
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    DetailRow(
+                        label = "Código",
+                        value = curso.codigo,
+                        icon = Icons.Outlined.Tag,
+                        color = EduRachaColors.Primary
+                    )
 
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(
-                            imageVector = Icons.Outlined.AttachFile,
-                            contentDescription = null,
-                            tint = EduRachaColors.Info,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Material adjunto",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.TextPrimary
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    DetailRow(
+                        label = "Duración",
+                        value = "${curso.duracionDias} días",
+                        icon = Icons.Outlined.CalendarMonth,
+                        color = EduRachaColors.Accent
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    DetailRow(
+                        label = "Estado",
+                        value = curso.estado.replaceFirstChar { it.uppercase() },
+                        icon = obtenerIconoEstado(curso.estado),
+                        color = obtenerColorEstado(curso.estado)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    DetailRow(
+                        label = "ID Docente",
+                        value = curso.docenteId,
+                        icon = Icons.Outlined.Person,
+                        color = EduRachaColors.Secondary
+                    )
+
+                    if (curso.descripcion.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Divider(color = EduRachaColors.Background)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = Icons.Outlined.Description,
+                                contentDescription = null,
+                                tint = EduRachaColors.Secondary,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "${curso.temas!!.size} archivo(s)",
-                                fontSize = 13.sp,
-                                color = EduRachaColors.TextSecondary
-                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Descripción",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EduRachaColors.TextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = curso.descripcion,
+                                    fontSize = 13.sp,
+                                    color = EduRachaColors.TextSecondary,
+                                    lineHeight = 18.sp
+                                )
+                            }
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = obtenerColorEstado(curso.estado)
-                ),
-                shape = RoundedCornerShape(12.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Cerrar")
+                if (modoEdicion) {
+                    // Botón Guardar cambios
+                    Button(
+                        onClick = {
+                            val cursoActualizado = curso.copy(
+                                titulo = titulo,
+                                descripcion = descripcion,
+                                duracionDias = duracionDias.toIntOrNull() ?: curso.duracionDias,
+                                estado = estado
+                            )
+
+                            viewModel.actualizarCurso(
+                                curso.id!!,
+                                cursoActualizado,
+                                onSuccess = {
+                                    Toast.makeText(
+                                        context,
+                                        "Curso actualizado correctamente",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    modoEdicion = false
+                                    onDismiss()
+                                },
+                                onError = { msg ->
+                                    Toast.makeText(context, "Error: $msg", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Guardar")
+                    }
+                } else {
+                    // Botón Editar
+                    Button(
+                        onClick = { modoEdicion = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Accent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Editar")
+                    }
+                }
+
+                // Botón Cerrar
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = obtenerColorEstado(estado)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cerrar")
+                }
             }
         },
         shape = RoundedCornerShape(24.dp),
         containerColor = Color.White
     )
+}
+
+@Composable
+fun DropdownMenuEstado(
+    estadoSeleccionado: String,
+    onEstadoSeleccionado: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val opciones = listOf("activo", "inactivo", "borrador", "archivado")
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = estadoSeleccionado.replaceFirstChar { it.uppercase() },
+                modifier = Modifier.weight(1f),
+                color = EduRachaColors.TextPrimary
+            )
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            opciones.forEach { opcion ->
+                DropdownMenuItem(
+                    text = { Text(opcion.replaceFirstChar { it.uppercase() }) },
+                    onClick = {
+                        onEstadoSeleccionado(opcion)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -718,53 +751,6 @@ fun EmptyCursosState() {
                     lineHeight = 18.sp
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun EmptySearchState(
-    onClearSearch: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.SearchOff,
-            contentDescription = null,
-            tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
-            modifier = Modifier.size(80.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "No se encontraron resultados",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary
-        )
-
-        Text(
-            text = "Intenta con otros términos de búsqueda",
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        TextButton(onClick = onClearSearch) {
-            Icon(
-                imageVector = Icons.Default.Clear,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Limpiar búsqueda")
         }
     }
 }

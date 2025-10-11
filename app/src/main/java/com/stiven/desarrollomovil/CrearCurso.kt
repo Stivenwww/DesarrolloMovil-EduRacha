@@ -1,9 +1,12 @@
 package com.stiven.desarrollomovil
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import com.stiven.desarrollomovil.models.Curso
+
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,8 +38,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.google.firebase.appdistribution.gradle.ApiService
+import com.stiven.desarrollomovil.models.Tema
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Object para mantener los cursos guardados
 object CrearCursoObject {
@@ -120,12 +129,22 @@ fun CrearCursoScreen(
         }
     )
 
-    fun validarYGuardar() {
-        tituloError = titulo.isBlank()
-        codigoError = codigo.isBlank()
-        descripcionError = descripcion.isBlank()
-        docenteIdError = docenteId.isBlank()
-        duracionError = duracionDias.isBlank() || duracionDias.toIntOrNull() == null || duracionDias.toInt() < 1
+    fun validarYGuardar(
+        context: Context,
+        titulo: String,
+        codigo: String,
+        descripcion: String,
+        docenteId: String,
+        duracionDias: String,
+        pdfUri: Uri?,
+        estado: String,
+        onCursoCreado: (Curso) -> Unit
+    ) {
+        var tituloError = titulo.isBlank()
+        var codigoError = codigo.isBlank()
+        var descripcionError = descripcion.isBlank()
+        var docenteIdError = docenteId.isBlank()
+        var duracionError = duracionDias.isBlank() || duracionDias.toIntOrNull() == null || duracionDias.toInt() < 1
 
         if (tituloError || codigoError || descripcionError || docenteIdError || duracionError) {
             Toast.makeText(context, "Por favor completa todos los campos requeridos", Toast.LENGTH_SHORT).show()
@@ -157,7 +176,25 @@ fun CrearCursoScreen(
             fechaCreacion = System.currentTimeMillis().toString()
         )
 
-        onCursoCreado(curso)
+        // 🚀 Llamada real al backend con corrutinas
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = com.stiven.desarrollomovil.api.ApiClient.apiService.crearCurso(curso)
+                withContext(Dispatchers.Main) {
+                    if (response.isSuccessful) {
+                        Toast.makeText(context, "Curso creado correctamente", Toast.LENGTH_SHORT).show()
+                        onCursoCreado(curso)
+                    } else {
+                        Toast.makeText(context, "Error al crear el curso: ${response.code()}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "No se pudo conectar al servidor", Toast.LENGTH_LONG).show()
+                }
+                e.printStackTrace()
+            }
+        }
     }
 
     Scaffold(
@@ -217,7 +254,20 @@ fun CrearCursoScreen(
                     onEliminarPdf = { pdfUri = null; pdfNombre = "" }
                 )
 
-                BotonCrearCurso(onClick = { validarYGuardar() })
+                BotonCrearCurso(onClick = { validarYGuardar(
+                    context = context,
+                    titulo = titulo,
+                    codigo = codigo,
+                    descripcion = descripcion,
+                    docenteId = docenteId,
+                    duracionDias = duracionDias,
+                    pdfUri = pdfUri,
+                    estado = estado,
+                    onCursoCreado = { nuevoCurso ->
+                        CrearCursoObject.cursosGuardados.add(nuevoCurso)
+                    }
+                )
+                 })
 
                 FooterInfo()
 

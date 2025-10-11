@@ -41,6 +41,16 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/DEPENDENCIES"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -82,6 +92,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     // Para cargar imágenes desde una URL de forma asíncrona
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.firebase.appdistribution.gradle)
 
     // Testing
     testImplementation(libs.junit)

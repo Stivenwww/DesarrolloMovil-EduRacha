@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,9 +31,12 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 import java.util.*
 
 class PanelDocenteActivity : ComponentActivity() {
+
+    private val cursoViewModel: CursoViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +47,7 @@ class PanelDocenteActivity : ComponentActivity() {
         setContent {
             EduRachaTheme {
                 PanelDocenteScreen(
+                    viewModel = cursoViewModel,
                     onNavigateToProfile = { navigateTo(PerfilDocenteActivity::class.java) },
                     onNavigateToNotifications = { navigateTo(NotificacionesActivity::class.java) },
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
@@ -69,49 +74,17 @@ class PanelDocenteActivity : ComponentActivity() {
     }
 
     private fun handleValidationClick() {
-        // Obtener cursos con preguntas pendientes
-        val cursosConPendientes = CrearCursoObject.cursosGuardados
-            .filter { curso ->
-                PreguntasIARepository.obtenerPreguntasPendientes(curso.titulo).isNotEmpty()
-            }
-            .map { it.titulo }
-
-        when {
-            cursosConPendientes.isEmpty() -> {
-                Toast.makeText(this, "No hay preguntas pendientes de validación", Toast.LENGTH_SHORT).show()
-            }
-            cursosConPendientes.size == 1 -> {
-                navigateToValidationScreen(cursosConPendientes[0])
-            }
-            else -> {
-                val items = cursosConPendientes.toTypedArray()
-                MaterialAlertDialogBuilder(this)
-                    .setTitle("Seleccionar Curso")
-                    .setItems(items) { dialog, which ->
-                        val cursoSeleccionado = cursosConPendientes[which]
-                        navigateToValidationScreen(cursoSeleccionado)
-                        dialog.dismiss()
-                    }
-                    .setNegativeButton("Cancelar") { dialog, _ ->
-                        dialog.dismiss()
-                    }
-                    .show()
-            }
-        }
+        navigateTo(ValidacionPreguntasActivity::class.java)
     }
 
     private fun handleCoursesClick() {
-        val cursos = CrearCursoObject.cursosGuardados
-        if (cursos.isEmpty()) {
-            Toast.makeText(this, "No hay cursos creados aún", Toast.LENGTH_SHORT).show()
-        } else {
-            navigateTo(ListaCursosActivity::class.java)
-        }
+        navigateTo(ListaCursosActivity::class.java)
     }
 }
 
 @Composable
 fun PanelDocenteScreen(
+    viewModel: CursoViewModel,
     onNavigateToProfile: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -128,13 +101,18 @@ fun PanelDocenteScreen(
     val userName = remember { user?.displayName?.split(" ")?.firstOrNull() ?: "Docente" }
     val userEmail = remember { user?.email ?: "docente@uniautonoma.edu.co" }
 
-    // Obtener datos actualizados de cursos
-    val totalCursos = CrearCursoObject.cursosGuardados.size
+    // Observar datos del ViewModel
+    val cursos by viewModel.cursos.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
-    // Sumar todas las preguntas pendientes de todos los cursos
-    val preguntasPendientes = CrearCursoObject.cursosGuardados.sumOf { curso ->
-        PreguntasIARepository.obtenerPreguntasPendientes(curso.titulo).size
+    // Cargar cursos al iniciar
+    LaunchedEffect(Unit) {
+        viewModel.obtenerCursos()
     }
+
+    // Contar datos desde la API
+    val totalCursos = cursos.size
+    val preguntasPendientes = 0 // TODO: Conectar cuando tengas el ViewModel de preguntas
 
     Column(
         modifier = Modifier
