@@ -19,6 +19,7 @@
     <color name="accent">#42A5F5</color>
     <color name="accent_light">#81D4FA</color>
     <color name="accent_dark">#1976D2</color>
+    <color name="success_container">#D1FADF</color>
 
     <!-- Colores de Estado -->
     <color name="success">#2E7D32</color>

@@ -62,7 +62,7 @@
 
         <!-- Activities de Validación IA -->
         <activity
-            android:name=".SeleccionarAsignaturaValidacionActivity"
+            android:name=".SeleccionarCursoValidacionActivity"
             android:exported="false" />
         <activity
             android:name=".ValidacionPreguntasActivity"
@@ -71,11 +71,11 @@
         <!-- Activities de Asignaturas -->
         <!-- Activities de Asignaturas -->
         <activity
-            android:name=".CrearAsignatura"
+            android:name=".CrearCursoActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ListaAsignaturasActivity"
+            android:name=".ListaCursosActivity"
             android:exported="false" />
 
         <!-- Activities de Gestión de Grupos -->

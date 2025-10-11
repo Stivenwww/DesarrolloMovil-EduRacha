@@ -1,16 +1,9 @@
 package com.stiven.desarrollomovil
 
-data class PreguntaIA(
-    val id: String,
-    val asignatura: String,
-    val pregunta: String,
-    val opciones: List<String>,
-    val respuestaCorrecta: Int, // Índice de la respuesta correcta (0-3)
-    val explicacion: String = "",
-    var estado: EstadoValidacion = EstadoValidacion.PENDIENTE,
-    val fechaGeneracion: Long = System.currentTimeMillis()
-)
+import kotlinx.serialization.Serializable
 
+// Enum para estados de validación
+@Serializable
 enum class EstadoValidacion {
     PENDIENTE,
     APROBADA,
@@ -18,159 +11,246 @@ enum class EstadoValidacion {
     EDITADA
 }
 
-// Companion object para datos de ejemplo
+@Serializable
+enum class DificultadPregunta {
+    FACIL,
+    MEDIA,
+    DIFICIL
+}
+
+@Serializable
+data class OpcionRespuesta(
+    val texto: String,
+    val esCorrecta: Boolean
+)
+
+@Serializable
+data class HistorialRevision(
+    val revisadoPor: String,
+    val fechaRevision: Long,
+    val notasRevision: String,
+    val modificada: Boolean
+)
+
+@Serializable
+data class VersionOriginal(
+    val texto: String,
+    val opciones: List<OpcionRespuesta>
+)
+
+@Serializable
+data class MetadatosPregunta(
+    val generadoPor: String, // ej: "IA", "Docente", "Sistema"
+    val instruccion: String,
+    val lotId: String
+)
+
+@Serializable
+data class PreguntaIA(
+    val id: String, // _id de MongoDB
+    val texto: String,
+    val opciones: List<OpcionRespuesta>,
+    val fuente: String, // ej: "Tema 1: Introducción"
+    var estado: EstadoValidacion,
+    val dificultad: DificultadPregunta,
+    val creadoPor: String,
+    val fechaCreacion: Long,
+
+    // Metadatos
+    val metadatos: MetadatosPregunta,
+
+    // Historial de Revisiones
+    val historialRevisiones: MutableList<HistorialRevision> = mutableListOf(),
+
+    // Versión Original
+    val versionOriginal: VersionOriginal?,
+
+    // Información adicional para UI - AHORA USA CURSO
+    val cursoTitulo: String,
+    val cursoCodigo: String,
+    val tema: String
+) {
+    // Propiedad calculada para obtener la respuesta correcta
+    val respuestaCorrecta: Int
+        get() = opciones.indexOfFirst { it.esCorrecta }
+
+    // Propiedad para verificar si fue revisada
+    val fueRevisada: Boolean
+        get() = historialRevisiones.isNotEmpty()
+
+    // Último revisor
+    val ultimoRevisor: String?
+        get() = historialRevisiones.lastOrNull()?.revisadoPor
+
+    // Fecha de última revisión
+    val fechaUltimaRevision: Long?
+        get() = historialRevisiones.lastOrNull()?.fechaRevision
+}
+
+// Repositorio simulado (deberá conectarse a MongoDB)
 object PreguntasIARepository {
 
-    private val preguntasPorAsignatura = mutableMapOf<String, MutableList<PreguntaIA>>()
+    private val preguntasPorCurso = mutableMapOf<String, MutableList<PreguntaIA>>()
 
     init {
-        // Generar preguntas de ejemplo
         generarPreguntasEjemplo()
     }
 
     private fun generarPreguntasEjemplo() {
-        // Preguntas para Bases de Datos
-        preguntasPorAsignatura["Bases de Datos"] = mutableListOf(
-            PreguntaIA(
-                id = "1",
-                asignatura = "Bases de Datos",
-                pregunta = "¿Qué significa SQL en el contexto de bases de datos?",
-                opciones = listOf(
-                    "Structured Query Language",
-                    "Simple Question Language",
-                    "System Query Logic",
-                    "Standard Quality Language"
-                ),
-                respuestaCorrecta = 0,
-                explicacion = "SQL es el lenguaje estándar para la gestión y manipulación de bases de datos relacionales"
-            ),
-            PreguntaIA(
-                id = "2",
-                asignatura = "Bases de Datos",
-                pregunta = "¿Cuál es la clave primaria en una tabla?",
-                opciones = listOf(
-                    "Un campo que puede contener valores duplicados",
-                    "Un campo único que identifica cada registro",
-                    "Un campo opcional en la tabla",
-                    "Un campo que se puede modificar libremente"
-                ),
-                respuestaCorrecta = 1,
-                explicacion = "La clave primaria identifica de manera única cada registro en una tabla"
-            ),
-            PreguntaIA(
-                id = "3",
-                asignatura = "Bases de Datos",
-                pregunta = "¿Qué operación SQL se usa para recuperar datos?",
-                opciones = listOf(
-                    "INSERT",
-                    "UPDATE",
-                    "SELECT",
-                    "DELETE"
-                ),
-                respuestaCorrecta = 2,
-                explicacion = "SELECT es la operación que se utiliza para consultar y recuperar datos"
-            )
-        )
+        // Obtener cursos existentes y generar preguntas para cada uno
+        CrearCursoObject.cursosGuardados.forEach { curso ->
+            if (curso.estado == "activo" || curso.estado == "borrador") {
+                val preguntasCurso = mutableListOf<PreguntaIA>()
 
-        // Preguntas para Desarrollo Móvil
-        preguntasPorAsignatura["Desarrollo Móvil"] = mutableListOf(
-            PreguntaIA(
-                id = "4",
-                asignatura = "Desarrollo Móvil",
-                pregunta = "¿Qué patrón arquitectónico es recomendado por Google para apps Android?",
-                opciones = listOf(
-                    "MVC",
-                    "MVVM",
-                    "MVP",
-                    "VIPER"
-                ),
-                respuestaCorrecta = 1,
-                explicacion = "MVVM (Model-View-ViewModel) es el patrón recomendado por Google para apps Android modernas"
-            ),
-            PreguntaIA(
-                id = "5",
-                asignatura = "Desarrollo Móvil",
-                pregunta = "¿Cuál es el ciclo de vida correcto de una Activity?",
-                opciones = listOf(
-                    "onCreate → onStart → onResume",
-                    "onStart → onCreate → onResume",
-                    "onCreate → onResume → onStart",
-                    "onResume → onCreate → onStart"
-                ),
-                respuestaCorrecta = 0,
-                explicacion = "El ciclo de vida de una Activity comienza con onCreate, seguido de onStart y finalmente onResume"
-            )
-        )
+                // Generar 2-5 preguntas de ejemplo por curso
+                val cantidad = if (curso.estado == "activo") 3 else 5
 
-        // Preguntas para Programación
-        preguntasPorAsignatura["Programación"] = mutableListOf(
-            PreguntaIA(
-                id = "6",
-                asignatura = "Programación",
-                pregunta = "¿Qué es la herencia en POO?",
-                opciones = listOf(
-                    "Compartir propiedades entre clases",
-                    "Crear múltiples objetos",
-                    "Eliminar código duplicado",
-                    "Optimizar el rendimiento"
-                ),
-                respuestaCorrecta = 0,
-                explicacion = "La herencia permite crear nuevas clases basadas en clases existentes, reutilizando código"
-            )
-        )
-    }
+                repeat(cantidad) { index ->
+                    preguntasCurso.add(
+                        PreguntaIA(
+                            id = "${curso.codigo}_Q${index + 1}",
+                            texto = "Pregunta de ejemplo ${index + 1} para el curso ${curso.titulo}",
+                            opciones = listOf(
+                                OpcionRespuesta("Opción A - Respuesta incorrecta", false),
+                                OpcionRespuesta("Opción B - Respuesta correcta", true),
+                                OpcionRespuesta("Opción C - Respuesta incorrecta", false),
+                                OpcionRespuesta("Opción D - Respuesta incorrecta", false)
+                            ),
+                            fuente = curso.temas?.keys?.firstOrNull() ?: "Tema general",
+                            estado = EstadoValidacion.PENDIENTE,
+                            dificultad = when (index % 3) {
+                                0 -> DificultadPregunta.FACIL
+                                1 -> DificultadPregunta.MEDIA
+                                else -> DificultadPregunta.DIFICIL
+                            },
+                            creadoPor = "sistema_ia",
+                            fechaCreacion = System.currentTimeMillis() - (index * 86400000L),
+                            metadatos = MetadatosPregunta(
+                                generadoPor = "IA - GPT-4",
+                                instruccion = "Generar pregunta basada en ${curso.titulo}",
+                                lotId = "LOTE_${curso.codigo}_001"
+                            ),
+                            versionOriginal = null,
+                            cursoTitulo = curso.titulo,
+                            cursoCodigo = curso.codigo,
+                            tema = curso.temas?.keys?.firstOrNull() ?: "Tema general"
+                        )
+                    )
+                }
 
-    fun obtenerAsignaturasConPreguntasPendientes(): List<String> {
-        return preguntasPorAsignatura.keys.filter { asignatura ->
-            contarPreguntasPendientesPorAsignatura(asignatura) > 0
+                preguntasPorCurso[curso.titulo] = preguntasCurso
+            }
         }
     }
 
-    fun obtenerPreguntasPendientes(asignatura: String): List<PreguntaIA> {
-        return preguntasPorAsignatura[asignatura]?.filter {
+    fun obtenerCursosConPreguntasPendientes(): List<Curso> {
+        return CrearCursoObject.cursosGuardados.filter { curso ->
+            contarPreguntasPendientesPorCurso(curso.titulo) > 0
+        }
+    }
+
+    fun obtenerPreguntasPendientes(cursoTitulo: String): List<PreguntaIA> {
+        return preguntasPorCurso[cursoTitulo]?.filter {
             it.estado == EstadoValidacion.PENDIENTE
         } ?: emptyList()
     }
 
-    fun obtenerPreguntasAprobadas(asignatura: String): List<PreguntaIA> {
-        return preguntasPorAsignatura[asignatura]?.filter {
-            it.estado == EstadoValidacion.APROBADA
-        } ?: emptyList()
+    fun obtenerTodasLasPreguntas(cursoTitulo: String): List<PreguntaIA> {
+        return preguntasPorCurso[cursoTitulo] ?: emptyList()
     }
 
-    fun aprobarPregunta(preguntaId: String) {
-        preguntasPorAsignatura.values.forEach { lista ->
-            lista.find { it.id == preguntaId }?.estado = EstadoValidacion.APROBADA
-        }
-    }
-
-    fun rechazarPregunta(preguntaId: String) {
-        preguntasPorAsignatura.values.forEach { lista ->
-            lista.find { it.id == preguntaId }?.estado = EstadoValidacion.RECHAZADA
-        }
-    }
-
-    fun editarPregunta(preguntaId: String) {
-        preguntasPorAsignatura.values.forEach { lista ->
-            lista.find { it.id == preguntaId }?.estado = EstadoValidacion.EDITADA
-        }
-    }
-
-    // ⭐ NUEVA FUNCIÓN: Actualizar pregunta completa
-    fun actualizarPregunta(preguntaEditada: PreguntaIA) {
-        preguntasPorAsignatura.values.forEach { lista ->
-            val index = lista.indexOfFirst { it.id == preguntaEditada.id }
-            if (index != -1) {
-                lista[index] = preguntaEditada.copy(
-                    estado = EstadoValidacion.EDITADA
+    fun aprobarPregunta(preguntaId: String, revisadoPor: String, notas: String = "") {
+        preguntasPorCurso.values.forEach { lista ->
+            lista.find { it.id == preguntaId }?.let { pregunta ->
+                pregunta.estado = EstadoValidacion.APROBADA
+                pregunta.historialRevisiones.add(
+                    HistorialRevision(
+                        revisadoPor = revisadoPor,
+                        fechaRevision = System.currentTimeMillis(),
+                        notasRevision = notas.ifEmpty { "Pregunta aprobada" },
+                        modificada = false
+                    )
                 )
             }
         }
     }
 
-    fun contarPreguntasPendientesPorAsignatura(asignatura: String): Int {
-        return preguntasPorAsignatura[asignatura]?.count {
+    fun rechazarPregunta(preguntaId: String, revisadoPor: String, motivo: String) {
+        preguntasPorCurso.values.forEach { lista ->
+            lista.find { it.id == preguntaId }?.let { pregunta ->
+                pregunta.estado = EstadoValidacion.RECHAZADA
+                pregunta.historialRevisiones.add(
+                    HistorialRevision(
+                        revisadoPor = revisadoPor,
+                        fechaRevision = System.currentTimeMillis(),
+                        notasRevision = "Rechazada: $motivo",
+                        modificada = false
+                    )
+                )
+            }
+        }
+    }
+
+    fun eliminarPregunta(preguntaId: String): Boolean {
+        preguntasPorCurso.values.forEach { lista ->
+            val index = lista.indexOfFirst { it.id == preguntaId }
+            if (index != -1) {
+                lista.removeAt(index)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun actualizarPregunta(preguntaEditada: PreguntaIA, revisadoPor: String, notas: String) {
+        preguntasPorCurso[preguntaEditada.cursoTitulo]?.let { lista ->
+            val index = lista.indexOfFirst { it.id == preguntaEditada.id }
+            if (index != -1) {
+                val preguntaAnterior = lista[index]
+
+                // Guardar versión original si no existe
+                val versionOriginal = preguntaAnterior.versionOriginal ?: VersionOriginal(
+                    texto = preguntaAnterior.texto,
+                    opciones = preguntaAnterior.opciones
+                )
+
+                // Agregar historial de revisión
+                preguntaEditada.historialRevisiones.add(
+                    HistorialRevision(
+                        revisadoPor = revisadoPor,
+                        fechaRevision = System.currentTimeMillis(),
+                        notasRevision = notas,
+                        modificada = true
+                    )
+                )
+
+                lista[index] = preguntaEditada.copy(
+                    estado = EstadoValidacion.EDITADA,
+                    versionOriginal = versionOriginal
+                )
+            }
+        }
+    }
+
+    fun contarPreguntasPendientesPorCurso(cursoTitulo: String): Int {
+        return preguntasPorCurso[cursoTitulo]?.count {
             it.estado == EstadoValidacion.PENDIENTE
         } ?: 0
+    }
+
+    fun contarTotalPreguntasPendientes(): Int {
+        return preguntasPorCurso.values.sumOf { lista ->
+            lista.count { it.estado == EstadoValidacion.PENDIENTE }
+        }
+    }
+
+    // Función para actualizar preguntas cuando se creen nuevos cursos
+    fun actualizarPreguntasParaNuevosCursos() {
+        CrearCursoObject.cursosGuardados.forEach { curso ->
+            if (!preguntasPorCurso.containsKey(curso.titulo) &&
+                (curso.estado == "activo" || curso.estado == "borrador")) {
+                generarPreguntasEjemplo()
+            }
+        }
     }
 }

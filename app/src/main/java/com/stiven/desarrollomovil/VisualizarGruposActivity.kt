@@ -7,8 +7,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,11 +18,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,243 +29,263 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 
-class VisualizarGruposActivity : ComponentActivity() {
+// NOTA: ASUMO QUE LAS CLASES 'Estudiante', 'GruposRepository', y 'GestionGruposActivity'
+// están definidas en otras partes de tu proyecto.
 
+class VisualizarGruposActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val cursoSeleccionado = intent.getStringExtra("CURSO")
 
         setContent {
             EduRachaTheme {
                 VisualizarGruposScreen(
-                    // --- ¡ESTA ES LA LÓGICA CORREGIDA! ---
+                    cursoInicial = cursoSeleccionado,
                     onNavigateBack = {
-                        val intent = Intent(this, AsignarEstudiantesActivity::class.java)
-
-                        // Simplemente inicia la actividad. No necesitamos `finish()`.
-                        // La actividad actual se pausará y quedará en la pila.
+                        val intent = Intent(this, GestionGruposActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         startActivity(intent)
-
-                        // La línea "finish()" ha sido eliminada.
+                        finish()
                     }
                 )
             }
         }
     }
+
+    // CORRECCIÓN CLAVE: Eliminada la función onResume() que contenía recreate().
+    // Esto previene el parpadeo de la pantalla.
 }
 
+// =========================================================================================
+// COMPOSABLES
+// =========================================================================================
 
-
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VisualizarGruposScreen(
+    cursoInicial: String?,
     onNavigateBack: () -> Unit
 ) {
-    // Aquí, GruposRepository.obtenerTodasLasAsignaturasConEstudiantes() devuelve un Map<String, List<Estudiante>>
-    val grupos = remember { GruposRepository.obtenerTodasLasAsignaturasConEstudiantes() }
-    val totalAsignaturas = grupos.size
+    // CORRECCIÓN/MEJORA: Usar 'key' con un valor que cambie cuando los datos del repositorio cambien.
+    // Esto asegura que si los datos cambian fuera de esta Activity, la vista se recomponga.
+    // Asumo que 'GruposRepository.obtenerTotalEstudiantes()' es una buena clave de cambio.
+    val grupos = remember(GruposRepository.obtenerTotalEstudiantes()) {
+        GruposRepository.obtenerTodosLosCursosConEstudiantes()
+    }
+
+    val totalCursos = grupos.size
     val totalEstudiantes = grupos.values.sumOf { it.size }
 
-    var expandedAsignatura by remember { mutableStateOf<String?>(null) }
+    var expandedCurso by remember { mutableStateOf(cursoInicial) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Uniautonoma.Background)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header con gradiente
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Uniautonoma.Primary,
-                                Uniautonoma.Accent
-                            )
-                        )
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 40.dp, bottom = 24.dp)
-                ) {
-                    // Toolbar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Este onClick ahora ejecutará el Intent que definimos en la Activity.
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Volver a Gestión de Grupos",
-                                tint = Color.White
-                            )
-                        }
+    Scaffold(
+        containerColor = EduRachaColors.Background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            VisualizarGruposHeader(
+                onNavigateBack = onNavigateBack,
+                totalCursos = totalCursos,
+                totalEstudiantes = totalEstudiantes
+            )
 
-                        Text(
-                            text = "Visualizar Grupos",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp)
-                        )
-                    }
-
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Card de estadísticas
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp)
-                        ) {
-                            // Header con icono
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(Uniautonoma.Accent.copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Groups,
-                                        contentDescription = null,
-                                        tint = Uniautonoma.Accent,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(16.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Grupos Organizados",
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Uniautonoma.TextPrimary
-                                    )
-                                    Text(
-                                        text = "Vista completa de estudiantes",
-                                        fontSize = 14.sp,
-                                        color = Uniautonoma.TextSecondary,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                            }
-
-                            Divider(
-                                modifier = Modifier.padding(vertical = 16.dp),
-                                color = Uniautonoma.Background
-                            )
-
-                            // Estadísticas
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Total Asignaturas
-                                StatVisualizarCard(
-                                    value = totalAsignaturas,
-                                    label = "Asignaturas",
-                                    icon = Icons.Outlined.MenuBook,
-                                    color = Uniautonoma.Primary,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                // Total Estudiantes
-                                StatVisualizarCard(
-                                    value = totalEstudiantes,
-                                    label = "Estudiantes",
-                                    icon = Icons.Outlined.Groups,
-                                    color = Uniautonoma.Success,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Section Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(24.dp)
-                        .background(Uniautonoma.Accent, RoundedCornerShape(2.dp))
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = "GRUPOS POR ASIGNATURA",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Uniautonoma.Accent,
-                    letterSpacing = 0.5.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Contenido principal
             if (grupos.isEmpty()) {
                 EmptyVisualizarGruposState()
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Usamos .toList() para poder usar forEachIndexed que es más simple aquí
-                    grupos.entries.toList().forEachIndexed { index, (asignatura, estudiantes) ->
-                        item(key = asignatura) {
-                            AnimatedGrupoCard(
-                                asignatura = asignatura,
-                                estudiantes = estudiantes,
-                                index = index,
-                                isExpanded = expandedAsignatura == asignatura,
-                                onExpandClick = {
-                                    expandedAsignatura = if (expandedAsignatura == asignatura) null else asignatura
-                                }
-                            )
-                        }
+                    // Ordenar cursos alfabéticamente para consistencia
+                    items(
+                        items = grupos.keys.sorted(),
+                        key = { it }
+                    ) { curso ->
+                        val estudiantes = grupos[curso] ?: emptyList()
+                        GrupoExpandibleCard(
+                            curso = curso,
+                            estudiantes = estudiantes,
+                            isExpanded = expandedCurso == curso,
+                            onCardClick = {
+                                expandedCurso = if (expandedCurso == curso) null else curso
+                            }
+                        )
                     }
 
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VisualizarGruposHeader(
+    onNavigateBack: () -> Unit,
+    totalCursos: Int,
+    totalEstudiantes: Int
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        EduRachaColors.Primary,
+                        EduRachaColors.Primary.copy(alpha = 0.85f)
+                    )
+                )
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Visualizar Grupos",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 28.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Estudiantes organizados por curso",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp
+                )
+            }
+
+            if (totalCursos > 0) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = EduRachaColors.Secondary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.School,
+                            null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "$totalCursos",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 20.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(EduRachaColors.Accent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Groups,
+                            contentDescription = null,
+                            tint = EduRachaColors.Accent,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Grupos Organizados",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary
+                        )
+                        Text(
+                            text = "Vista completa de estudiantes",
+                            fontSize = 14.sp,
+                            color = EduRachaColors.TextSecondary,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+
+                Divider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = EduRachaColors.Background
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatVisualizarCard(
+                        value = totalCursos,
+                        label = "Cursos",
+                        icon = Icons.Outlined.MenuBook,
+                        color = EduRachaColors.Primary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    StatVisualizarCard(
+                        value = totalEstudiantes,
+                        label = "Estudiantes",
+                        icon = Icons.Outlined.Groups,
+                        color = EduRachaColors.Success,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -313,7 +334,7 @@ fun StatVisualizarCard(
                 text = label,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = Uniautonoma.TextSecondary,
+                color = EduRachaColors.TextSecondary,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
@@ -321,150 +342,137 @@ fun StatVisualizarCard(
 }
 
 @Composable
-fun AnimatedGrupoCard(
-    asignatura: String,
+fun GrupoExpandibleCard(
+    curso: String,
     estudiantes: List<Estudiante>,
-    index: Int,
     isExpanded: Boolean,
-    onExpandClick: () -> Unit
+    onCardClick: () -> Unit
 ) {
-    var isVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(index * 50L)
-        isVisible = true
-    }
-
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(
-            animationSpec = tween(400)
-        ) + slideInVertically(
-            initialOffsetY = { it / 3 },
-            animationSpec = tween(400, easing = FastOutSlowInEasing)
-        )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onCardClick),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 8.dp else 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 8.dp else 4.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header de la asignatura
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(EduRachaColors.Primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Icono
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Uniautonoma.Primary.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
+                    Icon(
+                        imageVector = Icons.Outlined.MenuBook,
+                        contentDescription = "Curso",
+                        tint = EduRachaColors.Primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = curso,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        maxLines = 2
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = EduRachaColors.Success.copy(alpha = 0.15f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.MenuBook,
-                            contentDescription = null,
-                            tint = Uniautonoma.Primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Información
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = asignatura,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Uniautonoma.TextPrimary,
-                            maxLines = 2
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Uniautonoma.Success.copy(alpha = 0.15f)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Groups,
-                                    contentDescription = null,
-                                    tint = Uniautonoma.Success,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "${estudiantes.size} estudiantes",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Uniautonoma.Success
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Outlined.Groups,
+                                contentDescription = null,
+                                tint = EduRachaColors.Success,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${estudiantes.size} estudiantes",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = EduRachaColors.Success
+                            )
                         }
-                    }
-
-                    // Botón expandir
-                    IconButton(
-                        onClick = onExpandClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Uniautonoma.Accent.copy(alpha = 0.1f))
-                    ) {
-                        Icon(
-                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isExpanded) "Contraer" else "Expandir",
-                            tint = Uniautonoma.Accent
-                        )
                     }
                 }
 
-                // Lista de estudiantes expandible
-                AnimatedVisibility(
-                    visible = isExpanded,
-                    enter = expandVertically(
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(),
-                    exit = shrinkVertically(
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeOut()
+                IconButton(
+                    onClick = onCardClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(EduRachaColors.Accent.copy(alpha = 0.1f))
                 ) {
-                    Column {
-                        Divider(
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                            color = Uniautonoma.Background
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Contraer" else "Expandir",
+                        tint = EduRachaColors.Accent,
+                        modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(),
+                exit = shrinkVertically(
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut()
+            ) {
+                Column {
+                    Divider(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        color = EduRachaColors.Background
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Lista de Estudiantes",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextSecondary,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        if (estudiantes.isEmpty()) {
                             Text(
-                                text = "Lista de Estudiantes",
+                                text = "No hay estudiantes asignados a este curso.",
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Uniautonoma.TextSecondary,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                color = EduRachaColors.TextSecondary,
+                                modifier = Modifier.padding(vertical = 12.dp)
                             )
-
-                            estudiantes.forEachIndexed { estudianteIndex, estudiante ->
+                        } else {
+                            estudiantes.forEachIndexed { index, estudiante ->
                                 EstudianteItem(
                                     estudiante = estudiante,
-                                    index = estudianteIndex + 1
+                                    index = index + 1
                                 )
                             }
                         }
@@ -476,14 +484,11 @@ fun AnimatedGrupoCard(
 }
 
 @Composable
-fun EstudianteItem(
-    estudiante: Estudiante,
-    index: Int
-) {
+fun EstudianteItem(estudiante: Estudiante, index: Int) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = Uniautonoma.Background.copy(alpha = 0.5f)
+        color = EduRachaColors.Background.copy(alpha = 0.5f)
     ) {
         Row(
             modifier = Modifier
@@ -491,41 +496,58 @@ fun EstudianteItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Número
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Uniautonoma.Accent.copy(alpha = 0.2f)),
+                    .background(EduRachaColors.Accent.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "$index",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Uniautonoma.Accent
+                    color = EduRachaColors.Accent
                 )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Icono de estudiante
             Icon(
                 imageVector = Icons.Outlined.Person,
                 contentDescription = null,
-                tint = Uniautonoma.TextSecondary,
+                tint = EduRachaColors.TextSecondary,
                 modifier = Modifier.size(20.dp)
             )
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Nombre del estudiante
-            Text(
-                text = "${estudiante.nombre} ${estudiante.apellido}",
-                fontSize = 14.sp,
-                color = Uniautonoma.TextPrimary,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${estudiante.nombre} ${estudiante.apellido}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = EduRachaColors.TextPrimary
+                )
+                Text(
+                    text = estudiante.email,
+                    fontSize = 12.sp,
+                    color = EduRachaColors.TextSecondary
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = getRankingColor(estudiante.posicionRanking)
+            ) {
+                Text(
+                    "#${estudiante.posicionRanking}",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
         }
     }
 }
@@ -539,18 +561,17 @@ fun EmptyVisualizarGruposState() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Icono grande
         Box(
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(Uniautonoma.Accent.copy(alpha = 0.1f)),
+                .background(EduRachaColors.Accent.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Outlined.Groups,
                 contentDescription = null,
-                tint = Uniautonoma.Accent.copy(alpha = 0.5f),
+                tint = EduRachaColors.Accent.copy(alpha = 0.5f),
                 modifier = Modifier.size(60.dp)
             )
         }
@@ -561,25 +582,24 @@ fun EmptyVisualizarGruposState() {
             text = "No hay grupos formados",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = Uniautonoma.TextPrimary,
+            color = EduRachaColors.TextPrimary,
             textAlign = TextAlign.Center
         )
 
         Text(
-            text = "Asigna estudiantes a las asignaturas para poder visualizar los grupos",
+            text = "Asigna estudiantes a los cursos para poder visualizar los grupos",
             fontSize = 14.sp,
-            color = Uniautonoma.TextSecondary,
+            color = EduRachaColors.TextSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Card informativa
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Uniautonoma.Primary.copy(alpha = 0.1f)
+                containerColor = EduRachaColors.Primary.copy(alpha = 0.1f)
             ),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -590,7 +610,7 @@ fun EmptyVisualizarGruposState() {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = null,
-                    tint = Uniautonoma.Primary,
+                    tint = EduRachaColors.Primary,
                     modifier = Modifier.size(24.dp)
                 )
 
@@ -599,10 +619,11 @@ fun EmptyVisualizarGruposState() {
                 Text(
                     text = "Los grupos se crean automáticamente al asignar estudiantes desde la gestión de grupos",
                     fontSize = 13.sp,
-                    color = Uniautonoma.TextSecondary,
+                    color = EduRachaColors.TextSecondary,
                     lineHeight = 18.sp
                 )
             }
         }
     }
 }
+

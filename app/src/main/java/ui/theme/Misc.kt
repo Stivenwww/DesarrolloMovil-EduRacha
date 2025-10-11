@@ -1,8 +1,4 @@
-// ============================================
-// 📁 ARCHIVO: Misc.kt
-// 📂 Ubicación: app/src/main/java/com/stiven/desarrollomovil/ui/theme/components/Misc.kt
-// 🎯 Chips, Badges, Progress Bars y Componentes Varios
-// ============================================
+
 
 package com.stiven.desarrollomovil.ui.theme.components
 

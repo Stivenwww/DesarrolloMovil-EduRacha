@@ -17,8 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,8 +36,6 @@ import kotlinx.coroutines.delay
 // ============================================
 class GestionGruposActivity : ComponentActivity() {
 
-    // onResume() ya no es estrictamente necesario si el estado se maneja bien en Compose.
-    // Lo mantenemos por ahora para asegurar una actualización forzada al volver.
     override fun onResume() {
         super.onResume()
         setContent {
@@ -50,13 +46,14 @@ class GestionGruposActivity : ComponentActivity() {
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         startActivity(intent)
                     },
-                    onAsignaturaClick = { asignatura ->
+                    onCursoClick = { curso ->
                         val intent = Intent(this, AsignarEstudiantesActivity::class.java)
-                        intent.putExtra("ASIGNATURA", asignatura)
+                        intent.putExtra("CURSO_TITULO", curso.titulo)
+                        intent.putExtra("CURSO_CODIGO", curso.codigo)
                         startActivity(intent)
                     },
-                    onCrearAsignatura = {
-                        startActivity(Intent(this, CrearAsignatura::class.java))
+                    onCrearCurso = {
+                        startActivity(Intent(this, CrearCursoActivity::class.java))
                     }
                 )
             }
@@ -65,20 +62,18 @@ class GestionGruposActivity : ComponentActivity() {
 }
 
 // ============================================
-// SCREEN PRINCIPAL (MIGRADO Y CORREGIDO)
+// SCREEN PRINCIPAL
 // ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GestionGruposScreen(
     onNavigateBack: () -> Unit,
-    onAsignaturaClick: (String) -> Unit,
-    onCrearAsignatura: () -> Unit
+    onCursoClick: (Curso) -> Unit,
+    onCrearCurso: () -> Unit
 ) {
-    // CORRECCIÓN CLAVE:
-    // 1. Se usa el 'object CrearAsignatura' para acceder a la lista.
-    // 2. Se observa el tamaño de la lista para que la UI se recomponga si cambia.
-    val asignaturas by remember(CrearAsignatura.asignaturasGuardadas.size) {
-        mutableStateOf(CrearAsignatura.asignaturasGuardadas.toList())
+    // CORRECCIÓN: Usar CrearCursoObject para acceder a la lista de cursos guardados
+    val cursos by remember(CrearCursoObject.cursosGuardados.size) {
+        mutableStateOf(CrearCursoObject.cursosGuardados.toList())
     }
 
     Scaffold(
@@ -91,50 +86,44 @@ fun GestionGruposScreen(
         ) {
             GestionGruposHeader(onNavigateBack = onNavigateBack)
 
-            // Lógica para mostrar la lista o el estado vacío, igual que en el código XML original.
-            if (asignaturas.isEmpty()) {
-                EmptyStateGrupos(onCrearAsignatura = onCrearAsignatura)
+            if (cursos.isEmpty()) {
+                EmptyStateGrupos(onCrearCurso = onCrearCurso)
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // La tarjeta de estadísticas ahora solo muestra el total de asignaturas.
                     EstadisticasGruposCard(
-                        totalAsignaturas = asignaturas.size,
+                        totalCursos = cursos.size,
                         modifier = Modifier.padding(20.dp)
                     )
 
                     SectionHeaderGrupos(
-                        title = "ASIGNATURAS DISPONIBLES",
+                        title = "CURSOS DISPONIBLES",
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
                     )
 
-                    // El antiguo RecyclerView ahora es una LazyColumn.
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        // CORRECCIÓN: Se usa el constructor de PaddingValues que especifica los 4 lados.
                         contentPadding = PaddingValues(
-                            start = 20.dp,        end = 20.dp,
+                            start = 20.dp,
+                            end = 20.dp,
                             bottom = 20.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // El adapter se reemplaza por el bloque 'items'.
                         items(
-                            items = asignaturas,
-                            key = { it.id } // Usar un ID único para cada elemento.
-                        ) { asignatura ->
-                            AsignaturaGrupoCard(
-                                asignatura = asignatura,
-                                onClick = { onAsignaturaClick(asignatura.nombre) }
+                            items = cursos,
+                            key = { it.codigo } // Usar código único
+                        ) { curso ->
+                            CursoGrupoCard(
+                                curso = curso,
+                                onClick = { onCursoClick(curso) }
                             )
                         }
                     }
-
-                }
                 }
             }
         }
     }
-
+}
 
 // ============================================
 // HEADER
@@ -154,9 +143,11 @@ fun GestionGruposHeader(onNavigateBack: () -> Unit) {
                 )
             )
     ) {
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -168,13 +159,22 @@ fun GestionGruposHeader(onNavigateBack: () -> Unit) {
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
                 ) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Gestión de Grupos", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Text(
-                text = "Organiza estudiantes por asignatura",
+                text = "Gestión de Grupos",
+                color = Color.White,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Organiza estudiantes por curso",
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 14.sp,
                 modifier = Modifier.padding(top = 4.dp)
@@ -184,11 +184,11 @@ fun GestionGruposHeader(onNavigateBack: () -> Unit) {
 }
 
 // ============================================
-// ESTADÍSTICAS CARD (SIMPLIFICADO)
+// ESTADÍSTICAS CARD
 // ============================================
 @Composable
 fun EstadisticasGruposCard(
-    totalAsignaturas: Int,
+    totalCursos: Int,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -213,8 +213,8 @@ fun EstadisticasGruposCard(
 
             StatItemGrupos(
                 icon = Icons.Default.School,
-                value = totalAsignaturas.toString(),
-                label = "Total Asignaturas",
+                value = totalCursos.toString(),
+                label = "Total Cursos",
                 color = EduRachaColors.Success
             )
         }
@@ -222,11 +222,29 @@ fun EstadisticasGruposCard(
 }
 
 @Composable
-fun StatItemGrupos(icon: ImageVector, value: String, label: String, color: Color) {
+fun StatItemGrupos(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    color: Color
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
-            Text(text = value, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = color)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = value,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
         }
         Text(
             text = label,
@@ -242,12 +260,21 @@ fun StatItemGrupos(icon: ImageVector, value: String, label: String, color: Color
 // SECTION HEADER
 // ============================================
 @Composable
-fun SectionHeaderGrupos(title: String, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier
-            .width(4.dp)
-            .height(24.dp)
-            .background(EduRachaColors.Success, RoundedCornerShape(2.dp)))
+fun SectionHeaderGrupos(
+    title: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(24.dp)
+                .background(EduRachaColors.Success, RoundedCornerShape(2.dp))
+        )
         Text(
             text = title,
             fontSize = 16.sp,
@@ -259,17 +286,18 @@ fun SectionHeaderGrupos(title: String, modifier: Modifier = Modifier) {
 }
 
 // ============================================
-// ASIGNATURA CARD (ADAPTADO DEL ADAPTER)
+// CURSO CARD
 // ============================================
 @Composable
-fun AsignaturaGrupoCard(
-    asignatura: Asignatura,
+fun CursoGrupoCard(
+    curso: Curso,
     onClick: () -> Unit
 ) {
-    // Lógica para contar estudiantes, igual que en tu Adapter.
-    // Se usa 'remember' con la clave de la asignatura para que se calcule una sola vez por item.
-    val estudiantesAsignados = remember(asignatura.nombre) {
-        GruposRepository.obtenerEstudiantesPorAsignatura(asignatura.nombre).size
+    // Contar estudiantes asignados (si tienes un repositorio)
+    val estudiantesAsignados = remember(curso.codigo) {
+        // TODO: Implementar conteo real desde tu repositorio
+        // GruposRepository.obtenerEstudiantesPorCurso(curso.codigo).size
+        0
     }
 
     Card(
@@ -280,9 +308,13 @@ fun AsignaturaGrupoCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Row(modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icono del curso
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -304,24 +336,97 @@ fun AsignaturaGrupoCard(
                     modifier = Modifier.size(28.dp)
                 )
             }
+
             Spacer(modifier = Modifier.width(16.dp))
+
+            // Información del curso
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = asignatura.nombre, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
+                Text(
+                    text = curso.titulo,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaColors.TextPrimary
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.People,
-                        contentDescription = null,
-                        tint = EduRachaColors.TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "$estudiantesAsignados estudiantes",
-                        fontSize = 13.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
+
+                // Código del curso
+                Text(
+                    text = "Código: ${curso.codigo}",
+                    fontSize = 12.sp,
+                    color = EduRachaColors.TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Duración y estado
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = EduRachaColors.TextSecondary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "${curso.duracionDias} días",
+                            fontSize = 12.sp,
+                            color = EduRachaColors.TextSecondary
+                        )
+                    }
+
+                    // Estado
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when (curso.estado.lowercase()) {
+                            "activo" -> EduRachaColors.Success.copy(alpha = 0.15f)
+                            "inactivo" -> EduRachaColors.Error.copy(alpha = 0.15f)
+                            else -> EduRachaColors.TextSecondary.copy(alpha = 0.15f)
+                        }
+                    ) {
+                        Text(
+                            text = curso.estado.replaceFirstChar { it.uppercase() },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = when (curso.estado.lowercase()) {
+                                "activo" -> EduRachaColors.Success
+                                "inactivo" -> EduRachaColors.Error
+                                else -> EduRachaColors.TextSecondary
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Estudiantes asignados
+                if (estudiantesAsignados > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.People,
+                            contentDescription = null,
+                            tint = EduRachaColors.Accent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "$estudiantesAsignados estudiantes",
+                            fontSize = 12.sp,
+                            color = EduRachaColors.Accent,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
+
+            // Icono de navegación
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Ver más",
@@ -336,7 +441,7 @@ fun AsignaturaGrupoCard(
 // EMPTY STATE
 // ============================================
 @Composable
-fun EmptyStateGrupos(onCrearAsignatura: () -> Unit) {
+fun EmptyStateGrupos(onCrearCurso: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -345,8 +450,16 @@ fun EmptyStateGrupos(onCrearAsignatura: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         var isVisible by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { delay(100); isVisible = true }
-        AnimatedVisibility(visible = isVisible, enter = scaleIn() + fadeIn()) {
+
+        LaunchedEffect(Unit) {
+            delay(100)
+            isVisible = true
+        }
+
+        AnimatedVisibility(
+            visible = isVisible,
+            enter = scaleIn() + fadeIn()
+        ) {
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -362,33 +475,45 @@ fun EmptyStateGrupos(onCrearAsignatura: () -> Unit) {
                 )
             }
         }
+
         Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = "No hay asignaturas",
+            text = "No hay cursos",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.TextPrimary,
             textAlign = TextAlign.Center
         )
+
         Text(
-            text = "Crea una asignatura primero para poder gestionar grupos de estudiantes",
+            text = "Crea un curso primero para poder gestionar grupos de estudiantes",
             fontSize = 15.sp,
             color = EduRachaColors.TextSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
         )
+
         Spacer(modifier = Modifier.height(32.dp))
+
         Button(
-            onClick = onCrearAsignatura,
+            onClick = onCrearCurso,
             modifier = Modifier.height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Icon(imageVector = Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(
+                imageVector = Icons.Default.AddCircle,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(text = "Crear Asignatura", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Crear Curso",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
-

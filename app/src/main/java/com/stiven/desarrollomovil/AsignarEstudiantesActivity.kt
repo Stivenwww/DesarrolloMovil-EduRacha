@@ -19,8 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,33 +32,25 @@ import androidx.compose.ui.unit.sp
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 
-// ============================================
-// ACTIVITY
-// ============================================
-// ============================================
-// ACTIVITY
-// ============================================
 class AsignarEstudiantesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val asignatura = intent.getStringExtra("ASIGNATURA") ?: "Asignatura"
+        val curso = intent.getStringExtra("CURSO") ?: "Curso"
 
         setContent {
             EduRachaTheme {
                 AsignarEstudiantesScreen(
-                    asignatura = asignatura,
+                    curso = curso,
                     onNavigateBack = {
                         val intent = Intent(this, GestionGruposActivity::class.java)
-
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         startActivity(intent)
                     },
                     onAsignacionExitosa = {
-                        // Navegación corregida para asegurar que la nueva actividad es la principal
                         val intent = Intent(this, VisualizarGruposActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            putExtra("ASIGNATURA", asignatura) // Pasar la asignatura a la siguiente pantalla
+                            putExtra("CURSO", curso)
                         }
                         startActivity(intent)
                     }
@@ -70,30 +60,23 @@ class AsignarEstudiantesActivity : ComponentActivity() {
     }
 }
 
-
-// ============================================
-// SCREEN PRINCIPAL
-// ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AsignarEstudiantesScreen(
-    asignatura: String,
+    curso: String,
     onNavigateBack: () -> Unit,
     onAsignacionExitosa: () -> Unit
 ) {
     val context = LocalContext.current
 
-    // Estados
     var searchQuery by remember { mutableStateOf("") }
     val todosEstudiantes = remember { Estudiante.obtenerEstudiantesEjemplo() }
     val estudiantesYaAsignados = remember {
-        GruposRepository.obtenerEstudiantesPorAsignatura(asignatura)
+        GruposRepository.obtenerEstudiantesPorCurso(curso)
     }
-    // Usamos SnapshotStateList para que Compose reaccione a los cambios en la lista
     val estudiantesSeleccionados = remember { mutableStateListOf<Estudiante>() }
     var showDialog by remember { mutableStateOf(false) }
 
-    // Estudiantes filtrados por búsqueda y disponibilidad
     val estudiantesFiltrados = remember(searchQuery, todosEstudiantes) {
         todosEstudiantes.filter {
             it.nombre.contains(searchQuery, ignoreCase = true) ||
@@ -102,12 +85,11 @@ fun AsignarEstudiantesScreen(
         }
     }
 
-    // Función para asignar
     fun asignarEstudiantes() {
         if (estudiantesSeleccionados.isEmpty()) {
             Toast.makeText(context, "Selecciona al menos un estudiante", Toast.LENGTH_SHORT).show()
         } else {
-            GruposRepository.asignarEstudiantes(asignatura, estudiantesSeleccionados)
+            GruposRepository.asignarEstudiantes(curso, estudiantesSeleccionados)
             showDialog = true
         }
     }
@@ -146,29 +128,24 @@ fun AsignarEstudiantesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Header Premium
             AsignarEstudiantesHeader(
-                asignatura = asignatura,
+                curso = curso,
                 onNavigateBack = onNavigateBack
             )
 
-            // Contenido
             Column(modifier = Modifier.fillMaxSize()) {
-                // Card de estadísticas
                 EstadisticasCard(
                     totalEstudiantes = todosEstudiantes.size,
                     seleccionados = estudiantesSeleccionados.size,
                     modifier = Modifier.padding(16.dp)
                 )
 
-                // Barra de búsqueda
                 SearchBarAsignacion(
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                // Título de lista
                 Text(
                     text = "Lista de Estudiantes",
                     fontSize = 16.sp,
@@ -177,7 +154,6 @@ fun AsignarEstudiantesScreen(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                 )
 
-                // Lista de estudiantes
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
@@ -208,10 +184,9 @@ fun AsignarEstudiantesScreen(
         }
     }
 
-    // Diálogo de éxito
     if (showDialog) {
         DialogoExito(
-            asignatura = asignatura,
+            curso = curso,
             cantidadAsignados = estudiantesSeleccionados.size,
             onDismiss = {
                 showDialog = false
@@ -225,11 +200,8 @@ fun AsignarEstudiantesScreen(
     }
 }
 
-// ============================================
-// HEADER PREMIUM
-// ============================================
 @Composable
-fun AsignarEstudiantesHeader(asignatura: String, onNavigateBack: () -> Unit) {
+fun AsignarEstudiantesHeader(curso: String, onNavigateBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,14 +247,11 @@ fun AsignarEstudiantesHeader(asignatura: String, onNavigateBack: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("Asignar Estudiantes", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text(asignatura, color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+            Text(curso, color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
 
-// ============================================
-// ESTADÍSTICAS CARD
-// ============================================
 @Composable
 fun EstadisticasCard(totalEstudiantes: Int, seleccionados: Int, modifier: Modifier = Modifier) {
     val porcentaje = if (totalEstudiantes > 0) (seleccionados.toFloat() / totalEstudiantes.toFloat()) else 0f
@@ -325,7 +294,7 @@ fun EstadisticasCard(totalEstudiantes: Int, seleccionados: Int, modifier: Modifi
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { porcentaje }, // Usando la sintaxis moderna
+                    progress = { porcentaje },
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                     color = EduRachaColors.Success,
                     trackColor = EduRachaColors.SurfaceVariant
@@ -335,9 +304,6 @@ fun EstadisticasCard(totalEstudiantes: Int, seleccionados: Int, modifier: Modifi
     }
 }
 
-// ============================================
-// SEARCH BAR (CORREGIDO)
-// ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchBarAsignacion(searchQuery: String, onSearchQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -374,9 +340,6 @@ fun SearchBarAsignacion(searchQuery: String, onSearchQueryChange: (String) -> Un
     }
 }
 
-// ============================================
-// ESTUDIANTE CHECK ITEM
-// ============================================
 @Composable
 fun EstudianteCheckItem(estudiante: Estudiante, isSelected: Boolean, yaAsignado: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val borderColor = when {
@@ -434,16 +397,13 @@ fun EstudianteCheckItem(estudiante: Estudiante, isSelected: Boolean, yaAsignado:
     }
 }
 
-// ============================================
-// DIÁLOGO DE ÉXITO
-// ============================================
 @Composable
-fun DialogoExito(asignatura: String, cantidadAsignados: Int, onDismiss: () -> Unit, onVisualizar: () -> Unit) {
+fun DialogoExito(curso: String, cantidadAsignados: Int, onDismiss: () -> Unit, onVisualizar: () -> Unit) {
     AlertDialog(
-        onDismissRequest = { /* No hacer nada al pulsar fuera */ },
+        onDismissRequest = { },
         icon = { Icon(Icons.Default.CheckCircle, null, tint = EduRachaColors.Success, modifier = Modifier.size(48.dp)) },
         title = { Text("¡Éxito!", textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth()) },
-        text = { Text("$cantidadAsignados estudiantes han sido asignados correctamente a '$asignatura'", textAlign = TextAlign.Center) },
+        text = { Text("$cantidadAsignados estudiantes han sido asignados correctamente a '$curso'", textAlign = TextAlign.Center) },
         confirmButton = {
             Button(onClick = onVisualizar, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary)) {
                 Text("Visualizar Grupos")
@@ -457,3 +417,10 @@ fun DialogoExito(asignatura: String, cantidadAsignados: Int, onDismiss: () -> Un
     )
 }
 
+fun getRankingColor(posicion: Int): Color {
+    return when {
+        posicion <= 3 -> EduRachaColors.RankingGold
+        posicion <= 10 -> EduRachaColors.RankingSilver
+        else -> EduRachaColors.RankingBronze
+    }
+}

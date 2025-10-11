@@ -18,8 +18,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
+// CORRECCIÓN: Añadir importaciones para los iconos extendidos
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -36,7 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.google.firebase.auth.FirebaseAuth
-import java.util.Calendar
+import com.stiven.desarrollomovil.ui.theme.EduRachaColors
+import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -47,7 +51,7 @@ class MainActivity : ComponentActivity() {
         auth = FirebaseAuth.getInstance()
 
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme(primary = Uniautonoma.Primary)) {
+            EduRachaTheme {
                 val user = auth.currentUser
                 val (firstName, username) = remember(user) {
                     extractUserInfo(user?.displayName)
@@ -75,10 +79,8 @@ class MainActivity : ComponentActivity() {
         if (displayName.isNullOrEmpty()) {
             return "Estudiante" to "ESTUDIANTE"
         }
-        val nameParts = displayName.split(" ")
-        val firstName = nameParts.firstOrNull() ?: "Estudiante"
-        val username = displayName.replace(" ", "_").uppercase()
-        return firstName to username
+        val name = displayName.substringBefore("(")
+        return name.trim() to name.replace(" ", "_").uppercase()
     }
 }
 
@@ -102,7 +104,7 @@ fun StudentDashboardScreen(
     val subjects = remember { getSampleSubjects() }
 
     Scaffold(
-        containerColor = Uniautonoma.Background,
+        containerColor = EduRachaColors.Background,
         content = { padding ->
             Column(
                 modifier = Modifier
@@ -123,6 +125,7 @@ fun StudentDashboardScreen(
                     selectedSubject = subject
                     showQuizIntroDialog = true
                 }
+                Spacer(Modifier.height(40.dp))
             }
         }
     )
@@ -153,7 +156,7 @@ fun StudentDashboardScreen(
         QuizResultDialog(
             score = quizScore,
             totalQuestions = getSampleQuestions().size,
-            streakDays = 11,
+            streakDays = 11, // Simulado
             onDismiss = { showQuizResultDialog = false }
         )
     }
@@ -176,6 +179,8 @@ fun StudentDashboardScreen(
     }
 }
 
+// --- Componentes del Dashboard Corregidos ---
+
 @Composable
 fun Header(firstName: String, onSettingsClick: () -> Unit) {
     Row(
@@ -185,21 +190,21 @@ fun Header(firstName: String, onSettingsClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Hola, $firstName",
-                fontSize = 24.sp,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Uniautonoma.TextPrimary
+                color = EduRachaColors.TextPrimary
             )
             Text(
-                text = "¿Qué deseas aprender el día de hoy?",
-                fontSize = 14.sp,
-                color = Uniautonoma.TextSecondary
+                text = "¿Qué deseas aprender hoy?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = EduRachaColors.TextSecondary
             )
         }
         IconButton(onClick = onSettingsClick) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_settingss),
+                imageVector = Icons.Default.Settings,
                 contentDescription = "Configuración",
-                tint = Uniautonoma.TextSecondary,
+                tint = EduRachaColors.TextSecondary,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -210,8 +215,8 @@ fun Header(firstName: String, onSettingsClick: () -> Unit) {
 fun StreakCard(streakDays: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Uniautonoma.Surface),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Row(
@@ -219,26 +224,26 @@ fun StreakCard(streakDays: Int) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_fire),
+                imageVector = Icons.Default.LocalFireDepartment,
                 contentDescription = "Racha",
-                tint = Uniautonoma.Warning,
+                tint = EduRachaColors.StreakFire,
                 modifier = Modifier.size(40.dp)
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Racha actual", fontSize = 14.sp, color = Uniautonoma.TextSecondary)
-                Text("¡Sigue así!", fontSize = 12.sp, color = Uniautonoma.TextSecondary.copy(alpha = 0.7f))
+                Text("Racha actual", fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
+                Text("¡Sigue así!", style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
             }
             Text(
                 text = streakDays.toString(),
-                fontSize = 32.sp,
+                style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = Uniautonoma.Warning
+                color = EduRachaColors.StreakFire
             )
             Text(
                 text = "días",
-                fontSize = 14.sp,
-                color = Uniautonoma.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = EduRachaColors.TextSecondary,
                 modifier = Modifier.padding(start = 4.dp, top = 8.dp)
             )
         }
@@ -248,16 +253,20 @@ fun StreakCard(streakDays: Int) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchField() {
-    OutlinedTextField(
+    TextField(
         value = "",
         onValueChange = {},
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text("Buscar por asignatura") },
+        placeholder = { Text("Buscar por asignatura...") },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
         shape = RoundedCornerShape(12.dp),
-        colors = TextFieldDefaults.outlinedTextFieldColors(
-            focusedBorderColor = Uniautonoma.Primary,
-            unfocusedBorderColor = Color.LightGray
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = EduRachaColors.Surface,
+            unfocusedContainerColor = EduRachaColors.Surface,
+            disabledContainerColor = EduRachaColors.Surface,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
         )
     )
 }
@@ -267,36 +276,36 @@ fun RankingCard(username: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Uniautonoma.Primary),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Primary),
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.padding(vertical = 24.dp, horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Ranking de estudiantes",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+            Icon(
+                imageVector = Icons.Outlined.EmojiEvents, // CORRECCIÓN
+                contentDescription = "Ranking",
+                tint = EduRachaColors.RankingGold,
+                modifier = Modifier.size(48.dp)
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = username,
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.9f)
-            )
-            Spacer(Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .background(Uniautonoma.Secondary, shape = RoundedCornerShape(2.dp))
-            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Ranking de Estudiantes",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "¡Compite y gana puntos!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = "Ver ranking", tint = Color.White) // CORRECCIÓN
         }
     }
 }
@@ -310,21 +319,20 @@ fun CoursesSection(subjects: List<Subject>, onSubjectClick: (Subject) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Cursos inscritos",
-                fontSize = 18.sp,
+                text = "Cursos Inscritos",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Uniautonoma.TextPrimary
+                color = EduRachaColors.TextPrimary
             )
             Text(
-                text = "VER TODOS >",
-                fontSize = 12.sp,
+                text = "Ver todos",
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
-                color = Uniautonoma.Primary,
-                modifier = Modifier.clickable { /* TODO: Navigate to all courses */ }
+                color = EduRachaColors.Primary,
+                modifier = Modifier.clickable { /* TODO */ }
             )
         }
         Spacer(Modifier.height(16.dp))
-        // Aquí irían las tarjetas de los cursos.
         subjects.forEach { subject ->
             SubjectCard(subject = subject, onClick = { onSubjectClick(subject) })
             Spacer(Modifier.height(12.dp))
@@ -338,66 +346,43 @@ fun SubjectCard(subject: Subject, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Uniautonoma.Surface),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
+        border = BorderStroke(1.dp, EduRachaColors.SurfaceVariant)
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(subject.color.copy(alpha = 0.2f), CircleShape),
+                    .size(48.dp)
+                    .background(subject.color.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(subject.icon, contentDescription = null, tint = subject.color)
+                Icon(subject.icon, contentDescription = null, tint = subject.color, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(subject.name, fontWeight = FontWeight.Bold, color = Uniautonoma.TextPrimary)
-                Text("Prof: ${subject.teacher}", fontSize = 12.sp, color = Uniautonoma.TextSecondary)
+                Text(subject.name, fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
+                Text("Prof: ${subject.teacher}", style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = "Iniciar", tint = Uniautonoma.TextSecondary)
+            Icon(Icons.Default.ChevronRight, contentDescription = "Iniciar", tint = EduRachaColors.TextSecondary)
         }
     }
 }
 
+// --- Diálogos Corregidos ---
+
 @Composable
 fun QuizIntroDialog(subjectName: String, onDismiss: () -> Unit, onStart: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Uniautonoma.Surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_check_circle),
-                    contentDescription = null,
-                    tint = Uniautonoma.Primary,
-                    modifier = Modifier.size(60.dp)
-                )
+        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)) {
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Outlined.Quiz, null, tint = EduRachaColors.Primary, modifier = Modifier.size(60.dp)) // CORRECCIÓN
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    text = "Quiz de IA: $subjectName",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                Text("Quiz de IA: $subjectName", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Estás a punto de comenzar un cuestionario generado por IA para poner a prueba tus conocimientos. ¡Mucha suerte!",
-                    textAlign = TextAlign.Center,
-                    color = Uniautonoma.TextSecondary
-                )
+                Text("Estás a punto de comenzar un cuestionario generado por IA para poner a prueba tus conocimientos. ¡Mucha suerte!", textAlign = TextAlign.Center, color = EduRachaColors.TextSecondary)
                 Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = onStart,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("¡Vamos a empezar!")
-                }
+                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("¡Vamos a empezar!") }
             }
         }
     }
@@ -412,37 +397,26 @@ fun QuizScreen(subject: Subject, onQuizFinished: (Int) -> Unit) {
     var correctAnswers by remember { mutableStateOf(0) }
     val progress by animateFloatAsState((currentQuestionIndex + 1) / questions.size.toFloat(), label = "quizProgress")
 
-    Dialog(onDismissRequest = { /* No se puede cerrar a mitad del quiz */ }) {
+    Dialog(onDismissRequest = { /* No se cierra */ }) {
         Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Pregunta ${currentQuestionIndex + 1} de ${questions.size}", fontSize = 14.sp, color = Uniautonoma.TextSecondary)
+                Text("Pregunta ${currentQuestionIndex + 1} de ${questions.size}", style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
                 Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                    color = Uniautonoma.Primary,
-                    trackColor = Uniautonoma.Primary.copy(alpha = 0.2f)
-                )
+                LinearProgressIndicator(progress, Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = EduRachaColors.Primary, trackColor = EduRachaColors.Primary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(24.dp))
 
                 val question = questions[currentQuestionIndex]
-                Text(question.text, fontSize = 18.sp, fontWeight = FontWeight.Medium, minLines = 3)
+                Text(question.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, minLines = 3)
                 Spacer(Modifier.height(24.dp))
                 question.options.forEachIndexed { index, option ->
-                    OptionCard(
-                        text = option,
-                        isSelected = selectedOption == index,
-                        onClick = { selectedOption = index }
-                    )
+                    OptionCard(option, selectedOption == index) { selectedOption = index }
                     Spacer(Modifier.height(12.dp))
                 }
                 Spacer(Modifier.height(24.dp))
 
                 Button(
                     onClick = {
-                        if (selectedOption == question.correctAnswerIndex) {
-                            correctAnswers++
-                        }
+                        if (selectedOption == question.correctAnswerIndex) { correctAnswers++ }
                         if (currentQuestionIndex < questions.size - 1) {
                             currentQuestionIndex++
                             selectedOption = null
@@ -463,67 +437,42 @@ fun QuizScreen(subject: Subject, onQuizFinished: (Int) -> Unit) {
 @Composable
 fun OptionCard(text: String, isSelected: Boolean, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(2.dp, if (isSelected) Uniautonoma.Primary else Color.LightGray.copy(alpha = 0.5f)),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Uniautonoma.Primary.copy(alpha = 0.1f) else Uniautonoma.Surface
-        )
+        border = BorderStroke(2.dp, if (isSelected) EduRachaColors.Primary else EduRachaColors.SurfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) EduRachaColors.Primary.copy(alpha = 0.1f) else EduRachaColors.Surface)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text, modifier = Modifier.weight(1f))
+        Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(text, Modifier.weight(1f))
             if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Seleccionado",
-                    tint = Uniautonoma.Primary
-                )
-            }
-        }
-    }
-}
-@Composable
-fun QuizResultDialog(score: Int, totalQuestions: Int, streakDays: Int, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Uniautonoma.Surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_trophy),
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp)
-                )
-                Spacer(Modifier.height(16.dp))
-                Text("¡Felicidades!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Uniautonoma.Primary)
-                Spacer(Modifier.height(8.dp))
-                Text("Obtuviste $score de $totalQuestions puntos", textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocalFireDepartment, contentDescription = "Racha", tint = Uniautonoma.Warning)
-                    Spacer(Modifier.width(8.dp))
-                    Text("¡Tu racha aumentó a $streakDays días!", fontWeight = FontWeight.Medium)
-                }
-                Spacer(Modifier.height(24.dp))
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Genial")
-                }
+                Icon(Icons.Default.CheckCircle, "Seleccionado", tint = EduRachaColors.Primary)
             }
         }
     }
 }
 
+@Composable
+fun QuizResultDialog(score: Int, totalQuestions: Int, streakDays: Int, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)) {
+            Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Outlined.EmojiEvents, null, tint = EduRachaColors.RankingGold, modifier = Modifier.size(80.dp)) // CORRECCIÓN
+                Spacer(Modifier.height(16.dp))
+                Text("¡Felicidades!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = EduRachaColors.Primary)
+                Spacer(Modifier.height(8.dp))
+                Text("Obtuviste $score de $totalQuestions puntos", textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LocalFireDepartment, "Racha", tint = EduRachaColors.StreakFire)
+                    Spacer(Modifier.width(8.dp))
+                    Text("¡Tu racha aumentó a $streakDays días!", fontWeight = FontWeight.Medium)
+                }
+                Spacer(Modifier.height(24.dp))
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Genial") }
+            }
+        }
+    }
+}
 
 @Composable
 fun RankingDialog(currentUserUsername: String, onDismiss: () -> Unit, onUserClick: (RankingUser) -> Unit) {
@@ -531,7 +480,7 @@ fun RankingDialog(currentUserUsername: String, onDismiss: () -> Unit, onUserClic
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Ranking de la Clase", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+                Text("Ranking de la Clase", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
                 LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                     items(rankingUsers) { user ->
                         RankingItem(user = user, onUserClick = onUserClick)
@@ -545,38 +494,23 @@ fun RankingDialog(currentUserUsername: String, onDismiss: () -> Unit, onUserClic
 @Composable
 fun RankingItem(user: RankingUser, onUserClick: (RankingUser) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onUserClick(user) }
-            .padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onUserClick(user) }.padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "${user.rank}.",
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
+            text = "${user.rank}.", fontWeight = FontWeight.Bold, fontSize = 16.sp,
             color = when (user.rank) {
-                1 -> Uniautonoma.Secondary
-                2, 3 -> Uniautonoma.Secondary.copy(alpha = 0.7f)
-                else -> Uniautonoma.TextSecondary
+                1 -> EduRachaColors.RankingGold
+                2 -> EduRachaColors.RankingSilver
+                3 -> EduRachaColors.RankingBronze
+                else -> EduRachaColors.TextSecondary
             },
             modifier = Modifier.width(30.dp)
         )
-        Image(
-            painter = painterResource(id = user.avatarResId),
-            contentDescription = "Avatar",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .border(2.dp, if (user.isCurrentUser) Uniautonoma.Primary else Color.Transparent, CircleShape)
-        )
+        Icon(Icons.Default.Person, contentDescription = "Avatar", modifier = Modifier.size(40.dp).clip(CircleShape).border(2.dp, if (user.isCurrentUser) EduRachaColors.Primary else Color.Transparent, CircleShape))
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = user.username,
-            modifier = Modifier.weight(1f),
-            fontWeight = if (user.isCurrentUser) FontWeight.Bold else FontWeight.Normal
-        )
-        Text("${user.points} pts", fontWeight = FontWeight.Bold, color = Uniautonoma.Primary)
+        Text(text = user.username, modifier = Modifier.weight(1f), fontWeight = if (user.isCurrentUser) FontWeight.Bold else FontWeight.Normal)
+        Text("${user.points} pts", fontWeight = FontWeight.Bold, color = EduRachaColors.Primary)
     }
 }
 
@@ -584,30 +518,18 @@ fun RankingItem(user: RankingUser, onUserClick: (RankingUser) -> Unit) {
 fun StudentProfileDialog(user: RankingUser, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(20.dp)) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(id = user.avatarResId),
-                    contentDescription = "Avatar",
-                    modifier = Modifier.size(90.dp).clip(CircleShape)
-                )
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Person, "Avatar", modifier = Modifier.size(90.dp).clip(CircleShape).background(EduRachaColors.SurfaceVariant, CircleShape).padding(20.dp), tint = EduRachaColors.TextSecondary)
                 Spacer(Modifier.height(16.dp))
-                Text(user.username, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("@${user.username.lowercase()}", fontSize = 14.sp, color = Uniautonoma.TextSecondary)
+                Text(user.username, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("@${user.username.lowercase()}", style = MaterialTheme.typography.bodyMedium, color = EduRachaColors.TextSecondary)
                 Spacer(Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    ProfileStat(icon = Icons.Default.Star, value = "${user.points}", label = "Puntos")
-                    ProfileStat(icon = Icons.Default.LocalFireDepartment, value = "${user.streakDays}", label = "Racha")
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceAround) {
+                    ProfileStat(Icons.Default.Star, "${user.points}", "Puntos")
+                    ProfileStat(Icons.Default.LocalFireDepartment, "${user.streakDays}", "Racha")
                 }
                 Spacer(Modifier.height(24.dp))
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Cerrar")
-                }
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") }
             }
         }
     }
@@ -616,32 +538,32 @@ fun StudentProfileDialog(user: RankingUser, onDismiss: () -> Unit) {
 @Composable
 fun ProfileStat(icon: ImageVector, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, contentDescription = label, tint = Uniautonoma.Primary, modifier = Modifier.size(28.dp))
+        Icon(icon, label, tint = EduRachaColors.Primary, modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(4.dp))
-        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(label, fontSize = 12.sp, color = Uniautonoma.TextSecondary)
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
     }
 }
 
+// --- Clases de datos y funciones de ejemplo (sin cambios) ---
 data class Subject(val name: String, val teacher: String, val icon: ImageVector, val color: Color)
-data class RankingUser(val rank: Int, val username: String, val points: Int, val avatarResId: Int, val streakDays: Int, val isCurrentUser: Boolean = false)
+data class RankingUser(val rank: Int, val username: String, val points: Int, val streakDays: Int, val isCurrentUser: Boolean = false)
 data class QuizQuestion(val text: String, val options: List<String>, val correctAnswerIndex: Int)
 
 fun getSampleSubjects(): List<Subject> {
     return listOf(
         Subject("Teoría de la computación", "Prof. Zúñiga", Icons.Default.Computer, Color(0xFF1976D2)),
         Subject("Desarrollo Móvil", "Prof. Castillo", Icons.Default.PhoneAndroid, Color(0xFFF57C00)),
-        // Añade más asignaturas aquí
     )
 }
 
 fun getSampleRanking(currentUserUsername: String): List<RankingUser> {
     return listOf(
-        RankingUser(1, "JUANP", 1250, R.drawable.ic_person, 25),
-        RankingUser(2, currentUserUsername, 1100, R.drawable.ic_person, 10, isCurrentUser = true),
-        RankingUser(3, "MARIA_G", 980, R.drawable.ic_person, 18),
-        RankingUser(4, "CARLOS_V", 850, R.drawable.ic_person, 8),
-        RankingUser(5, "SOFIA_R", 720, R.drawable.ic_person, 12)
+        RankingUser(1, "JUANP", 1250, 25),
+        RankingUser(2, currentUserUsername, 1100, 10, isCurrentUser = true),
+        RankingUser(3, "MARIA_G", 980, 18),
+        RankingUser(4, "CARLOS_V", 850, 8),
+        RankingUser(5, "SOFIA_R", 720, 12)
     )
 }
 

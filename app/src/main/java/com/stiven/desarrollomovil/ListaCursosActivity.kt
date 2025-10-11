@@ -1,7 +1,6 @@
 package com.stiven.desarrollomovil
 
 import android.net.Uri
-import coil.compose.AsyncImage
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,15 +32,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.stiven.desarrollomovil.ui.theme.EduRachaColors
+import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 
-class ListaAsignaturasActivity : ComponentActivity() {
+class ListaCursosActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme(primary = Uniautonoma.Primary)) {
-                ListaAsignaturasScreen(
+            EduRachaTheme {
+                ListaCursosScreen(
                     onNavigateBack = { finish() }
                 )
             }
@@ -51,42 +53,43 @@ class ListaAsignaturasActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListaAsignaturasScreen(
+fun ListaCursosScreen(
     onNavigateBack: () -> Unit
 ) {
-    val asignaturas = remember { CrearAsignatura.asignaturasGuardadas }
-    var selectedAsignatura by remember { mutableStateOf<Asignatura?>(null) }
+    // CORRECCIÓN: Usar CrearCursoObject en lugar de CrearCurso
+    val cursos = remember { CrearCursoObject.cursosGuardados }
+    var selectedCurso by remember { mutableStateOf<Curso?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf<String?>(null) }
 
-    val asignaturasFiltradas = remember(searchQuery, selectedFilter) {
-        asignaturas.filter { asignatura ->
-            val matchesSearch = asignatura.nombre.contains(searchQuery, ignoreCase = true) ||
-                    asignatura.codigo.contains(searchQuery, ignoreCase = true)
-            val matchesFilter = selectedFilter == null || asignatura.modalidad == selectedFilter
+    val cursosFiltrados = remember(searchQuery, selectedFilter) {
+        cursos.filter { curso ->
+            val matchesSearch = curso.titulo.contains(searchQuery, ignoreCase = true) ||
+                    curso.codigo.contains(searchQuery, ignoreCase = true)
+            val matchesFilter = selectedFilter == null || curso.estado == selectedFilter
             matchesSearch && matchesFilter
         }
     }
 
-    val modalidades = remember {
-        asignaturas.map { it.modalidad }.distinct()
+    val estados = remember {
+        cursos.map { it.estado }.distinct()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Uniautonoma.Background)
+            .background(EduRachaColors.Background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header con gradiente y estadísticas
+            // Header con gradiente
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
-                                Uniautonoma.Primary,
-                                Uniautonoma.PrimaryLight
+                                EduRachaColors.Primary,
+                                EduRachaColors.PrimaryLight
                             )
                         )
                     )
@@ -117,15 +120,15 @@ fun ListaAsignaturasScreen(
                                 .padding(start = 8.dp)
                         ) {
                             Text(
-                                text = "Mis Asignaturas",
+                                text = "Mis Cursos",
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
 
-                            if (asignaturas.isNotEmpty()) {
+                            if (cursos.isNotEmpty()) {
                                 Text(
-                                    text = "${asignaturas.size} ${if (asignaturas.size == 1) "asignatura" else "asignaturas"}",
+                                    text = "${cursos.size} ${if (cursos.size == 1) "curso" else "cursos"}",
                                     fontSize = 14.sp,
                                     color = Color.White.copy(alpha = 0.9f)
                                 )
@@ -133,7 +136,7 @@ fun ListaAsignaturasScreen(
                         }
 
                         // Badge con número total
-                        if (asignaturas.isNotEmpty()) {
+                        if (cursos.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -142,7 +145,7 @@ fun ListaAsignaturasScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "${asignaturas.size}",
+                                    text = "${cursos.size}",
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -152,7 +155,7 @@ fun ListaAsignaturasScreen(
                     }
 
                     // Barra de búsqueda
-                    if (asignaturas.isNotEmpty()) {
+                    if (cursos.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(20.dp))
 
                         OutlinedTextField(
@@ -163,7 +166,7 @@ fun ListaAsignaturasScreen(
                                 .padding(horizontal = 24.dp),
                             placeholder = {
                                 Text(
-                                    "Buscar asignaturas...",
+                                    "Buscar cursos...",
                                     color = Color.White.copy(alpha = 0.7f)
                                 )
                             },
@@ -199,8 +202,8 @@ fun ListaAsignaturasScreen(
                 }
             }
 
-            // Filtros por modalidad
-            if (asignaturas.isNotEmpty() && modalidades.size > 1) {
+            // Filtros por estado
+            if (cursos.isNotEmpty() && estados.size > 1) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -210,22 +213,22 @@ fun ListaAsignaturasScreen(
                     FilterChip(
                         selected = selectedFilter == null,
                         onClick = { selectedFilter = null },
-                        label = { Text("Todas") },
+                        label = { Text("Todos") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Uniautonoma.Primary,
+                            selectedContainerColor = EduRachaColors.Primary,
                             selectedLabelColor = Color.White
                         )
                     )
 
-                    modalidades.forEach { modalidad ->
+                    estados.forEach { estado ->
                         FilterChip(
-                            selected = selectedFilter == modalidad,
+                            selected = selectedFilter == estado,
                             onClick = {
-                                selectedFilter = if (selectedFilter == modalidad) null else modalidad
+                                selectedFilter = if (selectedFilter == estado) null else estado
                             },
-                            label = { Text(modalidad) },
+                            label = { Text(estado.replaceFirstChar { it.uppercase() }) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = obtenerColorModalidad(modalidad),
+                                selectedContainerColor = obtenerColorEstado(estado),
                                 selectedLabelColor = Color.White
                             )
                         )
@@ -234,9 +237,9 @@ fun ListaAsignaturasScreen(
             }
 
             // Contenido principal
-            if (asignaturas.isEmpty()) {
-                EmptyAsignaturasState()
-            } else if (asignaturasFiltradas.isEmpty()) {
+            if (cursos.isEmpty()) {
+                EmptyCursosState()
+            } else if (cursosFiltrados.isEmpty()) {
                 EmptySearchState(onClearSearch = { searchQuery = "" })
             } else {
                 LazyColumn(
@@ -245,13 +248,13 @@ fun ListaAsignaturasScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     itemsIndexed(
-                        items = asignaturasFiltradas,
-                        key = { _, asignatura -> asignatura.codigo }
-                    ) { index, asignatura ->
-                        AnimatedAsignaturaCard(
-                            asignatura = asignatura,
+                        items = cursosFiltrados,
+                        key = { _, curso -> curso.id ?: curso.codigo }
+                    ) { index, curso ->
+                        AnimatedCursoCard(
+                            curso = curso,
                             index = index,
-                            onClick = { selectedAsignatura = asignatura }
+                            onClick = { selectedCurso = curso }
                         )
                     }
 
@@ -264,17 +267,17 @@ fun ListaAsignaturasScreen(
     }
 
     // Diálogo de detalles
-    if (selectedAsignatura != null) {
-        AsignaturaDetailDialog(
-            asignatura = selectedAsignatura!!,
-            onDismiss = { selectedAsignatura = null }
+    if (selectedCurso != null) {
+        CursoDetailDialog(
+            curso = selectedCurso!!,
+            onDismiss = { selectedCurso = null }
         )
     }
 }
 
 @Composable
-fun AnimatedAsignaturaCard(
-    asignatura: Asignatura,
+fun AnimatedCursoCard(
+    curso: Curso,
     index: Int,
     onClick: () -> Unit
 ) {
@@ -305,12 +308,12 @@ fun AnimatedAsignaturaCard(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Header con color de modalidad
+                // Header con color de estado
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp)
-                        .background(obtenerColorModalidad(asignatura.modalidad))
+                        .background(obtenerColorEstado(curso.estado))
                 )
 
                 Row(
@@ -319,33 +322,25 @@ fun AnimatedAsignaturaCard(
                         .padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Icono de asignatura
+                    // Icono del curso
                     Box(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(obtenerColorModalidad(asignatura.modalidad).copy(alpha = 0.1f))
+                            .background(obtenerColorEstado(curso.estado).copy(alpha = 0.1f))
                             .border(
                                 2.dp,
-                                obtenerColorModalidad(asignatura.modalidad).copy(alpha = 0.3f),
+                                obtenerColorEstado(curso.estado).copy(alpha = 0.3f),
                                 RoundedCornerShape(16.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (asignatura.imagenUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = Uri.parse(asignatura.imagenUrl),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Icon(
-                                imageVector = obtenerIconoAsignatura(asignatura.modalidad),
-                                contentDescription = null,
-                                tint = obtenerColorModalidad(asignatura.modalidad),
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.MenuBook,
+                            contentDescription = null,
+                            tint = obtenerColorEstado(curso.estado),
+                            modifier = Modifier.size(32.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(16.dp))
@@ -353,10 +348,10 @@ fun AnimatedAsignaturaCard(
                     // Información
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = asignatura.nombre,
+                            text = curso.titulo,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Uniautonoma.TextPrimary,
+                            color = EduRachaColors.TextPrimary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -367,48 +362,48 @@ fun AnimatedAsignaturaCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = asignatura.codigo,
+                                text = curso.codigo,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = obtenerColorModalidad(asignatura.modalidad)
+                                color = obtenerColorEstado(curso.estado)
                             )
 
                             Text(
                                 text = " • ",
                                 fontSize = 14.sp,
-                                color = Uniautonoma.TextSecondary
+                                color = EduRachaColors.TextSecondary
                             )
 
                             Text(
-                                text = "Sem. ${asignatura.semestre}",
+                                text = "${curso.duracionDias} días",
                                 fontSize = 14.sp,
-                                color = Uniautonoma.TextSecondary
+                                color = EduRachaColors.TextSecondary
                             )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Chip de modalidad
+                        // Chip de estado
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = obtenerColorModalidad(asignatura.modalidad).copy(alpha = 0.15f)
+                            color = obtenerColorEstado(curso.estado).copy(alpha = 0.15f)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = obtenerIconoModalidad(asignatura.modalidad),
+                                    imageVector = obtenerIconoEstado(curso.estado),
                                     contentDescription = null,
-                                    tint = obtenerColorModalidad(asignatura.modalidad),
+                                    tint = obtenerColorEstado(curso.estado),
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = asignatura.modalidad,
+                                    text = curso.estado.replaceFirstChar { it.uppercase() },
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = obtenerColorModalidad(asignatura.modalidad)
+                                    color = obtenerColorEstado(curso.estado)
                                 )
                             }
                         }
@@ -418,15 +413,15 @@ fun AnimatedAsignaturaCard(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = Uniautonoma.TextSecondary
+                        tint = EduRachaColors.TextSecondary
                     )
                 }
 
-                // Preview del plan de aula
-                if (asignatura.planAula.isNotEmpty()) {
+                // Preview de la descripción
+                if (curso.descripcion.isNotEmpty()) {
                     Divider(
                         modifier = Modifier.padding(horizontal = 20.dp),
-                        color = Uniautonoma.Background
+                        color = EduRachaColors.Background
                     )
 
                     Row(
@@ -438,20 +433,20 @@ fun AnimatedAsignaturaCard(
                         Icon(
                             imageVector = Icons.Outlined.Description,
                             contentDescription = null,
-                            tint = Uniautonoma.TextSecondary.copy(alpha = 0.7f),
+                            tint = EduRachaColors.TextSecondary.copy(alpha = 0.7f),
                             modifier = Modifier.size(18.dp)
                         )
 
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Text(
-                            text = if (asignatura.planAula.length > 120) {
-                                asignatura.planAula.substring(0, 120) + "..."
+                            text = if (curso.descripcion.length > 120) {
+                                curso.descripcion.substring(0, 120) + "..."
                             } else {
-                                asignatura.planAula
+                                curso.descripcion
                             },
                             fontSize = 13.sp,
-                            color = Uniautonoma.TextSecondary,
+                            color = EduRachaColors.TextSecondary,
                             lineHeight = 18.sp,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
@@ -464,8 +459,8 @@ fun AnimatedAsignaturaCard(
 }
 
 @Composable
-fun AsignaturaDetailDialog(
-    asignatura: Asignatura,
+fun CursoDetailDialog(
+    curso: Curso,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -476,14 +471,14 @@ fun AsignaturaDetailDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = obtenerIconoAsignatura(asignatura.modalidad),
+                        imageVector = Icons.Outlined.MenuBook,
                         contentDescription = null,
-                        tint = obtenerColorModalidad(asignatura.modalidad),
+                        tint = obtenerColorEstado(curso.estado),
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = asignatura.nombre,
+                        text = curso.titulo,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -495,33 +490,42 @@ fun AsignaturaDetailDialog(
             ) {
                 DetailRow(
                     label = "Código",
-                    value = asignatura.codigo,
+                    value = curso.codigo,
                     icon = Icons.Outlined.Tag,
-                    color = Uniautonoma.Primary
+                    color = EduRachaColors.Primary
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 DetailRow(
-                    label = "Semestre",
-                    value = "${asignatura.semestre}°",
+                    label = "Duración",
+                    value = "${curso.duracionDias} días",
                     icon = Icons.Outlined.CalendarMonth,
-                    color = Uniautonoma.Accent
+                    color = EduRachaColors.Accent
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 DetailRow(
-                    label = "Modalidad",
-                    value = asignatura.modalidad,
-                    icon = obtenerIconoModalidad(asignatura.modalidad),
-                    color = obtenerColorModalidad(asignatura.modalidad)
+                    label = "Estado",
+                    value = curso.estado.replaceFirstChar { it.uppercase() },
+                    icon = obtenerIconoEstado(curso.estado),
+                    color = obtenerColorEstado(curso.estado)
                 )
 
-                if (asignatura.planAula.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                DetailRow(
+                    label = "ID Docente",
+                    value = curso.docenteId,
+                    icon = Icons.Outlined.Person,
+                    color = EduRachaColors.Secondary
+                )
+
+                if (curso.descripcion.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Divider(color = Uniautonoma.Background)
+                    Divider(color = EduRachaColors.Background)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -531,23 +535,54 @@ fun AsignaturaDetailDialog(
                         Icon(
                             imageVector = Icons.Outlined.Description,
                             contentDescription = null,
-                            tint = Uniautonoma.Secondary,
+                            tint = EduRachaColors.Secondary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Plan de Aula",
+                                text = "Descripción",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Uniautonoma.TextPrimary
+                                color = EduRachaColors.TextPrimary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = asignatura.planAula,
+                                text = curso.descripcion,
                                 fontSize = 13.sp,
-                                color = Uniautonoma.TextSecondary,
+                                color = EduRachaColors.TextSecondary,
                                 lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+
+                // Mostrar temas si existen
+                if (curso.temas?.isNotEmpty() == true) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider(color = EduRachaColors.Background)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(
+                            imageVector = Icons.Outlined.AttachFile,
+                            contentDescription = null,
+                            tint = EduRachaColors.Info,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Material adjunto",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "${curso.temas!!.size} archivo(s)",
+                                fontSize = 13.sp,
+                                color = EduRachaColors.TextSecondary
                             )
                         }
                     }
@@ -558,7 +593,7 @@ fun AsignaturaDetailDialog(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = obtenerColorModalidad(asignatura.modalidad)
+                    containerColor = obtenerColorEstado(curso.estado)
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -601,20 +636,20 @@ fun DetailRow(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                color = Uniautonoma.TextSecondary
+                color = EduRachaColors.TextSecondary
             )
             Text(
                 text = value,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = Uniautonoma.TextPrimary
+                color = EduRachaColors.TextPrimary
             )
         }
     }
 }
 
 @Composable
-fun EmptyAsignaturasState() {
+fun EmptyCursosState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -626,13 +661,13 @@ fun EmptyAsignaturasState() {
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(Uniautonoma.Primary.copy(alpha = 0.1f)),
+                .background(EduRachaColors.Primary.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Outlined.MenuBook,
                 contentDescription = null,
-                tint = Uniautonoma.Primary.copy(alpha = 0.5f),
+                tint = EduRachaColors.Primary.copy(alpha = 0.5f),
                 modifier = Modifier.size(60.dp)
             )
         }
@@ -640,16 +675,16 @@ fun EmptyAsignaturasState() {
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "No tienes asignaturas",
+            text = "No tienes cursos",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = Uniautonoma.TextPrimary
+            color = EduRachaColors.TextPrimary
         )
 
         Text(
-            text = "Crea tu primera asignatura para comenzar",
+            text = "Crea tu primer curso para comenzar",
             fontSize = 14.sp,
-            color = Uniautonoma.TextSecondary,
+            color = EduRachaColors.TextSecondary,
             modifier = Modifier.padding(top = 8.dp),
             textAlign = TextAlign.Center
         )
@@ -659,7 +694,7 @@ fun EmptyAsignaturasState() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Uniautonoma.Accent.copy(alpha = 0.1f)
+                containerColor = EduRachaColors.Accent.copy(alpha = 0.1f)
             ),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -670,16 +705,16 @@ fun EmptyAsignaturasState() {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = null,
-                    tint = Uniautonoma.Accent,
+                    tint = EduRachaColors.Accent,
                     modifier = Modifier.size(24.dp)
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
-                    text = "Las asignaturas te ayudan a organizar tu contenido académico",
+                    text = "Los cursos te ayudan a organizar tu contenido educativo",
                     fontSize = 13.sp,
-                    color = Uniautonoma.TextSecondary,
+                    color = EduRachaColors.TextSecondary,
                     lineHeight = 18.sp
                 )
             }
@@ -701,7 +736,7 @@ fun EmptySearchState(
         Icon(
             imageVector = Icons.Outlined.SearchOff,
             contentDescription = null,
-            tint = Uniautonoma.TextSecondary.copy(alpha = 0.5f),
+            tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
             modifier = Modifier.size(80.dp)
         )
 
@@ -711,13 +746,13 @@ fun EmptySearchState(
             text = "No se encontraron resultados",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = Uniautonoma.TextPrimary
+            color = EduRachaColors.TextPrimary
         )
 
         Text(
             text = "Intenta con otros términos de búsqueda",
             fontSize = 14.sp,
-            color = Uniautonoma.TextSecondary,
+            color = EduRachaColors.TextSecondary,
             modifier = Modifier.padding(top = 8.dp)
         )
 
@@ -735,32 +770,22 @@ fun EmptySearchState(
 }
 
 // Funciones auxiliares
-fun obtenerColorModalidad(modalidad: String): Color {
-    return when (modalidad) {
-        "Presencial" -> Uniautonoma.Primary
-        "Virtual" -> Uniautonoma.Accent
-        "Híbrida" -> Uniautonoma.Secondary
-        "Remota" -> Uniautonoma.Success
-        else -> Uniautonoma.TextSecondary
+fun obtenerColorEstado(estado: String): Color {
+    return when (estado.lowercase()) {
+        "activo" -> EduRachaColors.Success
+        "inactivo" -> EduRachaColors.TextSecondary
+        "borrador" -> EduRachaColors.Warning
+        "archivado" -> EduRachaColors.Info
+        else -> EduRachaColors.Primary
     }
 }
 
-fun obtenerIconoModalidad(modalidad: String): ImageVector {
-    return when (modalidad) {
-        "Presencial" -> Icons.Outlined.School
-        "Virtual" -> Icons.Outlined.Computer
-        "Híbrida" -> Icons.Outlined.DevicesOther
-        "Remota" -> Icons.Outlined.Cloud
-        else -> Icons.Outlined.Class
-    }
-}
-
-fun obtenerIconoAsignatura(modalidad: String): ImageVector {
-    return when (modalidad) {
-        "Presencial" -> Icons.Outlined.MenuBook
-        "Virtual" -> Icons.Outlined.Computer
-        "Híbrida" -> Icons.Outlined.AutoStories
-        "Remota" -> Icons.Outlined.CloudQueue
-        else -> Icons.Outlined.Book
+fun obtenerIconoEstado(estado: String): ImageVector {
+    return when (estado.lowercase()) {
+        "activo" -> Icons.Default.CheckCircle
+        "inactivo" -> Icons.Default.Cancel
+        "borrador" -> Icons.Default.Edit
+        "archivado" -> Icons.Default.Archive
+        else -> Icons.Default.Circle
     }
 }

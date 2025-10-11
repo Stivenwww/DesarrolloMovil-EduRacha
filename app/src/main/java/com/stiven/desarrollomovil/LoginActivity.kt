@@ -200,7 +200,6 @@ fun LoginScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Icono de la institución (usando el icono que te gustó)
                     Surface(
                         shape = CircleShape,
                         color = Color.White.copy(alpha = 0.2f),

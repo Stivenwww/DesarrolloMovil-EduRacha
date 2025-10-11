@@ -1,7 +1,9 @@
 package com.stiven.desarrollomovil
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
@@ -37,7 +39,7 @@ class PreguntasIAValidacionAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         private val cards: List<MaterialCardView>
-        private val texts: List<android.widget.TextView>
+        private val texts: List<TextView>
 
         init {
             cards = with(binding) { listOf(cardOpcionA, cardOpcionB, cardOpcionC, cardOpcionD) }
@@ -45,15 +47,17 @@ class PreguntasIAValidacionAdapter(
         }
 
         fun bind(pregunta: PreguntaIA) {
-            binding.txtPregunta.text = pregunta.pregunta
+            // --- CORRECCIÓN 1: Se usa 'pregunta.texto' en lugar de 'pregunta.pregunta' ---
+            binding.txtPregunta.text = pregunta.texto
 
             // Asigna el texto a cada opción y oculta las que no se usan
             for (i in cards.indices) {
                 if (i < pregunta.opciones.size) {
-                    texts[i].text = pregunta.opciones[i]
-                    cards[i].visibility = android.view.View.VISIBLE
+                    // --- CORRECCIÓN 2: Se accede a la propiedad '.texto' del objeto OpcionRespuesta ---
+                    texts[i].text = pregunta.opciones[i].texto
+                    cards[i].visibility = View.VISIBLE
                 } else {
-                    cards[i].visibility = android.view.View.GONE
+                    cards[i].visibility = View.GONE
                 }
             }
 
@@ -79,12 +83,14 @@ class PreguntasIAValidacionAdapter(
         }
 
         private fun marcarRespuestaCorrecta(pregunta: PreguntaIA) {
+            // La propiedad 'respuestaCorrecta' ahora se calcula en la data class
             val indiceCorrecto = pregunta.respuestaCorrecta
 
             if (indiceCorrecto in cards.indices) {
                 val cardCorrecta = cards[indiceCorrecto]
                 val successColor = ContextCompat.getColor(itemView.context, R.color.success)
-                val successBackgroundColor = ContextCompat.getColor(itemView.context, R.color.quiz_neutral)
+                // Usando un color más sutil para el fondo de la respuesta correcta
+                val successBackgroundColor = ContextCompat.getColor(itemView.context, R.color.success_container)
 
                 cardCorrecta.setCardBackgroundColor(successBackgroundColor)
                 cardCorrecta.strokeColor = successColor
@@ -95,6 +101,7 @@ class PreguntasIAValidacionAdapter(
 
     fun actualizarPreguntas(nuevasPreguntas: List<PreguntaIA>) {
         preguntas = nuevasPreguntas
+        // Es más eficiente usar DiffUtil, pero para simplicidad mantenemos notifyDataSetChanged()
         notifyDataSetChanged()
     }
 }

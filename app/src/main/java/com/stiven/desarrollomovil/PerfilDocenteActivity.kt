@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-// CORRECCIÓN 1: Añadir la importación que falta para ImageVector
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +42,7 @@ class PerfilDocenteActivity : ComponentActivity() {
 }
 
 // ============================================
-// PANTALLA PRINCIPAL DE PERFIL DOCENTE (CORREGIDO)
+// PANTALLA PRINCIPAL DE PERFIL DOCENTE
 // ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,10 +51,11 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
     val user = FirebaseAuth.getInstance().currentUser
     val userName = user?.displayName ?: "Docente"
     val userEmail = user?.email ?: "correo@uniautonoma.edu.co"
-    // ELIMINADO: Ya no se obtiene el teléfono
-    // val userPhone = user?.phoneNumber ?: "Sin teléfono"
 
-    val totalAsignaturas = CrearAsignatura.asignaturasGuardadas.size
+    // CORRECCIÓN: Se usa CrearCursoObject en lugar de CrearCurso
+    val totalCursos = CrearCursoObject.cursosGuardados.size
+    val cursosActivos = CrearCursoObject.cursosGuardados.count { it.estado == "activo" }
+    val cursosBorrador = CrearCursoObject.cursosGuardados.count { it.estado == "borrador" }
 
     Scaffold(
         containerColor = EduRachaColors.Background
@@ -77,7 +77,7 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
 
             item { Spacer(modifier = Modifier.height(Spacing.large)) }
 
-            // Sección de estadísticas simplificada.
+            // Sección de estadísticas de cursos
             item {
                 Column(
                     modifier = Modifier
@@ -85,28 +85,51 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
                         .padding(horizontal = Spacing.screenPadding)
                 ) {
                     Text(
-                        text = "Estadísticas",
+                        text = "Estadísticas de Cursos",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = EduRachaColors.TextPrimary,
                         modifier = Modifier.padding(bottom = Spacing.medium)
                     )
 
-                    // Solo se muestra la tarjeta de asignaturas
-                    EduRachaStatsCard(
-                        title = "Asignaturas Creadas",
-                        value = totalAsignaturas.toString(),
-                        icon = Icons.Default.School,
-                        iconBackgroundColor = EduRachaColors.Primary,
-                        iconTint = EduRachaColors.Primary,
-                        modifier = Modifier.fillMaxWidth() // Ocupa todo el ancho
-                    )
+                    // Tarjetas de estadísticas en fila
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Total de cursos
+                        EduRachaCompactStatsCard(
+                            title = "Total",
+                            value = totalCursos.toString(),
+                            icon = Icons.Default.School,
+                            iconColor = EduRachaColors.Primary,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Cursos activos
+                        EduRachaCompactStatsCard(
+                            title = "Activos",
+                            value = cursosActivos.toString(),
+                            icon = Icons.Default.CheckCircle,
+                            iconColor = EduRachaColors.Success,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Cursos en borrador
+                        EduRachaCompactStatsCard(
+                            title = "Borradores",
+                            value = cursosBorrador.toString(),
+                            icon = Icons.Default.Edit,
+                            iconColor = EduRachaColors.Warning,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 
             item { Spacer(modifier = Modifier.height(Spacing.large)) }
 
-            // Información del docente (sin cambios)
+            // Información del docente
             item {
                 Column(
                     modifier = Modifier
@@ -136,16 +159,6 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
                                 label = "Correo electrónico",
                                 value = userEmail
                             )
-
-                            // --- BLOQUE DEL TELÉFONO ELIMINADO ---
-                            // EduRachaDivider()
-                            // InfoDocenteItem(
-                            //     icon = Icons.Default.Phone,
-                            //     label = "Teléfono",
-                            //     value = userPhone
-                            // )
-                            // ------------------------------------
-
                             EduRachaDivider()
                             InfoDocenteItem(
                                 icon = Icons.Default.AccountCircle,
@@ -165,6 +178,53 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
 
             item { Spacer(modifier = Modifier.height(Spacing.large)) }
 
+            // Resumen de cursos por estado
+            if (totalCursos > 0) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.screenPadding)
+                    ) {
+                        Text(
+                            text = "Resumen de Cursos",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary,
+                            modifier = Modifier.padding(bottom = Spacing.medium)
+                        )
+
+                        EduRachaCard {
+                            Column(
+                                modifier = Modifier.padding(Spacing.cardPadding),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.medium)
+                            ) {
+                                ResumenCursoRow(
+                                    estado = "Activo",
+                                    cantidad = cursosActivos,
+                                    color = EduRachaColors.Success,
+                                    total = totalCursos
+                                )
+                                ResumenCursoRow(
+                                    estado = "Borrador",
+                                    cantidad = cursosBorrador,
+                                    color = EduRachaColors.Warning,
+                                    total = totalCursos
+                                )
+                                ResumenCursoRow(
+                                    estado = "Inactivo",
+                                    cantidad = totalCursos - cursosActivos - cursosBorrador,
+                                    color = EduRachaColors.TextSecondary,
+                                    total = totalCursos
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(Spacing.large)) }
+            }
+
             // Footer institucional
             item {
                 FooterInstitucional()
@@ -174,7 +234,7 @@ fun PerfilDocenteScreen(onBackClick: () -> Unit) {
 }
 
 // ============================================
-// HEADER DEL PERFIL DOCENTE (CORREGIDO)
+// HEADER DEL PERFIL DOCENTE
 // ============================================
 @Composable
 fun PerfilDocenteHeader(
@@ -272,13 +332,129 @@ fun PerfilDocenteHeader(
                         color = Color.White.copy(alpha = 0.9f),
                         textAlign = TextAlign.Center
                     )
-
                 }
             }
         }
     }
 }
 
+// ============================================
+// TARJETA COMPACTA DE ESTADÍSTICAS
+// ============================================
+@Composable
+fun EduRachaCompactStatsCard(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    iconColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = CustomShapes.Card,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.small)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.medium),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.small)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(iconColor.copy(alpha = 0.1f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Text(
+                text = value,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = iconColor
+            )
+
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = EduRachaColors.TextSecondary
+            )
+        }
+    }
+}
+
+// ============================================
+// FILA DE RESUMEN DE CURSO
+// ============================================
+@Composable
+fun ResumenCursoRow(
+    estado: String,
+    cantidad: Int,
+    color: Color,
+    total: Int
+) {
+    val porcentaje = if (total > 0) (cantidad * 100) / total else 0
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .background(color, CircleShape)
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = estado,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = EduRachaColors.TextPrimary
+                )
+                Text(
+                    text = "$cantidad cursos",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Barra de progreso
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CustomShapes.Badge)
+                    .background(color.copy(alpha = 0.2f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(porcentaje / 100f)
+                        .fillMaxHeight()
+                        .background(color)
+                )
+            }
+        }
+    }
+}
 
 // ============================================
 // ITEM DE INFORMACIÓN DEL DOCENTE
@@ -381,5 +557,3 @@ fun FooterInstitucional() {
         }
     }
 }
-
-

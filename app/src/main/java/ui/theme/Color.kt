@@ -217,6 +217,15 @@ private val DarkColorScheme = darkColorScheme(
     error = EduRachaColors.ErrorLight,
     onError = Color(0xFF690005)
 )
+// En el archivo Color.kt    // ... (otros colores como Purple80, Pink80, etc.)
+
+// Colores semánticos de la App
+val Success = Color(0xFF28A745)
+val SuccessContainer = Color(0xFFD1FADF) // <-- AÑADE ESTA LÍNEA (verde claro)
+val Warning = Color(0xFFFFA901)
+val Error = Color(0xFFD92D20)
+// ...etc
+
 
 // ============================================
 // TEMA PRINCIPAL PREMIUM
