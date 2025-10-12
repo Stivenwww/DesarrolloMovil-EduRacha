@@ -1,5 +1,8 @@
+// Archivo: app/src/main/java/com/stiven/desarrollomovil/ListaCursosActivity.kt
+
 package com.stiven.desarrollomovil
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -24,6 +27,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,10 +50,13 @@ class ListaCursosActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val proposito = intent.getStringExtra("PROPOSITO")
+
         setContent {
             EduRachaTheme {
                 ListaCursosScreen(
                     viewModel = cursoViewModel,
+                    proposito = proposito,
                     onNavigateBack = { finish() }
                 )
             }
@@ -60,16 +68,17 @@ class ListaCursosActivity : ComponentActivity() {
 @Composable
 fun ListaCursosScreen(
     viewModel: CursoViewModel,
+    proposito: String?,
     onNavigateBack: () -> Unit
 ) {
-    // Observar los estados del ViewModel
+    val context = LocalContext.current
     val cursos by viewModel.cursos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.error.collectAsState()
 
-    var cursoSeleccionado by remember { mutableStateOf<Curso?>(null) }
+    var cursoSeleccionadoParaDialogo by remember { mutableStateOf<Curso?>(null) }
+    val esModoValidacion = proposito == "VALIDAR_PREGUNTAS"
 
-    // Cargar cursos cuando se inicia
     LaunchedEffect(Unit) {
         viewModel.obtenerCursos()
     }
@@ -77,7 +86,7 @@ fun ListaCursosScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cursos Creados") },
+                title = { Text(if (esModoValidacion) "Seleccionar Curso para Validar" else "Mis Cursos Creados") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -101,7 +110,7 @@ fun ListaCursosScreen(
                 }
 
                 errorMessage != null -> {
-                    ErrorMessage(
+                    ErrorMessage( // Llamada correcta a tu Composable
                         message = errorMessage ?: "Error desconocido",
                         onRetry = { viewModel.obtenerCursos() }
                     )
@@ -117,28 +126,73 @@ fun ListaCursosScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        if (esModoValidacion) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = EduRachaColors.Accent.copy(alpha = 0.1f))
+                                ) {
+                                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Outlined.CheckCircle, null, tint = EduRachaColors.Accent)
+                                        Spacer(Modifier.width(12.dp))
+                                        Text(
+                                            "Selecciona un curso para revisar sus preguntas generadas por IA.",
+                                            color = EduRachaColors.TextSecondary,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         itemsIndexed(cursos) { index, curso ->
                             AnimatedCursoCard(
                                 curso = curso,
                                 index = index,
-                                onClick = { cursoSeleccionado = curso }
+                                onClick = {
+                                    // --- ¡ESTA ES LA LÓGICA CORREGIDA Y DEFINITIVA! ---
+                                    if (esModoValidacion) {
+                                        // 1. Obtenemos el objeto del primer tema, no solo su clave.
+                                        val primerTema = curso.temas?.values?.firstOrNull()
+
+                                        // 2. Verificamos si el tema y su ID existen.
+                                        if (primerTema?.id != null) {
+                                            // 3. Si todo está bien, navegamos y pasamos los IDs correctos.
+                                            val intent = Intent(context, ValidacionPreguntasActivity::class.java).apply {
+                                                putExtra("CURSO_ID", curso.id)
+                                                putExtra("CURSO_TITULO", curso.titulo)
+                                                putExtra("TEMA_ID", primerTema.id) // <- ¡ID REAL DEL TEMA!
+                                            }
+                                            context.startActivity(intent)
+                                        } else {
+                                            // 4. Si el curso no tiene temas, informamos al usuario.
+                                            Toast.makeText(context, "El curso '${curso.titulo}' no tiene temas para validar.", Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        // MODO NORMAL: Muestra el diálogo de detalles
+                                        cursoSeleccionadoParaDialogo = curso
+                                    }
+                                }
                             )
                         }
                     }
                 }
             }
 
-            // Mostrar detalles del curso si se selecciona
-            cursoSeleccionado?.let { curso ->
-                CursoDetailDialog(
-                    curso = curso,
-                    viewModel = viewModel,
-                    onDismiss = { cursoSeleccionado = null }
-                )
+            if (!esModoValidacion) {
+                cursoSeleccionadoParaDialogo?.let { curso ->
+                    CursoDetailDialog(
+                        curso = curso,
+                        viewModel = viewModel,
+                        onDismiss = { cursoSeleccionadoParaDialogo = null }
+                    )
+                }
             }
         }
     }
 }
+
+// --- El resto de tus Composables (ErrorMessage, AnimatedCursoCard, etc.) permanecen igual ---
 
 @Composable
 fun ErrorMessage(
@@ -158,27 +212,21 @@ fun ErrorMessage(
             tint = EduRachaColors.Error,
             modifier = Modifier.size(80.dp)
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Text(
             text = "Oops, algo salió mal",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.TextPrimary
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
         Text(
             text = message,
             fontSize = 14.sp,
             color = EduRachaColors.TextSecondary,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(

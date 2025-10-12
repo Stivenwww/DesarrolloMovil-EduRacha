@@ -30,6 +30,7 @@ import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 // ============================================
 // ACTIVITY PARA SELECCIONAR CURSO
 // ============================================
+
 class SeleccionarCursoValidacionActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,22 +39,30 @@ class SeleccionarCursoValidacionActivity : ComponentActivity() {
             EduRachaTheme {
                 SeleccionarCursoValidacionScreen(
                     onNavigateBack = { finish() },
-                    onCursoSelected = { cursoTitulo ->
-                        abrirValidacionPreguntas(cursoTitulo)
+                    // --- PASO 1: Ajusta la firma para recibir el objeto Curso completo ---
+                    onCursoSelected = { curso ->
+                        abrirValidacionPreguntas(curso)
                     }
                 )
             }
         }
     }
 
-    private fun abrirValidacionPreguntas(cursoTitulo: String) {
+    // --- PASO 2: REEMPLAZA TU FUNCIÓN ANTIGUA CON ESTA NUEVA VERSIÓN ---
+    private fun abrirValidacionPreguntas(curso: Curso) {
         val intent = Intent(this, ValidacionPreguntasActivity::class.java).apply {
-            putExtra("CURSO_TITULO", cursoTitulo)
+            putExtra("CURSO_TITULO", curso.titulo)
+            putExtra("CURSO_ID", curso.id) // IMPORTANTE: Pasas el ID del curso
+            putExtra("TEMA_ID", curso.temas?.keys?.firstOrNull() ?: "tema_1") // IMPORTANTE: Pasas el ID del primer tema
         }
         startActivity(intent)
     }
 }
 
+
+// ============================================
+// PANTALLA EN JETPACK COMPOSE
+// ============================================
 // ============================================
 // PANTALLA EN JETPACK COMPOSE
 // ============================================
@@ -61,7 +70,8 @@ class SeleccionarCursoValidacionActivity : ComponentActivity() {
 @Composable
 fun SeleccionarCursoValidacionScreen(
     onNavigateBack: () -> Unit,
-    onCursoSelected: (String) -> Unit
+    // --- CORRECCIÓN 1: La firma ahora espera un objeto 'Curso' ---
+    onCursoSelected: (Curso) -> Unit
 ) {
     // Obtener cursos con preguntas pendientes
     val cursosConPendientes = remember {
@@ -183,7 +193,8 @@ fun SeleccionarCursoValidacionScreen(
                             curso = curso,
                             preguntasPendientes = pendientes,
                             preguntasTotales = total,
-                            onClick = { onCursoSelected(curso.titulo) }
+                            // --- CORRECCIÓN 2: Se pasa el objeto 'curso' completo ---
+                            onClick = { onCursoSelected(curso) }
                         )
                     }
 
@@ -195,6 +206,7 @@ fun SeleccionarCursoValidacionScreen(
         }
     }
 }
+
 
 // ============================================
 // CARD INFORMATIVA
@@ -444,6 +456,7 @@ fun CursoValidacionCard(
         }
     }
 }
+
 
 // ============================================
 // EMPTY STATE

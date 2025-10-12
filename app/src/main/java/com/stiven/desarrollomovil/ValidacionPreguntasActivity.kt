@@ -1,49 +1,59 @@
+// Archivo: app/src/main/java/com/stiven/desarrollomovil/ValidacionPreguntasActivity.kt
+
 package com.stiven.desarrollomovil
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
+import androidx.activity.viewModels
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stiven.desarrollomovil.ui.theme.*
-import com.stiven.desarrollomovil.ui.theme.components.*
-import com.google.firebase.auth.FirebaseAuth
-import com.stiven.desarrollomovil.models.Curso
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
-
+import com.stiven.desarrollomovil.models.OpcionIA
+import com.stiven.desarrollomovil.models.PreguntaIA
+import com.stiven.desarrollomovil.ui.theme.EduRachaColors
+import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
+import com.stiven.desarrollomovil.viewmodel.ValidacionPreguntasViewModel // ViewModel dedicado
 
 class ValidacionPreguntasActivity : ComponentActivity() {
+
+    // Se usa un ViewModel dedicado para esta pantalla
+    private val viewModel: ValidacionPreguntasViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val cursoTitulo = intent.getStringExtra("CURSO_TITULO") ?: ""
+        // Se leen los IDs que nos envía la pantalla anterior
+        val cursoTitulo = intent.getStringExtra("CURSO_TITULO") ?: "Curso"
+        val cursoId = intent.getStringExtra("CURSO_ID") ?: ""
+        val temaId = intent.getStringExtra("TEMA_ID") ?: ""
 
         setContent {
             EduRachaTheme {
                 ValidacionPreguntasScreen(
                     cursoTitulo = cursoTitulo,
+                    cursoId = cursoId,
+                    temaId = temaId,
+                    viewModel = viewModel,
                     onNavigateBack = { finish() }
                 )
             }
@@ -51,38 +61,43 @@ class ValidacionPreguntasActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ValidacionPreguntasScreen(
     cursoTitulo: String,
+    cursoId: String,
+    temaId: String,
+    viewModel: ValidacionPreguntasViewModel,
     onNavigateBack: () -> Unit
 ) {
-    // Buscar el curso por título
-    val curso = remember(cursoTitulo) {
-        CrearCursoObject.cursosGuardados.find { it.titulo == cursoTitulo }
-    }
-
-    var preguntas by remember {
-        mutableStateOf(PreguntasIARepository.obtenerPreguntasPendientes(cursoTitulo))
-    }
-
-    var showEditDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var preguntaSeleccionada by remember { mutableStateOf<PreguntaIA?>(null) }
-
+    val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
 
-    val currentUser = FirebaseAuth.getInstance().currentUser
-    val nombreRevisor = currentUser?.displayName ?: "Docente"
+    // El LaunchedEffect llama al ViewModel para cargar las preguntas
+    // Se ejecuta solo si cursoId o temaId cambian.
+    LaunchedEffect(cursoId, temaId) {
+        if (cursoId.isNotEmpty() && temaId.isNotEmpty()) {
+            viewModel.cargarPreguntasPendientes(cursoId, temaId)
+        }
+    }
+
+    // Efecto para mostrar mensajes de error o éxito
+    LaunchedEffect(uiState.error, uiState.successMessage) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.limpiarMensajes()
+        }
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.limpiarMensajes()
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             ValidacionTopAppBar(
                 cursoTitulo = cursoTitulo,
-                cursoCodigo = curso?.codigo ?: "",
-                pendingCount = preguntas.size,
+                pendingCount = uiState.preguntas.size,
                 onNavigateBack = onNavigateBack
             )
         },
@@ -93,939 +108,285 @@ fun ValidacionPreguntasScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (preguntas.isEmpty()) {
-                EduRachaEmptyState(
-                    icon = Icons.Default.CheckCircle,
-                    title = "¡Todo validado!",
-                    description = "No hay preguntas pendientes en $cursoTitulo",
-                    actionText = "Volver",
-                    onActionClick = onNavigateBack,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(Spacing.screenPadding),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.medium)
-                ) {
-                    // Header con información del curso
-                    item {
-                        CursoInfoCard(curso = curso)
-                    }
-
-                    items(preguntas, key = { it.id }) { pregunta ->
-                        PreguntaValidacionCard(
-                            pregunta = pregunta,
-                            onAprobar = {
-                                PreguntasIARepository.aprobarPregunta(
-                                    preguntaId = pregunta.id,
-                                    revisadoPor = nombreRevisor,
-                                    notas = "Pregunta aprobada sin modificaciones"
-                                )
-                                preguntas = preguntas.filter { it.id != pregunta.id }
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("✓ Pregunta aprobada")
-                                }
-                            },
-                            onRechazar = {
-                                preguntaSeleccionada = pregunta
-                                showDeleteDialog = true
-                            },
-                            onEditar = {
-                                preguntaSeleccionada = pregunta
-                                showEditDialog = true
-                            }
-                        )
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(Spacing.large))
+            when {
+                // Estado de Carga
+                uiState.isLoading -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(color = EduRachaColors.Primary)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Cargando preguntas...", color = EduRachaColors.TextSecondary)
                     }
                 }
-            }
-        }
-    }
-
-    // Diálogo de edición
-    if (showEditDialog && preguntaSeleccionada != null) {
-        EditarPreguntaDialog(
-            pregunta = preguntaSeleccionada!!,
-            nombreRevisor = nombreRevisor,
-            onDismiss = {
-                showEditDialog = false
-                preguntaSeleccionada = null
-            },
-            onConfirm = { preguntaEditada, notas ->
-                PreguntasIARepository.actualizarPregunta(
-                    preguntaEditada = preguntaEditada,
-                    revisadoPor = nombreRevisor,
-                    notas = notas
-                )
-                preguntas = preguntas.filter { it.id != preguntaEditada.id }
-                showEditDialog = false
-                preguntaSeleccionada = null
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✓ Pregunta editada y guardada")
-                }
-            }
-        )
-    }
-
-    // Diálogo de confirmación de rechazo
-    if (showDeleteDialog && preguntaSeleccionada != null) {
-        ConfirmarRechazoDialog(
-            pregunta = preguntaSeleccionada!!,
-            onDismiss = {
-                showDeleteDialog = false
-                preguntaSeleccionada = null
-            },
-            onConfirm = { motivo ->
-                PreguntasIARepository.rechazarPregunta(
-                    preguntaId = preguntaSeleccionada!!.id,
-                    revisadoPor = nombreRevisor,
-                    motivo = motivo
-                )
-                preguntas = preguntas.filter { it.id != preguntaSeleccionada!!.id }
-                showDeleteDialog = false
-                preguntaSeleccionada = null
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✓ Pregunta rechazada")
-                }
-            }
-        )
-    }
-}
-
-// ============================================
-// CARD DE INFORMACIÓN DEL CURSO
-// ============================================
-@Composable
-fun CursoInfoCard(curso: Curso?) {
-    if (curso == null) return
-
-    EduRachaCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.cardPadding),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(EduRachaColors.PrimaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.School,
-                    contentDescription = null,
-                    tint = EduRachaColors.Primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(Spacing.medium))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = curso.titulo,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = curso.codigo,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = EduRachaColors.Primary
-                    )
-                    Text(
-                        text = "•",
-                        fontSize = 13.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                    Text(
-                        text = "${curso.duracionDias} días",
-                        fontSize = 13.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-            }
-
-            // Badge de estado
-            Surface(
-                color = when (curso.estado) {
-                    "activo" -> EduRachaColors.Success
-                    "borrador" -> EduRachaColors.Warning
-                    "inactivo" -> EduRachaColors.TextSecondary
-                    else -> EduRachaColors.Primary
-                }.copy(alpha = 0.15f),
-                shape = CustomShapes.Badge
-            ) {
-                Text(
-                    text = curso.estado.replaceFirstChar { it.uppercase() },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when (curso.estado) {
-                        "activo" -> EduRachaColors.Success
-                        "borrador" -> EduRachaColors.Warning
-                        "inactivo" -> EduRachaColors.TextSecondary
-                        else -> EduRachaColors.Primary
-                    },
-                    modifier = Modifier.padding(
-                        horizontal = Spacing.medium,
-                        vertical = Spacing.small
-                    )
-                )
-            }
-        }
-    }
-}
-
-// ============================================
-// TOP APP BAR
-// ============================================
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ValidacionTopAppBar(
-    cursoTitulo: String,
-    cursoCodigo: String,
-    pendingCount: Int,
-    onNavigateBack: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 4.dp),
-        color = EduRachaColors.Primary
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            EduRachaColors.GradientStart,
-                            EduRachaColors.GradientEnd
-                        )
-                    )
-                )
-        ) {
-            TopAppBar(
-                title = {
-                    Column {
+                // Estado Vacío (después de cargar)
+                uiState.preguntas.isEmpty() && !uiState.isLoading -> {
+                    Column(
+                        Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, Modifier.size(80.dp), EduRachaColors.Success)
+                        Spacer(Modifier.height(16.dp))
+                        Text("¡Todo validado!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Validar Preguntas",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            "No hay preguntas pendientes para este curso.",
+                            fontSize = 14.sp,
+                            color = EduRachaColors.TextSecondary
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = cursoTitulo,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = Color.White.copy(alpha = 0.9f)
+                    }
+                }
+                // Estado con Contenido
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(uiState.preguntas, key = { it.id ?: it.texto }) { pregunta ->
+                            PreguntaCard(
+                                pregunta = pregunta,
+                                onAprobar = { viewModel.aprobarPregunta(pregunta.id ?: "") },
+                                onRechazar = { motivo -> viewModel.rechazarPregunta(pregunta.id ?: "", motivo) },
+                                onEditar = { preguntaEditada, notas -> viewModel.actualizarPregunta(preguntaEditada, notas) }
                             )
-                            if (cursoCodigo.isNotEmpty()) {
-                                Text(
-                                    text = "•",
-                                    fontSize = 14.sp,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = cursoCodigo,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color.White.copy(alpha = 0.8f)
-                                )
-                            }
                         }
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    Surface(
-                        color = EduRachaColors.Secondary,
-                        shape = CustomShapes.Badge
-                    ) {
-                        Text(
-                            text = "$pendingCount pendientes",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(
-                                horizontal = 12.dp,
-                                vertical = 6.dp
-                            )
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
+                }
+            }
         }
     }
 }
 
-// ============================================
-// CARD DE PREGUNTA CON INFORMACIÓN COMPLETA
-// ============================================
+
+// =====================================================================
+// COMPONENTES VISUALES (Composables)
+// =====================================================================
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PreguntaValidacionCard(
+fun ValidacionTopAppBar(cursoTitulo: String, pendingCount: Int, onNavigateBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Column {
+                Text("Validar: $cursoTitulo", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("$pendingCount preguntas pendientes", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.Primary),
+        modifier = Modifier.shadow(4.dp)
+    )
+}
+
+@Composable
+fun PreguntaCard(
     pregunta: PreguntaIA,
     onAprobar: () -> Unit,
-    onRechazar: () -> Unit,
-    onEditar: () -> Unit,
-    modifier: Modifier = Modifier
+    onRechazar: (String) -> Unit,
+    onEditar: (PreguntaIA, String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showRejectDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = Elevation.medium, shape = CustomShapes.Card)
             .animateContentSize(),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(
-            containerColor = EduRachaColors.Surface
-        )
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.cardPadding)
-        ) {
-            // Header con metadata
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header con ID y Dificultad
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // ID Badge
-                    Surface(
-                        color = EduRachaColors.PrimaryContainer,
-                        shape = CustomShapes.Badge
-                    ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val idPregunta = pregunta.id?.takeLast(4) ?: "N/A"
+                    Surface(color = EduRachaColors.Primary.copy(0.15f), shape = RoundedCornerShape(8.dp)) {
                         Text(
-                            text = "ID: ${pregunta.id}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
+                            "ID: $idPregunta",
+                            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             color = EduRachaColors.Primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    // Dificultad Badge
-                    Surface(
-                        color = when (pregunta.dificultad) {
-                            DificultadPregunta.FACIL -> EduRachaColors.Success.copy(alpha = 0.15f)
-                            DificultadPregunta.MEDIA -> EduRachaColors.Warning.copy(alpha = 0.15f)
-                            DificultadPregunta.DIFICIL -> EduRachaColors.Error.copy(alpha = 0.15f)
-                        },
-                        shape = CustomShapes.Badge
-                    ) {
-                        Text(
-                            text = when (pregunta.dificultad) {
-                                DificultadPregunta.FACIL -> "Fácil"
-                                DificultadPregunta.MEDIA -> "Media"
-                                DificultadPregunta.DIFICIL -> "Difícil"
-                            },
-                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = when (pregunta.dificultad) {
-                                DificultadPregunta.FACIL -> EduRachaColors.Success
-                                DificultadPregunta.MEDIA -> EduRachaColors.Warning
-                                DificultadPregunta.DIFICIL -> EduRachaColors.Error
-                            },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            fontSize = 11.sp
                         )
                     }
-                }
 
-                IconButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) "Contraer" else "Expandir",
-                        tint = EduRachaColors.TextSecondary
-                    )
+                    val dificultad = pregunta.dificultad.orEmpty().lowercase()
+                    if (dificultad.isNotEmpty()) {
+                        val colorDificultad = when (dificultad) {
+                            "facil", "bajo" -> EduRachaColors.Success
+                            "media" -> EduRachaColors.Warning
+                            "dificil", "alto" -> EduRachaColors.Error
+                            else -> EduRachaColors.TextSecondary
+                        }
+                        Surface(color = colorDificultad.copy(0.15f), shape = RoundedCornerShape(8.dp)) {
+                            Text(
+                                dificultad.replaceFirstChar { it.uppercase() },
+                                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = colorDificultad,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
                 }
             }
 
-            Spacer(modifier = Modifier.height(Spacing.medium))
-
-            // Pregunta
-            Text(
-                text = pregunta.texto,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary,
-                lineHeight = 24.sp
-            )
-
-            Spacer(modifier = Modifier.height(Spacing.small))
-
-            // Fuente/Tema
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Bookmark,
-                    contentDescription = null,
-                    tint = EduRachaColors.TextSecondary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = pregunta.fuente,
-                    fontSize = 13.sp,
-                    color = EduRachaColors.TextSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.medium))
+            Spacer(Modifier.height(16.dp))
+            Text(pregunta.texto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
 
             // Opciones
             pregunta.opciones.forEachIndexed { index, opcion ->
-                OpcionRespuesta(
-                    letra = ('A' + index).toString(),
-                    texto = opcion.texto,
-                    esCorrecta = opcion.esCorrecta,
-                    modifier = Modifier.padding(bottom = Spacing.small)
-                )
+                OpcionItem(('A' + index).toString(), opcion.texto, opcion.esCorrecta)
+                if (index < pregunta.opciones.size - 1) Spacer(Modifier.height(8.dp))
             }
 
-            // Información expandible
-            AnimatedVisibility(visible = expanded) {
-                Column {
-                    Spacer(modifier = Modifier.height(Spacing.medium))
-                    EduRachaDivider()
-                    Spacer(modifier = Modifier.height(Spacing.medium))
+            // Sección Expandible
+            if (expanded) {
+                Spacer(Modifier.height(16.dp))
+                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                InfoRow(Icons.Default.AutoAwesome, "Generado por", pregunta.metadatosIA?.generadoPor ?: "No especificado")
+                Spacer(Modifier.height(8.dp))
+                InfoRow(Icons.Default.Bookmark, "Fuente", pregunta.fuente)
+            }
 
-                    // Generado por IA
-                    InfoRow(
-                        icon = Icons.Default.AutoAwesome,
-                        label = "Generado por",
-                        value = pregunta.metadatos.generadoPor,
-                        color = EduRachaColors.Info
-                    )
+            // Botones de Acción
+            Spacer(Modifier.height(20.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ showEditDialog = true }, Modifier.weight(1f)) {
+                    Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Editar")
+                }
+                OutlinedButton({ showRejectDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Icon(Icons.Default.ThumbDown, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Rechazar")
+                }
+                Button(onAprobar, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success)) {
+                    Icon(Icons.Default.ThumbUp, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Aprobar")
+                }
+            }
+        }
+    }
 
-                    Spacer(modifier = Modifier.height(Spacing.small))
+    if (showEditDialog) {
+        var textoEditado by remember { mutableStateOf(pregunta.texto) }
+        val opcionesOriginales = pregunta.opciones
+        var opcionesEditadas by remember { mutableStateOf(opcionesOriginales.map { it.texto }) }
+        var respuestaCorrecta by remember { mutableStateOf(opcionesOriginales.indexOfFirst { it.esCorrecta }) }
+        var notas by remember { mutableStateOf("") }
 
-                    // Fecha de creación
-                    InfoRow(
-                        icon = Icons.Default.CalendarToday,
-                        label = "Fecha de creación",
-                        value = formatDate(pregunta.fechaCreacion),
-                        color = EduRachaColors.TextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(Spacing.small))
-
-                    // Creado por
-                    InfoRow(
-                        icon = Icons.Default.Person,
-                        label = "Creado por",
-                        value = pregunta.creadoPor,
-                        color = EduRachaColors.TextSecondary
-                    )
-
-                    // Historial de revisiones
-                    if (pregunta.fueRevisada) {
-                        Spacer(modifier = Modifier.height(Spacing.medium))
-                        EduRachaDivider()
-                        Spacer(modifier = Modifier.height(Spacing.medium))
-
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = null,
-                                tint = EduRachaColors.Success,
-                                modifier = Modifier.size(20.dp)
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Editar pregunta") },
+            text = {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item { OutlinedTextField(textoEditado, { textoEditado = it }, label = { Text("Texto de la pregunta") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
+                    items(opcionesEditadas.size) { index ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = respuestaCorrecta == index, onClick = { respuestaCorrecta = index })
+                            TextField(
+                                value = opcionesEditadas[index],
+                                onValueChange = {
+                                    opcionesEditadas = opcionesEditadas.toMutableList().also { list -> list[index] = it }
+                                },
+                                label = { Text("Opción ${'A' + index}") },
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(modifier = Modifier.width(Spacing.small))
-                            Column {
-                                Text(
-                                    text = "Historial de Revisiones",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EduRachaColors.Success
-                                )
-                                Spacer(modifier = Modifier.height(Spacing.extraSmall))
-
-                                pregunta.historialRevisiones.forEach { revision ->
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                        color = EduRachaColors.SuccessContainer,
-                                        shape = CustomShapes.CardSmall
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(Spacing.medium)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(
-                                                    text = "Revisado por: ${revision.revisadoPor}",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = EduRachaColors.Success
-                                                )
-                                                if (revision.modificada) {
-                                                    Surface(
-                                                        color = EduRachaColors.Warning.copy(alpha = 0.2f),
-                                                        shape = CustomShapes.Badge
-                                                    ) {
-                                                        Text(
-                                                            text = "EDITADA",
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = EduRachaColors.Warning,
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Text(
-                                                text = formatDate(revision.fechaRevision),
-                                                fontSize = 11.sp,
-                                                color = EduRachaColors.TextSecondary
-                                            )
-                                            if (revision.notasRevision.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = revision.notasRevision,
-                                                    fontSize = 12.sp,
-                                                    color = EduRachaColors.TextPrimary,
-                                                    lineHeight = 16.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
-
-                    // Lote ID
-                    Spacer(modifier = Modifier.height(Spacing.small))
-                    InfoRow(
-                        icon = Icons.Default.Inventory,
-                        label = "Lote ID",
-                        value = pregunta.metadatos.lotId,
-                        color = EduRachaColors.TextSecondary
-                    )
+                    item { OutlinedTextField(notas, { notas = it }, label = { Text("Notas de revisión (opcional)") }, modifier = Modifier.fillMaxWidth()) }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.medium))
-            EduRachaDivider()
-            Spacer(modifier = Modifier.height(Spacing.medium))
-
-            // Botones de acción
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.small)
-            ) {
-                EduRachaSmallButton(
-                    text = "Editar",
-                    onClick = onEditar,
-                    icon = Icons.Default.Edit,
-                    backgroundColor = EduRachaColors.Info,
-                    modifier = Modifier.weight(1f)
-                )
-
-                EduRachaSmallButton(
-                    text = "Rechazar",
-                    onClick = onRechazar,
-                    icon = Icons.Default.Delete,
-                    backgroundColor = EduRachaColors.Error,
-                    modifier = Modifier.weight(1f)
-                )
-
-                EduRachaSmallButton(
-                    text = "Aprobar",
-                    onClick = onAprobar,
-                    icon = Icons.Default.CheckCircle,
-                    backgroundColor = EduRachaColors.Success,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-// ============================================
-// COMPONENTES AUXILIARES
-// ============================================
-
-@Composable
-fun InfoRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String,
-    color: Color
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.small)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(
-            text = "$label:",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = EduRachaColors.TextSecondary
-        )
-        Text(
-            text = value,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Normal,
-            color = EduRachaColors.TextPrimary
-        )
-    }
-}
-
-@Composable
-fun OpcionRespuesta(
-    letra: String,
-    texto: String,
-    esCorrecta: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = if (esCorrecta)
-        EduRachaColors.SuccessContainer
-    else
-        EduRachaColors.SurfaceVariant
-
-    val borderColor = if (esCorrecta)
-        EduRachaColors.Success
-    else
-        Color.Transparent
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(
-                width = if (esCorrecta) BorderWidth.medium else BorderWidth.none,
-                color = borderColor,
-                shape = CustomShapes.CardSmall
-            ),
-        shape = CustomShapes.CardSmall,
-        color = backgroundColor
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.medium),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .background(
-                        color = if (esCorrecta) EduRachaColors.Success else EduRachaColors.Primary,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = letra,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            Spacer(modifier = Modifier.width(Spacing.medium))
-
-            Text(
-                text = texto,
-                fontSize = 14.sp,
-                fontWeight = if (esCorrecta) FontWeight.SemiBold else FontWeight.Normal,
-                color = EduRachaColors.TextPrimary,
-                modifier = Modifier.weight(1f)
-            )
-
-            if (esCorrecta) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Respuesta correcta",
-                    tint = EduRachaColors.Success,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-// ============================================
-// DIÁLOGOS
-// ============================================
-
-@Composable
-fun EditarPreguntaDialog(
-    pregunta: PreguntaIA,
-    nombreRevisor: String,
-    onDismiss: () -> Unit,
-    onConfirm: (PreguntaIA, String) -> Unit
-) {
-    var textoPregunta by remember { mutableStateOf(pregunta.texto) }
-    var opciones by remember {
-        mutableStateOf(pregunta.opciones.map { it.texto }.toMutableList())
-    }
-    var respuestaCorrectaIndex by remember {
-        mutableStateOf(pregunta.opciones.indexOfFirst { it.esCorrecta })
-    }
-    var notasRevision by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = EduRachaColors.Info,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(modifier = Modifier.width(Spacing.small))
-                Column {
-                    Text(
-                        text = "Editar Pregunta",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "ID: ${pregunta.id}",
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-            }
-        },
-        text = {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(Spacing.medium)
-            ) {
-                item {
-                    EduRachaTextArea(
-                        value = textoPregunta,
-                        onValueChange = { textoPregunta = it },
-                        label = "Pregunta",
-                        placeholder = "Escribe la pregunta...",
-                        minLines = 2,
-                        maxLines = 4
-                    )
-                }
-
-                item {
-                    Text(
-                        text = "Opciones (selecciona la correcta)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-                }
-
-                items(opciones.size) { index ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.small)
-                    ) {
-                        RadioButton(
-                            selected = respuestaCorrectaIndex == index,
-                            onClick = { respuestaCorrectaIndex = index },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = EduRachaColors.Success
-                            )
-                        )
-
-                        EduRachaTextField(
-                            value = opciones[index],
-                            onValueChange = { opciones[index] = it },
-                            label = "Opción ${('A' + index)}",
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                item {
-                    EduRachaTextArea(
-                        value = notasRevision,
-                        onValueChange = { notasRevision = it },
-                        label = "Notas de revisión",
-                        placeholder = "Describe los cambios realizados...",
-                        minLines = 2,
-                        maxLines = 3
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            EduRachaPrimaryButton(
-                text = "Guardar Cambios",
-                onClick = {
+            },
+            confirmButton = {
+                Button(onClick = {
                     val preguntaEditada = pregunta.copy(
-                        texto = textoPregunta,
-                        opciones = opciones.mapIndexed { index, texto ->
-                            OpcionRespuesta(texto, index == respuestaCorrectaIndex)
+                        texto = textoEditado,
+                        opciones = opcionesEditadas.mapIndexed { index, texto ->
+                            OpcionIA(
+                                id = opcionesOriginales[index].id,
+                                texto = texto,
+                                esCorrecta = index == respuestaCorrecta
+                            )
                         }
                     )
-                    onConfirm(
-                        preguntaEditada,
-                        notasRevision.ifEmpty { "Pregunta editada por $nombreRevisor" }
-                    )
-                },
-                enabled = textoPregunta.isNotBlank() &&
-                        opciones.all { it.isNotBlank() } &&
-                        respuestaCorrectaIndex >= 0,
-                icon = Icons.Default.Save
-            )
-        },
-        dismissButton = {
-            EduRachaTextButton(
-                text = "Cancelar",
-                onClick = onDismiss
-            )
-        },
-        shape = CustomShapes.Dialog,
-        containerColor = EduRachaColors.Surface
-    )
+                    onEditar(preguntaEditada, notas)
+                    showEditDialog = false
+                }) { Text("Guardar Cambios") }
+            },
+            dismissButton = { TextButton({ showEditDialog = false }) { Text("Cancelar") } }
+        )
+    }
+
+    if (showRejectDialog) {
+        var motivo by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showRejectDialog = false },
+            title = { Text("Rechazar pregunta") },
+            text = {
+                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo del rechazo") }, modifier = Modifier.fillMaxWidth())
+            },
+            confirmButton = {
+                Button(
+                    onClick = { if (motivo.isNotBlank()) { onRechazar(motivo); showRejectDialog = false } },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Confirmar Rechazo") }
+            },
+            dismissButton = { TextButton({ showRejectDialog = false }) { Text("Cancelar") } }
+        )
+    }
+}
+
+// --- ¡CORRECCIÓN! ESTAS FUNCIONES AHORA ESTÁN FUERA DE PREGUNTACARD ---
+
+@Composable
+fun OpcionItem(letra: String, texto: String, esCorrecta: Boolean) {
+    val backgroundColor = if (esCorrecta) EduRachaColors.Success.copy(0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, if (esCorrecta) EduRachaColors.Success else Color.Transparent, RoundedCornerShape(12.dp))
+            .background(backgroundColor, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(28.dp).background(if (esCorrecta) EduRachaColors.Success else MaterialTheme.colorScheme.primary, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(letra, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(texto, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable
-fun ConfirmarRechazoDialog(
-    pregunta: PreguntaIA,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var motivo by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = EduRachaColors.Error,
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "¿Rechazar pregunta?",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                Text(
-                    text = "Esta acción no se puede deshacer. La pregunta será marcada como rechazada.",
-                    fontSize = 14.sp,
-                    color = EduRachaColors.TextSecondary,
-                    lineHeight = 20.sp
-                )
-
-                Spacer(modifier = Modifier.height(Spacing.medium))
-
-                Surface(
-                    color = EduRachaColors.ErrorContainer,
-                    shape = CustomShapes.CardSmall
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.medium)) {
-                        Text(
-                            text = "Pregunta a rechazar:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Error
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = pregunta.texto,
-                            fontSize = 13.sp,
-                            color = EduRachaColors.TextPrimary,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(Spacing.medium))
-
-                EduRachaTextArea(
-                    value = motivo,
-                    onValueChange = { motivo = it },
-                    label = "Motivo del rechazo (requerido)",
-                    placeholder = "Explica por qué rechazas esta pregunta...",
-                    minLines = 3,
-                    maxLines = 5
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(motivo) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Error
-                ),
-                enabled = motivo.isNotBlank()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(Spacing.small))
-                Text("Rechazar")
-            }
-        },
-        dismissButton = {
-            EduRachaTextButton(
-                text = "Cancelar",
-                onClick = onDismiss
-            )
-        },
-        shape = CustomShapes.Dialog,
-        containerColor = EduRachaColors.Surface
-    )
-}
-
-// ============================================
-// FUNCIÓN AUXILIAR PARA FORMATEAR FECHAS
-// ============================================
-fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("es", "ES"))
-    return sdf.format(Date(timestamp))
+fun InfoRow(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(16.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(8.dp))
+        Text("$label:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(4.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
 }

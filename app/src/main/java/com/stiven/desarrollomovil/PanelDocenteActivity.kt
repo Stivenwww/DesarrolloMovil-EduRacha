@@ -1,8 +1,9 @@
+// Archivo: PanelDocenteActivity.kt
+
 package com.stiven.desarrollomovil
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -27,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
@@ -40,10 +40,12 @@ class PanelDocenteActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // El setContent se mueve a onResume para refrescar los datos
     }
 
     override fun onResume() {
         super.onResume()
+        // Cada vez que la pantalla vuelve a estar visible, se piden los cursos actualizados
         cursoViewModel.obtenerCursos()
         setContent {
             EduRachaTheme {
@@ -53,7 +55,7 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToNotifications = { navigateTo(NotificacionesActivity::class.java) },
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
                     onNavigateToCreateCourse = { navigateTo(CrearCursoActivity::class.java) },
-                    onNavigateToValidation = { handleValidationClick() },
+                    onNavigateToValidation = { handleValidationClick() }, // Esta llamada no cambia
                     onNavigateToReports = { navigateTo(ListaEstudiantesActivity::class.java) },
                     onNavigateToGroups = { navigateTo(GestionGruposActivity::class.java) },
                     onNavigateToStudents = { navigateTo(ListaEstudiantesActivity::class.java) },
@@ -67,307 +69,310 @@ class PanelDocenteActivity : ComponentActivity() {
         startActivity(Intent(this, activityClass))
     }
 
-    private fun navigateToValidationScreen(cursoTitulo: String) {
-        val intent = Intent(this, ValidacionPreguntasActivity::class.java).apply {
-            putExtra("CURSO_TITULO", cursoTitulo)
+// En: PanelDocenteActivity.kt
+
+    private fun handleValidationClick() {
+        // Le decimos a la siguiente pantalla que el propósito es validar preguntas
+        val intent = Intent(this, ListaCursosActivity::class.java).apply {
+            putExtra("PROPOSITO", "VALIDAR_PREGUNTAS")
         }
         startActivity(intent)
     }
 
-    private fun handleValidationClick() {
-        navigateTo(ValidacionPreguntasActivity::class.java)
-    }
-
     private fun handleCoursesClick() {
+        // Aquí no pasamos ningún extra, así que el modo será el normal
         navigateTo(ListaCursosActivity::class.java)
     }
-}
-
-@Composable
-fun PanelDocenteScreen(
-    viewModel: CursoViewModel,
-    onNavigateToProfile: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToCreateCourse: () -> Unit,
-    onNavigateToValidation: () -> Unit,
-    onNavigateToReports: () -> Unit,
-    onNavigateToGroups: () -> Unit,
-    onNavigateToStudents: () -> Unit,
-    onNavigateToCourses: () -> Unit
-) {
-    val context = LocalContext.current
-    val greeting = remember { getGreeting() }
-    val user = FirebaseAuth.getInstance().currentUser
-    val userName = remember { user?.displayName?.split(" ")?.firstOrNull() ?: "Docente" }
-    val userEmail = remember { user?.email ?: "docente@uniautonoma.edu.co" }
-
-    // Observar datos del ViewModel
-    val cursos by viewModel.cursos.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
 
 
+// =======================================================================
+// EL RESTO DEL ARCHIVO (PanelDocenteScreen Y SUS COMPONENTES) NO CAMBIA
+// =======================================================================
 
-    // Contar datos desde la API
-    val totalCursos = cursos.size
-    val preguntasPendientes = 0 // TODO: Conectar cuando tengas el ViewModel de preguntas
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EduRachaColors.Background)
-            .verticalScroll(rememberScrollState())
+    @Composable
+    fun PanelDocenteScreen(
+        viewModel: CursoViewModel,
+        onNavigateToProfile: () -> Unit,
+        onNavigateToNotifications: () -> Unit,
+        onNavigateToSettings: () -> Unit,
+        onNavigateToCreateCourse: () -> Unit,
+        onNavigateToValidation: () -> Unit,
+        onNavigateToReports: () -> Unit,
+        onNavigateToGroups: () -> Unit,
+        onNavigateToStudents: () -> Unit,
+        onNavigateToCourses: () -> Unit
     ) {
-        // Header con datos del usuario
-        Box(
+        val context = LocalContext.current
+        val greeting = remember { getGreeting() }
+        val user = FirebaseAuth.getInstance().currentUser
+        val userName = remember { user?.displayName?.split(" ")?.firstOrNull() ?: "Docente" }
+        val userEmail = remember { user?.email ?: "docente@uniautonoma.edu.co" }
+
+        // Observar datos del ViewModel
+        val cursos by viewModel.cursos.collectAsState()
+        val isLoading by viewModel.isLoading.collectAsState()
+
+        // Contar datos desde la API
+        val totalCursos = cursos.size
+        val preguntasPendientes = 0 // TODO: Conectar cuando tengas el ViewModel de preguntas
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(top = 40.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
+                .fillMaxSize()
+                .background(EduRachaColors.Background)
+                .verticalScroll(rememberScrollState())
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Header con datos del usuario
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(top = 40.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, EduRachaColors.Primary, CircleShape)
-                        .background(Color.White)
-                        .clickable(onClick = onNavigateToProfile),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = "Perfil",
-                        modifier = Modifier.size(32.dp),
-                        tint = EduRachaColors.Primary
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = greeting, fontSize = 14.sp, color = EduRachaColors.TextPrimary)
-                    Text(
-                        text = userName,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-                    if (userEmail.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, EduRachaColors.Primary, CircleShape)
+                            .background(Color.White)
+                            .clickable(onClick = onNavigateToProfile),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = "Perfil",
+                            modifier = Modifier.size(32.dp),
+                            tint = EduRachaColors.Primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = greeting, fontSize = 14.sp, color = EduRachaColors.TextPrimary)
                         Text(
-                            text = userEmail,
-                            fontSize = 12.sp,
-                            color = EduRachaColors.TextSecondary,
-                            modifier = Modifier.padding(top = 2.dp)
+                            text = userName,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary
                         )
+                        if (userEmail.isNotEmpty()) {
+                            Text(
+                                text = userEmail,
+                                fontSize = 12.sp,
+                                color = EduRachaColors.TextSecondary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                     }
-                }
-                Row {
-                    IconButton(onClick = onNavigateToNotifications) {
-                        Icon(
-                            imageVector = Icons.Outlined.Notifications,
-                            contentDescription = "Notificaciones",
-                            tint = EduRachaColors.TextSecondary
-                        )
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Ajustes",
-                            tint = EduRachaColors.TextSecondary
-                        )
+                    Row {
+                        IconButton(onClick = onNavigateToNotifications) {
+                            Icon(
+                                imageVector = Icons.Outlined.Notifications,
+                                contentDescription = "Notificaciones",
+                                tint = EduRachaColors.TextSecondary
+                            )
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = "Ajustes",
+                                tint = EduRachaColors.TextSecondary
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Tarjetas de estadísticas
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CompactStatCard(
-                label = "Cursos",
-                value = "$totalCursos",
-                icon = Icons.Outlined.MenuBook,
-                iconColor = EduRachaColors.Primary,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToCourses
-            )
-            CompactStatCard(
-                label = "Pendientes",
-                value = "$preguntasPendientes",
-                icon = Icons.Outlined.HourglassTop,
-                iconColor = EduRachaColors.Warning,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToValidation
-            )
-            CompactStatCard(
-                label = "Estudiantes",
-                value = "124",
-                icon = Icons.Outlined.Groups,
-                iconColor = EduRachaColors.Success,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToStudents
-            )
-        }
+            // Tarjetas de estadísticas
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CompactStatCard(
+                    label = "Cursos",
+                    value = "$totalCursos",
+                    icon = Icons.Outlined.MenuBook,
+                    iconColor = EduRachaColors.Primary,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToCourses
+                )
+                CompactStatCard(
+                    label = "Pendientes",
+                    value = "$preguntasPendientes",
+                    icon = Icons.Outlined.HourglassTop,
+                    iconColor = EduRachaColors.Warning,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToValidation
+                )
+                CompactStatCard(
+                    label = "Estudiantes",
+                    value = "124", // Simulado
+                    icon = Icons.Outlined.Groups,
+                    iconColor = EduRachaColors.Success,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToStudents
+                )
+            }
 
-        // Herramientas principales
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Herramientas principales",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            MainToolCard(
-                title = "Crear Curso",
-                description = "Sube tu plan de aula y configura el curso",
-                icon = Icons.Outlined.Add,
-                backgroundColor = EduRachaColors.Primary,
-                onClick = onNavigateToCreateCourse
-            )
-            MainToolCard(
-                title = "Validación IA",
-                description = "Revisa y aprueba preguntas generadas por IA",
-                icon = Icons.Outlined.CheckCircle,
-                backgroundColor = EduRachaColors.Accent,
-                onClick = onNavigateToValidation
-            )
-            MainToolCard(
-                title = "Reportes y Analytics",
-                description = "Visualiza estadísticas de participación",
-                icon = Icons.Outlined.BarChart,
-                backgroundColor = EduRachaColors.Secondary,
-                onClick = onNavigateToReports
-            )
-            MainToolCard(
-                title = "Gestión de Grupos",
-                description = "Organiza y asigna estudiantes a grupos",
-                icon = Icons.Outlined.GroupAdd,
-                backgroundColor = EduRachaColors.Success,
-                onClick = onNavigateToGroups
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-        }
-    }
-}
-
-@Composable
-fun CompactStatCard(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    iconColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 20.dp, horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(36.dp),
-                tint = iconColor
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = iconColor
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = EduRachaColors.TextSecondary,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-fun MainToolCard(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    backgroundColor: Color,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                modifier = Modifier.size(40.dp),
-                tint = Color.White
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            // Herramientas principales
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
-                    text = title,
-                    fontSize = 18.sp,
+                    text = "Herramientas principales",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = EduRachaColors.TextPrimary,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+
+                MainToolCard(
+                    title = "Crear Curso",
+                    description = "Sube tu plan de aula y configura el curso",
+                    icon = Icons.Outlined.Add,
+                    backgroundColor = EduRachaColors.Primary,
+                    onClick = onNavigateToCreateCourse
+                )
+                MainToolCard(
+                    title = "Validación IA",
+                    description = "Revisa y aprueba preguntas generadas por IA",
+                    icon = Icons.Outlined.CheckCircle,
+                    backgroundColor = EduRachaColors.Accent,
+                    onClick = onNavigateToValidation
+                )
+                MainToolCard(
+                    title = "Reportes y Analytics",
+                    description = "Visualiza estadísticas de participación",
+                    icon = Icons.Outlined.BarChart,
+                    backgroundColor = EduRachaColors.Secondary,
+                    onClick = onNavigateToReports
+                )
+                MainToolCard(
+                    title = "Gestión de Grupos",
+                    description = "Organiza y asigna estudiantes a grupos",
+                    icon = Icons.Outlined.GroupAdd,
+                    backgroundColor = EduRachaColors.Success,
+                    onClick = onNavigateToGroups
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+        }
+    }
+
+    @Composable
+    fun CompactStatCard(
+        label: String,
+        value: String,
+        icon: ImageVector,
+        iconColor: Color,
+        modifier: Modifier = Modifier,
+        onClick: () -> Unit
+    ) {
+        Card(
+            modifier = modifier.clickable(onClick = onClick),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp, horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(36.dp),
+                    tint = iconColor
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = value,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = iconColor
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = description,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.9f),
-                    lineHeight = 18.sp
+                    text = label,
+                    fontSize = 12.sp,
+                    color = EduRachaColors.TextSecondary,
+                    fontWeight = FontWeight.Medium
                 )
             }
-            Icon(
-                imageVector = Icons.Outlined.ArrowForward,
-                contentDescription = "Ir",
-                tint = Color.White
-            )
         }
     }
-}
 
-fun getGreeting(): String {
-    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    return when {
-        hour in 0..11 -> "Buenos días"
-        hour in 12..18 -> "Buenas tardes"
-        else -> "Buenas noches"
+    @Composable
+    fun MainToolCard(
+        title: String,
+        description: String,
+        icon: ImageVector,
+        backgroundColor: Color,
+        onClick: () -> Unit
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = backgroundColor)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize() // Cambiado para asegurar que el Row ocupe el Card
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    modifier = Modifier.size(40.dp),
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.9f),
+                        lineHeight = 18.sp
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Outlined.ArrowForward,
+                    contentDescription = "Ir",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+
+    fun getGreeting(): String {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when {
+            hour in 0..11 -> "Buenos días"
+            hour in 12..18 -> "Buenas tardes"
+            else -> "Buenas noches"
+        }
     }
 }
