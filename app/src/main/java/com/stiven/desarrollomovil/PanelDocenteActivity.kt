@@ -44,6 +44,7 @@ class PanelDocenteActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        cursoViewModel.obtenerCursos()
         setContent {
             EduRachaTheme {
                 PanelDocenteScreen(
@@ -105,10 +106,7 @@ fun PanelDocenteScreen(
     val cursos by viewModel.cursos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    // Cargar cursos al iniciar
-    LaunchedEffect(Unit) {
-        viewModel.obtenerCursos()
-    }
+
 
     // Contar datos desde la API
     val totalCursos = cursos.size

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -31,11 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
-
-// NOTA: ASUMO QUE LAS CLASES 'Estudiante', 'GruposRepository', y 'GestionGruposActivity'
-// están definidas en otras partes de tu proyecto.
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 
 class VisualizarGruposActivity : ComponentActivity() {
+
+    private val cursoViewModel: CursoViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -45,6 +47,7 @@ class VisualizarGruposActivity : ComponentActivity() {
             EduRachaTheme {
                 VisualizarGruposScreen(
                     cursoInicial = cursoSeleccionado,
+                    cursoViewModel = cursoViewModel,
                     onNavigateBack = {
                         val intent = Intent(this, GestionGruposActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -55,9 +58,6 @@ class VisualizarGruposActivity : ComponentActivity() {
             }
         }
     }
-
-    // CORRECCIÓN CLAVE: Eliminada la función onResume() que contenía recreate().
-    // Esto previene el parpadeo de la pantalla.
 }
 
 // =========================================================================================
@@ -67,63 +67,194 @@ class VisualizarGruposActivity : ComponentActivity() {
 @Composable
 fun VisualizarGruposScreen(
     cursoInicial: String?,
+    cursoViewModel: CursoViewModel,
     onNavigateBack: () -> Unit
 ) {
-    // CORRECCIÓN/MEJORA: Usar 'key' con un valor que cambie cuando los datos del repositorio cambien.
-    // Esto asegura que si los datos cambian fuera de esta Activity, la vista se recomponga.
-    // Asumo que 'GruposRepository.obtenerTotalEstudiantes()' es una buena clave de cambio.
-    val grupos = remember(GruposRepository.obtenerTotalEstudiantes()) {
-        GruposRepository.obtenerTodosLosCursosConEstudiantes()
+    // Cargar cursos desde la API
+    LaunchedEffect(Unit) {
+        cursoViewModel.obtenerCursos()
+    }
+
+    // Observar estados del ViewModel
+    val cursos by cursoViewModel.cursos.collectAsState()
+    val isLoading by cursoViewModel.isLoading.collectAsState()
+    val error by cursoViewModel.error.collectAsState()
+
+    // Estado local para expandir/contraer
+    var expandedCurso by remember { mutableStateOf(cursoInicial) }
+
+    // Obtener datos desde la API (ahora los cursos tienen estudiantes en el backend)
+    // Aquí organizamos los grupos: cada curso con sus estudiantes
+    val grupos = remember(cursos) {
+        // Si tu backend ya trae estudiantes por curso, ajusta esto
+        // Por ahora asumo que cada curso tiene su información
+        cursos.associate { curso ->
+            curso.titulo to (GruposRepository.obtenerEstudiantesPorCurso(curso.titulo) ?: emptyList())
+        }
     }
 
     val totalCursos = grupos.size
     val totalEstudiantes = grupos.values.sumOf { it.size }
 
-    var expandedCurso by remember { mutableStateOf(cursoInicial) }
-
     Scaffold(
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            VisualizarGruposHeader(
-                onNavigateBack = onNavigateBack,
-                totalCursos = totalCursos,
-                totalEstudiantes = totalEstudiantes
-            )
-
-            if (grupos.isEmpty()) {
-                EmptyVisualizarGruposState()
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+            // Mostrar loading
+            if (isLoading && cursos.isEmpty()) {
+                LoadingVisualizarGrupos()
+            }
+            // Mostrar error
+            else if (error != null && cursos.isEmpty()) {
+                ErrorVisualizarGrupos(
+                    mensaje = error ?: "Error desconocido",
+                    onRetry = { cursoViewModel.obtenerCursos() }
+                )
+            }
+            // Mostrar contenido
+            else {
+                Column(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    // Ordenar cursos alfabéticamente para consistencia
-                    items(
-                        items = grupos.keys.sorted(),
-                        key = { it }
-                    ) { curso ->
-                        val estudiantes = grupos[curso] ?: emptyList()
-                        GrupoExpandibleCard(
-                            curso = curso,
-                            estudiantes = estudiantes,
-                            isExpanded = expandedCurso == curso,
-                            onCardClick = {
-                                expandedCurso = if (expandedCurso == curso) null else curso
-                            }
-                        )
-                    }
+                    VisualizarGruposHeader(
+                        onNavigateBack = onNavigateBack,
+                        totalCursos = totalCursos,
+                        totalEstudiantes = totalEstudiantes
+                    )
 
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
+                    if (grupos.isEmpty()) {
+                        EmptyVisualizarGruposState()
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(
+                                items = grupos.keys.sorted(),
+                                key = { it }
+                            ) { curso ->
+                                val estudiantes = grupos[curso] ?: emptyList()
+                                GrupoExpandibleCard(
+                                    curso = curso,
+                                    estudiantes = estudiantes,
+                                    isExpanded = expandedCurso == curso,
+                                    onCardClick = {
+                                        expandedCurso = if (expandedCurso == curso) null else curso
+                                    }
+                                )
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LoadingVisualizarGrupos() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EduRachaColors.Background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                color = EduRachaColors.Primary,
+                strokeWidth = 4.dp,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Cargando grupos...",
+                fontSize = 16.sp,
+                color = EduRachaColors.TextSecondary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun ErrorVisualizarGrupos(
+    mensaje: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(EduRachaColors.Error.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                tint = EduRachaColors.Error,
+                modifier = Modifier.size(60.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Error al cargar grupos",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = mensaje,
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = EduRachaColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Reintentar",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -626,4 +757,3 @@ fun EmptyVisualizarGruposState() {
         }
     }
 }
-
