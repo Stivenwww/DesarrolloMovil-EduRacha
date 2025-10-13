@@ -5,100 +5,104 @@ import androidx.lifecycle.viewModelScope
 import com.stiven.desarrollomovil.models.Curso
 import com.stiven.desarrollomovil.repository.CursoRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class CursoUiState(
+    val cursos: List<Curso> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val operationSuccess: String? = null
+)
 
 class CursoViewModel : ViewModel() {
 
     private val repository = CursoRepository()
 
-    private val _cursos = MutableStateFlow<List<Curso>>(emptyList())
-    val cursos: StateFlow<List<Curso>> = _cursos
+    private val _uiState = MutableStateFlow(CursoUiState())
+    val uiState = _uiState.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    init {
+        obtenerCursos()
+    }
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
-
-    // Obtener todos los cursos
     fun obtenerCursos() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
+            _uiState.update { it.copy(isLoading = true, error = null) }
             repository.obtenerCursos()
                 .onSuccess { listaCursos ->
-                    _cursos.value = listaCursos
+                    _uiState.update { it.copy(isLoading = false, cursos = listaCursos) }
                 }
                 .onFailure { exception ->
-                    _error.value = exception.message ?: "Error desconocido"
+                    _uiState.update { it.copy(isLoading = false, error = exception.message ?: "Error desconocido al cargar") }
                 }
-
-            _isLoading.value = false
         }
     }
 
-    // Crear un nuevo curso - CORREGIDO con onError
-    fun crearCurso(curso: Curso, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+    fun crearCurso(curso: Curso) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
+            _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.crearCurso(curso)
                 .onSuccess { response ->
-                    onSuccess(response.id ?: "")
-                    obtenerCursos() // Recargar la lista
+                    _uiState.update { it.copy(isLoading = false, operationSuccess = "Curso creado exitosamente") }
+                    obtenerCursos() // Refrescar la lista
                 }
                 .onFailure { exception ->
-                    val errorMsg = exception.message ?: "Error al crear curso"
-                    _error.value = errorMsg
-                    onError(errorMsg) // ESTO FALTABA
+                    _uiState.update { it.copy(isLoading = false, error = exception.message ?: "Error desconocido al crear") }
                 }
-
-            _isLoading.value = false
         }
     }
 
-    // Actualizar un curso
-    fun actualizarCurso(id: String, curso: Curso, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+    /**
+     * --- ¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE! ---
+     * Se añade una validación robusta para el ID antes de llamar al repositorio.
+     */
+    fun actualizarCurso(curso: Curso) {
+        // 1. Extraer el ID del curso de forma segura.
+        val id = curso.id
 
+        // 2. Comprobar que el ID no sea nulo ni esté en blanco.
+        if (id.isNullOrBlank()) {
+            // Si el ID es inválido, actualiza la UI con un error claro y no continúes.
+            _uiState.update { it.copy(isLoading = false, error = "ID del curso no encontrado. No se puede actualizar.") }
+            return // Detiene la ejecución de la función aquí.
+        }
+
+        // 3. Si el ID es válido, procede con la llamada a la API.
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
+            // Llama al repositorio con el ID validado.
             repository.actualizarCurso(id, curso)
                 .onSuccess {
-                    onSuccess()
-                    obtenerCursos() // Recargar la lista
+                    _uiState.update { it.copy(isLoading = false, operationSuccess = "Curso '${curso.titulo}' actualizado") }
+                    obtenerCursos() // Refrescar la lista para que la UI muestre los cambios.
                 }
                 .onFailure { exception ->
-                    val errorMsg = exception.message ?: "Error al actualizar curso"
-                    _error.value = errorMsg
-                    onError(errorMsg)
+                    _uiState.update { it.copy(isLoading = false, error = exception.message ?: "Error desconocido al actualizar") }
                 }
-
-            _isLoading.value = false
         }
     }
 
-    // Eliminar un curso
-    fun eliminarCurso(id: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun eliminarCurso(id: String) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
+            _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.eliminarCurso(id)
                 .onSuccess {
-                    onSuccess()
-                    obtenerCursos() // Recargar la lista
+                    _uiState.update { it.copy(isLoading = false, operationSuccess = "Curso eliminado exitosamente.") }
+                    obtenerCursos() // Refrescar la lista
                 }
                 .onFailure { exception ->
-                    val errorMsg = exception.message ?: "Error al eliminar curso"
-                    _error.value = errorMsg
-                    onError(errorMsg)
+                    _uiState.update { it.copy(isLoading = false, error = exception.message ?: "Error desconocido al eliminar") }
                 }
-
-            _isLoading.value = false
         }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearSuccessMessage() {
+        _uiState.update { it.copy(operationSuccess = null) }
     }
 }

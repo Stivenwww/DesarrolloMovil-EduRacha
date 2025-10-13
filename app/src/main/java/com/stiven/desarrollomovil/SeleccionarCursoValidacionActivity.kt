@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,29 +18,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.desarrollomovil.models.Curso
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
-
-// ============================================
-// ACTIVITY PARA SELECCIONAR CURSO
-// ============================================
+import com.stiven.desarrollomovil.viewmodel.CursoViewModel
+import com.stiven.desarrollomovil.viewmodel.ValidacionPreguntasViewModel
 
 class SeleccionarCursoValidacionActivity : ComponentActivity() {
+
+    private val cursoViewModel: CursoViewModel by viewModels()
+    private val preguntasViewModel: ValidacionPreguntasViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             EduRachaTheme {
                 SeleccionarCursoValidacionScreen(
+                    cursoViewModel = cursoViewModel,
+                    preguntasViewModel = preguntasViewModel,
                     onNavigateBack = { finish() },
-                    // --- PASO 1: Ajusta la firma para recibir el objeto Curso completo ---
                     onCursoSelected = { curso ->
                         abrirValidacionPreguntas(curso)
                     }
@@ -48,158 +50,144 @@ class SeleccionarCursoValidacionActivity : ComponentActivity() {
         }
     }
 
-    // --- PASO 2: REEMPLAZA TU FUNCIÓN ANTIGUA CON ESTA NUEVA VERSIÓN ---
     private fun abrirValidacionPreguntas(curso: Curso) {
         val intent = Intent(this, ValidacionPreguntasActivity::class.java).apply {
             putExtra("CURSO_TITULO", curso.titulo)
-            putExtra("CURSO_ID", curso.id) // IMPORTANTE: Pasas el ID del curso
-            putExtra("TEMA_ID", curso.temas?.keys?.firstOrNull() ?: "tema_1") // IMPORTANTE: Pasas el ID del primer tema
+            putExtra("CURSO_ID", curso.id)
+            putExtra("CURSO_CODIGO", curso.codigo)
         }
         startActivity(intent)
     }
 }
 
-
-// ============================================
-// PANTALLA EN JETPACK COMPOSE
-// ============================================
 // ============================================
 // PANTALLA EN JETPACK COMPOSE
 // ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SeleccionarCursoValidacionScreen(
+    cursoViewModel: CursoViewModel,
+    preguntasViewModel: ValidacionPreguntasViewModel,
     onNavigateBack: () -> Unit,
-    // --- CORRECCIÓN 1: La firma ahora espera un objeto 'Curso' ---
     onCursoSelected: (Curso) -> Unit
 ) {
-    // Obtener cursos con preguntas pendientes
-    val cursosConPendientes = remember {
-        PreguntasIARepository.obtenerCursosConPreguntasPendientes()
+    val cursoUiState by cursoViewModel.uiState.collectAsState()
+    val preguntasUiState by preguntasViewModel.uiState.collectAsState()
+
+    val todosLosCursos = cursoUiState.cursos
+    val preguntasPendientes = preguntasUiState.preguntas
+    val isLoading = cursoUiState.isLoading || preguntasUiState.isLoading
+
+    LaunchedEffect(Unit) {
+        cursoViewModel.obtenerCursos()
+        preguntasViewModel.cargarTodasLasPreguntasPendientes()
     }
 
-    // Calcular estadísticas por curso
-    val estadisticasPorCurso = remember(cursosConPendientes) {
-        cursosConPendientes.associateWith { curso ->
-            val pendientes = PreguntasIARepository.obtenerPreguntasPendientes(curso.titulo).size
-            val total = PreguntasIARepository.obtenerTodasLasPreguntas(curso.titulo).size
-            Pair(pendientes, total)
-        }
+    // Combinar datos usando el ID del curso
+    val cursosConPreguntasPendientes = remember(todosLosCursos, preguntasPendientes) {
+        val idsCursosConPendientes = preguntasPendientes
+            .mapNotNull { pregunta ->
+                // Intentar obtener el ID del curso desde la pregunta
+                // Asumiendo que tienes un campo cursoId en tu modelo PreguntaIA
+                when {
+                    pregunta.cursoId != null -> pregunta.cursoId
+                    pregunta.cursoTitulo != null -> {
+                        // Si solo tienes título, buscar el ID del curso por título
+                        todosLosCursos.find { it.titulo == pregunta.cursoTitulo }?.id
+                    }
+                    else -> null
+                }
+            }
+            .toSet()
+
+        todosLosCursos.filter { curso -> curso.id in idsCursosConPendientes }
     }
 
     Scaffold(
         topBar = {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(elevation = 4.dp),
-                color = EduRachaColors.Primary
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    EduRachaColors.Primary,
-                                    EduRachaColors.Primary.copy(alpha = 0.85f)
-                                )
-                            )
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Validar Preguntas IA", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text("Selecciona un curso", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
+                    }
+                },
+                actions = {
+                    Surface(
+                        color = EduRachaColors.Secondary,
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text(
+                            text = "${preguntasPendientes.size} total",
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
-                ) {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    text = "Validar Preguntas IA",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Selecciona un curso",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowBack,
-                                    contentDescription = "Volver",
-                                    tint = Color.White
-                                )
-                            }
-                        },
-                        actions = {
-                            Surface(
-                                color = EduRachaColors.Secondary,
-                                shape = RoundedCornerShape(20.dp)
-                            ) {
-                                Text(
-                                    text = "${estadisticasPorCurso.values.sumOf { it.first }} total",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(
-                                        horizontal = 12.dp,
-                                        vertical = 6.dp
-                                    )
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent
-                        )
-                    )
-                }
-            }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.Primary)
+            )
         },
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (cursosConPendientes.isEmpty()) {
-                EmptyStateValidacion(onNavigateBack = onNavigateBack)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Header informativo
-                    item {
-                        InfoCard(
-                            totalCursos = cursosConPendientes.size,
-                            totalPendientes = estadisticasPorCurso.values.sumOf { it.first }
-                        )
-                    }
-
-                    // Título de sección
-                    item {
-                        SectionHeaderValidacion()
-                    }
-
-                    // Lista de cursos
-                    items(cursosConPendientes, key = { it.codigo }) { curso ->
-                        val (pendientes, total) = estadisticasPorCurso[curso] ?: Pair(0, 0)
-
-                        CursoValidacionCard(
-                            curso = curso,
-                            preguntasPendientes = pendientes,
-                            preguntasTotales = total,
-                            // --- CORRECCIÓN 2: Se pasa el objeto 'curso' completo ---
-                            onClick = { onCursoSelected(curso) }
-                        )
-                    }
-
-                    item {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            when {
+                isLoading && cursosConPreguntasPendientes.isEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(color = EduRachaColors.Primary)
                         Spacer(modifier = Modifier.height(16.dp))
+                        Text("Cargando cursos...", color = EduRachaColors.TextSecondary)
+                    }
+                }
+                cursosConPreguntasPendientes.isEmpty() -> {
+                    EmptyStateValidacion(onNavigateBack = onNavigateBack)
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item {
+                            InfoCard(
+                                totalCursos = cursosConPreguntasPendientes.size,
+                                totalPendientes = preguntasPendientes.size
+                            )
+                        }
+
+                        item { SectionHeaderValidacion() }
+
+                        items(cursosConPreguntasPendientes, key = { it.id ?: it.codigo }) { curso ->
+                            // Contar preguntas pendientes de este curso específico
+                            val pendientesEnEsteCurso = preguntasPendientes.count { pregunta ->
+                                when {
+                                    pregunta.cursoId != null -> pregunta.cursoId == curso.id
+                                    pregunta.cursoTitulo != null -> pregunta.cursoTitulo == curso.titulo
+                                    else -> false
+                                }
+                            }
+
+                            CursoValidacionCard(
+                                curso = curso,
+                                preguntasPendientes = pendientesEnEsteCurso,
+                                onClick = { onCursoSelected(curso) }
+                            )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
                 }
             }
@@ -207,124 +195,86 @@ fun SeleccionarCursoValidacionScreen(
     }
 }
 
+// ============================================
+// COMPONENTES DE UI
+// ============================================
 
-// ============================================
-// CARD INFORMATIVA
-// ============================================
 @Composable
-private fun InfoCard(
-    totalCursos: Int,
-    totalPendientes: Int
-) {
+private fun InfoCard(totalCursos: Int, totalPendientes: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = EduRachaColors.Warning.copy(alpha = 0.1f)
+            containerColor = EduRachaColors.Warning.copy(alpha = 0.15f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(EduRachaColors.Warning.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(EduRachaColors.Warning.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Assignment,
-                        contentDescription = null,
-                        tint = EduRachaColors.Warning,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Preguntas por Validar",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-                    Text(
-                        text = "$totalCursos ${if (totalCursos == 1) "curso" else "cursos"} con preguntas pendientes",
-                        fontSize = 14.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-
-                Surface(
-                    color = EduRachaColors.Warning,
-                    shape = CircleShape
-                ) {
-                    Text(
-                        text = "$totalPendientes",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Assignment,
+                    contentDescription = null,
+                    tint = EduRachaColors.Warning,
+                    modifier = Modifier.size(28.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.width(16.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Preguntas por Validar",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaColors.TextPrimary
+                )
+                Text(
+                    "$totalCursos ${if (totalCursos == 1) "curso" else "cursos"} con preguntas pendientes",
+                    fontSize = 14.sp,
+                    color = EduRachaColors.TextSecondary
+                )
+            }
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.7f)
+                color = EduRachaColors.Warning,
+                shape = CircleShape
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = EduRachaColors.Warning,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Selecciona un curso para revisar sus preguntas generadas por IA",
-                        fontSize = 13.sp,
-                        color = EduRachaColors.TextSecondary,
-                        lineHeight = 18.sp
-                    )
-                }
+                Text(
+                    text = "$totalPendientes",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
         }
     }
 }
 
-// ============================================
-// HEADER DE SECCIÓN
-// ============================================
 @Composable
 private fun SectionHeaderValidacion() {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
     ) {
         Box(
-            modifier = Modifier
+            Modifier
                 .width(4.dp)
                 .height(24.dp)
                 .background(EduRachaColors.Warning, RoundedCornerShape(2.dp))
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
-            text = "CURSOS CON PREGUNTAS PENDIENTES",
+            "CURSOS CON PREGUNTAS PENDIENTES",
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.Warning,
@@ -333,14 +283,10 @@ private fun SectionHeaderValidacion() {
     }
 }
 
-// ============================================
-// CARD DE CURSO
-// ============================================
 @Composable
 fun CursoValidacionCard(
     curso: Curso,
     preguntasPendientes: Int,
-    preguntasTotales: Int,
     onClick: () -> Unit
 ) {
     Card(
@@ -351,46 +297,34 @@ fun CursoValidacionCard(
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono del curso
             Box(
                 modifier = Modifier
-                    .size(64.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary.copy(alpha = 0.2f),
-                                EduRachaColors.Primary.copy(alpha = 0.1f)
-                            )
-                        )
-                    ),
+                    .background(EduRachaColors.PrimaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.School,
-                    contentDescription = null,
+                    Icons.Default.School,
+                    null,
                     tint = EduRachaColors.Primary,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(Modifier.width(16.dp))
 
-            // Información del curso
-            Column(modifier = Modifier.weight(1f)) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    text = curso.titulo,
+                    curso.titulo,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = EduRachaColors.TextPrimary
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -398,8 +332,8 @@ fun CursoValidacionCard(
                 ) {
                     // Badge de pendientes
                     Surface(
-                        color = EduRachaColors.Warning.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(8.dp)
+                        color = EduRachaColors.WarningContainer,
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -407,49 +341,33 @@ fun CursoValidacionCard(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.HourglassTop,
-                                contentDescription = null,
+                                Icons.Default.HourglassTop,
+                                null,
                                 tint = EduRachaColors.Warning,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = "$preguntasPendientes pendientes",
+                                "$preguntasPendientes pendientes",
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = EduRachaColors.Warning
+                                color = EduRachaColors.Warning,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    // Total de preguntas
                     Text(
-                        text = "de $preguntasTotales total",
+                        "• ${curso.codigo}",
                         fontSize = 12.sp,
                         color = EduRachaColors.TextSecondary
                     )
                 }
-
-                // Barra de progreso
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = if (preguntasTotales > 0) {
-                        (preguntasTotales - preguntasPendientes).toFloat() / preguntasTotales
-                    } else 0f,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = EduRachaColors.Success,
-                    trackColor = EduRachaColors.Background
-                )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
 
-            // Flecha indicadora
             Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Ir a validación",
+                Icons.Default.ChevronRight,
+                "Ir",
                 tint = EduRachaColors.Primary,
                 modifier = Modifier.size(28.dp)
             )
@@ -457,10 +375,6 @@ fun CursoValidacionCard(
     }
 }
 
-
-// ============================================
-// EMPTY STATE
-// ============================================
 @Composable
 fun EmptyStateValidacion(onNavigateBack: () -> Unit) {
     Column(
@@ -470,50 +384,35 @@ fun EmptyStateValidacion(onNavigateBack: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(EduRachaColors.Success.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = EduRachaColors.Success,
-                modifier = Modifier.size(64.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
+        Icon(
+            Icons.Default.CheckCircle,
+            null,
+            tint = EduRachaColors.Success,
+            modifier = Modifier.size(80.dp)
+        )
+        Spacer(Modifier.height(24.dp))
         Text(
-            text = "¡Todo al día!",
+            "¡Todo al día!",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.TextPrimary
         )
-
         Text(
-            text = "No hay preguntas pendientes de validación en ningún curso",
-            fontSize = 14.sp,
+            "No hay preguntas pendientes de validación.",
+            textAlign = TextAlign.Center,
             color = EduRachaColors.TextSecondary,
-            modifier = Modifier.padding(top = 8.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            modifier = Modifier.padding(top = 8.dp)
         )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
+        Spacer(Modifier.height(32.dp))
         Button(
             onClick = onNavigateBack,
             colors = ButtonDefaults.buttonColors(
                 containerColor = EduRachaColors.Primary
-            ),
-            shape = RoundedCornerShape(12.dp)
+            )
         ) {
             Icon(Icons.Default.ArrowBack, null)
             Spacer(Modifier.width(8.dp))
-            Text("Volver", fontWeight = FontWeight.Bold)
+            Text("Volver")
         }
     }
 }

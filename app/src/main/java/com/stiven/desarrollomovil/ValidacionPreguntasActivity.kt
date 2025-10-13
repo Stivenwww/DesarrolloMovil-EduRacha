@@ -1,5 +1,3 @@
-// Archivo: app/src/main/java/com/stiven/desarrollomovil/ValidacionPreguntasActivity.kt
-
 package com.stiven.desarrollomovil
 
 import android.os.Bundle
@@ -32,17 +30,15 @@ import com.stiven.desarrollomovil.models.OpcionIA
 import com.stiven.desarrollomovil.models.PreguntaIA
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
-import com.stiven.desarrollomovil.viewmodel.ValidacionPreguntasViewModel // ViewModel dedicado
+import com.stiven.desarrollomovil.viewmodel.ValidacionPreguntasViewModel
 
 class ValidacionPreguntasActivity : ComponentActivity() {
 
-    // Se usa un ViewModel dedicado para esta pantalla
     private val viewModel: ValidacionPreguntasViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Se leen los IDs que nos envía la pantalla anterior
         val cursoTitulo = intent.getStringExtra("CURSO_TITULO") ?: "Curso"
         val cursoId = intent.getStringExtra("CURSO_ID") ?: ""
         val temaId = intent.getStringExtra("TEMA_ID") ?: ""
@@ -72,15 +68,12 @@ fun ValidacionPreguntasScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // El LaunchedEffect llama al ViewModel para cargar las preguntas
-    // Se ejecuta solo si cursoId o temaId cambian.
     LaunchedEffect(cursoId, temaId) {
         if (cursoId.isNotEmpty() && temaId.isNotEmpty()) {
             viewModel.cargarPreguntasPendientes(cursoId, temaId)
         }
     }
 
-    // Efecto para mostrar mensajes de error o éxito
     LaunchedEffect(uiState.error, uiState.successMessage) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -97,6 +90,7 @@ fun ValidacionPreguntasScreen(
         topBar = {
             ValidacionTopAppBar(
                 cursoTitulo = cursoTitulo,
+                temaId = temaId,
                 pendingCount = uiState.preguntas.size,
                 onNavigateBack = onNavigateBack
             )
@@ -109,8 +103,7 @@ fun ValidacionPreguntasScreen(
                 .padding(paddingValues)
         ) {
             when {
-                // Estado de Carga
-                uiState.isLoading -> {
+                uiState.isLoading && uiState.preguntas.isEmpty() -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,24 +114,35 @@ fun ValidacionPreguntasScreen(
                         Text("Cargando preguntas...", color = EduRachaColors.TextSecondary)
                     }
                 }
-                // Estado Vacío (después de cargar)
+
                 uiState.preguntas.isEmpty() && !uiState.isLoading -> {
                     Column(
-                        Modifier.fillMaxSize().padding(32.dp),
+                        Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.CheckCircle, null, Modifier.size(80.dp), EduRachaColors.Success)
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            "Todo validado",
+                            Modifier.size(80.dp),
+                            EduRachaColors.Success
+                        )
                         Spacer(Modifier.height(16.dp))
-                        Text("¡Todo validado!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            "No hay preguntas pendientes para este curso.",
+                            "¡Todo validado!",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "No hay preguntas pendientes para este tema.",
                             fontSize = 14.sp,
                             color = EduRachaColors.TextSecondary
                         )
                     }
                 }
-                // Estado con Contenido
+
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(16.dp),
@@ -148,8 +152,12 @@ fun ValidacionPreguntasScreen(
                             PreguntaCard(
                                 pregunta = pregunta,
                                 onAprobar = { viewModel.aprobarPregunta(pregunta.id ?: "") },
-                                onRechazar = { motivo -> viewModel.rechazarPregunta(pregunta.id ?: "", motivo) },
-                                onEditar = { preguntaEditada, notas -> viewModel.actualizarPregunta(preguntaEditada, notas) }
+                                onRechazar = { motivo ->
+                                    viewModel.rechazarPregunta(pregunta.id ?: "", motivo)
+                                },
+                                onEditar = { preguntaEditada ->
+                                    viewModel.actualizarPregunta(preguntaEditada)
+                                }
                             )
                         }
                     }
@@ -159,19 +167,28 @@ fun ValidacionPreguntasScreen(
     }
 }
 
-
-// =====================================================================
-// COMPONENTES VISUALES (Composables)
-// =====================================================================
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ValidacionTopAppBar(cursoTitulo: String, pendingCount: Int, onNavigateBack: () -> Unit) {
+fun ValidacionTopAppBar(
+    cursoTitulo: String,
+    temaId: String,
+    pendingCount: Int,
+    onNavigateBack: () -> Unit
+) {
     TopAppBar(
         title = {
             Column {
-                Text("Validar: $cursoTitulo", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("$pendingCount preguntas pendientes", fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f))
+                Text(
+                    "Validar: $cursoTitulo",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "$pendingCount preguntas pendientes | Tema: $temaId",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
             }
         },
         navigationIcon = {
@@ -189,7 +206,7 @@ fun PreguntaCard(
     pregunta: PreguntaIA,
     onAprobar: () -> Unit,
     onRechazar: (String) -> Unit,
-    onEditar: (PreguntaIA, String) -> Unit
+    onEditar: (PreguntaIA) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var showRejectDialog by remember { mutableStateOf(false) }
@@ -212,7 +229,10 @@ fun PreguntaCard(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val idPregunta = pregunta.id?.takeLast(4) ?: "N/A"
-                    Surface(color = EduRachaColors.Primary.copy(0.15f), shape = RoundedCornerShape(8.dp)) {
+                    Surface(
+                        color = EduRachaColors.Primary.copy(0.15f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
                         Text(
                             "ID: $idPregunta",
                             Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -222,32 +242,40 @@ fun PreguntaCard(
                         )
                     }
 
-                    val dificultad = pregunta.dificultad.orEmpty().lowercase()
-                    if (dificultad.isNotEmpty()) {
-                        val colorDificultad = when (dificultad) {
-                            "facil", "bajo" -> EduRachaColors.Success
-                            "media" -> EduRachaColors.Warning
-                            "dificil", "alto" -> EduRachaColors.Error
-                            else -> EduRachaColors.TextSecondary
-                        }
-                        Surface(color = colorDificultad.copy(0.15f), shape = RoundedCornerShape(8.dp)) {
-                            Text(
-                                dificultad.replaceFirstChar { it.uppercase() },
-                                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = colorDificultad,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                            )
-                        }
+                    val dificultad = pregunta.dificultad?.lowercase() ?: "media"
+                    val colorDificultad = when (dificultad) {
+                        "facil", "bajo" -> EduRachaColors.Success
+                        "media", "medio" -> EduRachaColors.Warning
+                        "dificil", "alto" -> EduRachaColors.Error
+                        else -> EduRachaColors.TextSecondary
+                    }
+                    Surface(
+                        color = colorDificultad.copy(0.15f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            dificultad.replaceFirstChar { it.uppercase() },
+                            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = colorDificultad,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        )
                     }
                 }
                 IconButton(onClick = { expanded = !expanded }) {
-                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        "Expandir"
+                    )
                 }
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(pregunta.texto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                pregunta.texto,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
             Spacer(Modifier.height(12.dp))
 
             // Opciones
@@ -261,26 +289,50 @@ fun PreguntaCard(
                 Spacer(Modifier.height(16.dp))
                 Divider(color = MaterialTheme.colorScheme.surfaceVariant)
                 Spacer(Modifier.height(16.dp))
-                InfoRow(Icons.Default.AutoAwesome, "Generado por", pregunta.metadatosIA?.generadoPor ?: "No especificado")
+                InfoRow(
+                    Icons.Default.AutoAwesome,
+                    "Generado por",
+                    pregunta.metadatosIA?.generadoPor ?: "No especificado"
+                )
                 Spacer(Modifier.height(8.dp))
-                InfoRow(Icons.Default.Bookmark, "Fuente", pregunta.fuente)
+                val fuente = pregunta.fuente ?: "No especificada"
+                if(fuente.isNotBlank()) InfoRow(Icons.Default.Bookmark, "Fuente", fuente)
             }
 
             // Botones de Acción
             Spacer(Modifier.height(20.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton({ showEditDialog = true }, Modifier.weight(1f)) {
-                    Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
+            // --- CÓDIGO COMPLETADO ---
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Editar", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Editar")
                 }
-                OutlinedButton({ showRejectDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                    Icon(Icons.Default.ThumbDown, null, Modifier.size(18.dp))
+                OutlinedButton(
+                    onClick = { showRejectDialog = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = EduRachaColors.Error
+                    )
+                ) {
+                    Icon(Icons.Default.ThumbDown, contentDescription = "Rechazar", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Rechazar")
                 }
-                Button(onAprobar, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success)) {
-                    Icon(Icons.Default.ThumbUp, null, Modifier.size(18.dp))
+                Button(
+                    onClick = onAprobar,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EduRachaColors.Success
+                    )
+                ) {
+                    Icon(Icons.Default.ThumbUp, contentDescription = "Aprobar", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Aprobar")
                 }
@@ -291,49 +343,66 @@ fun PreguntaCard(
     if (showEditDialog) {
         var textoEditado by remember { mutableStateOf(pregunta.texto) }
         val opcionesOriginales = pregunta.opciones
-        var opcionesEditadas by remember { mutableStateOf(opcionesOriginales.map { it.texto }) }
-        var respuestaCorrecta by remember { mutableStateOf(opcionesOriginales.indexOfFirst { it.esCorrecta }) }
-        var notas by remember { mutableStateOf("") }
+        var opcionesEditadas by remember {
+            mutableStateOf(opcionesOriginales.map { it.texto })
+        }
+        var respuestaCorrectaIndex by remember {
+            mutableStateOf(opcionesOriginales.indexOfFirst { it.esCorrecta })
+        }
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
             title = { Text("Editar pregunta") },
             text = {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { OutlinedTextField(textoEditado, { textoEditado = it }, label = { Text("Texto de la pregunta") }, modifier = Modifier.fillMaxWidth(), minLines = 3) }
+                    item {
+                        OutlinedTextField(
+                            value = textoEditado,
+                            onValueChange = { textoEditado = it },
+                            label = { Text("Texto de la pregunta") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3
+                        )
+                    }
                     items(opcionesEditadas.size) { index ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = respuestaCorrecta == index, onClick = { respuestaCorrecta = index })
+                            RadioButton(
+                                selected = respuestaCorrectaIndex == index,
+                                onClick = { respuestaCorrectaIndex = index }
+                            )
                             TextField(
                                 value = opcionesEditadas[index],
                                 onValueChange = {
-                                    opcionesEditadas = opcionesEditadas.toMutableList().also { list -> list[index] = it }
+                                    opcionesEditadas = opcionesEditadas.toMutableList()
+                                        .also { list -> list[index] = it }
                                 },
                                 label = { Text("Opción ${'A' + index}") },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
-                    item { OutlinedTextField(notas, { notas = it }, label = { Text("Notas de revisión (opcional)") }, modifier = Modifier.fillMaxWidth()) }
                 }
             },
             confirmButton = {
                 Button(onClick = {
                     val preguntaEditada = pregunta.copy(
                         texto = textoEditado,
-                        opciones = opcionesEditadas.mapIndexed { index, texto ->
+                        opciones = opcionesEditadas.mapIndexed { index, textoOpcion ->
+                            val idOriginal = opcionesOriginales.getOrNull(index)?.id ?: "op${System.currentTimeMillis()}"
                             OpcionIA(
-                                id = opcionesOriginales[index].id,
-                                texto = texto,
-                                esCorrecta = index == respuestaCorrecta
+                                id = idOriginal,
+                                texto = textoOpcion,
+                                esCorrecta = index == respuestaCorrectaIndex
                             )
                         }
                     )
-                    onEditar(preguntaEditada, notas)
+                    onEditar(preguntaEditada)
                     showEditDialog = false
                 }) { Text("Guardar Cambios") }
             },
-            dismissButton = { TextButton({ showEditDialog = false }) { Text("Cancelar") } }
+            dismissButton = {
+                TextButton({ showEditDialog = false }) { Text("Cancelar") }
+            }
         )
     }
 
@@ -343,34 +412,59 @@ fun PreguntaCard(
             onDismissRequest = { showRejectDialog = false },
             title = { Text("Rechazar pregunta") },
             text = {
-                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo del rechazo") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = motivo,
+                    onValueChange = { motivo = it },
+                    label = { Text("Motivo del rechazo") },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             confirmButton = {
                 Button(
-                    onClick = { if (motivo.isNotBlank()) { onRechazar(motivo); showRejectDialog = false } },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    onClick = {
+                        if (motivo.isNotBlank()) {
+                            onRechazar(motivo)
+                            showRejectDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EduRachaColors.Error
+                    )
                 ) { Text("Confirmar Rechazo") }
             },
-            dismissButton = { TextButton({ showRejectDialog = false }) { Text("Cancelar") } }
+            dismissButton = {
+                TextButton({ showRejectDialog = false }) { Text("Cancelar") }
+            }
         )
     }
 }
 
-// --- ¡CORRECCIÓN! ESTAS FUNCIONES AHORA ESTÁN FUERA DE PREGUNTACARD ---
-
 @Composable
 fun OpcionItem(letra: String, texto: String, esCorrecta: Boolean) {
-    val backgroundColor = if (esCorrecta) EduRachaColors.Success.copy(0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    val backgroundColor = if (esCorrecta) {
+        EduRachaColors.Success.copy(0.1f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, if (esCorrecta) EduRachaColors.Success else Color.Transparent, RoundedCornerShape(12.dp))
+            .border(
+                1.dp,
+                if (esCorrecta) EduRachaColors.Success else Color.Transparent,
+                RoundedCornerShape(12.dp)
+            )
             .background(backgroundColor, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(28.dp).background(if (esCorrecta) EduRachaColors.Success else MaterialTheme.colorScheme.primary, CircleShape),
+            modifier = Modifier
+                .size(28.dp)
+                .background(
+                    if (esCorrecta) EduRachaColors.Success else MaterialTheme.colorScheme.primary,
+                    CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(letra, color = Color.White, fontWeight = FontWeight.Bold)
@@ -383,9 +477,18 @@ fun OpcionItem(letra: String, texto: String, esCorrecta: Boolean) {
 @Composable
 fun InfoRow(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(16.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            icon,
+            null,
+            Modifier.size(16.dp),
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.width(8.dp))
-        Text("$label:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            "$label:",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
+        )
         Spacer(Modifier.width(4.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }

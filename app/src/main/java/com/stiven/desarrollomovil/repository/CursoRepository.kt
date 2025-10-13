@@ -4,18 +4,33 @@ import android.util.Log
 import com.stiven.desarrollomovil.api.ApiClient
 import com.stiven.desarrollomovil.models.ApiResponse
 import com.stiven.desarrollomovil.models.Curso
+import com.stiven.desarrollomovil.models.CursoRequest
+import com.stiven.desarrollomovil.models.toRequest
 
 class CursoRepository {
 
     private val api = ApiClient.apiService
 
+    /**
+     * Crear curso - Convierte Curso a CursoRequest (sin ID)
+     */
     suspend fun crearCurso(curso: Curso): Result<ApiResponse> {
         return try {
-            val response = api.crearCurso(curso)
+            // Convertir Curso a CursoRequest (elimina el campo id)
+            val cursoRequest = curso.toRequest()
+
+            // Log para debug
+            Log.d("CursoRepository", "Enviando: ${com.google.gson.Gson().toJson(cursoRequest)}")
+
+            val response = api.crearCurso(cursoRequest)
+
             if (response.isSuccessful && response.body() != null) {
+                Log.d("CursoRepository", "Curso creado exitosamente")
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Error al crear curso: ${response.code()}"))
+                val errorBody = response.errorBody()?.string()
+                Log.e("CursoRepository", "Error ${response.code()}: $errorBody")
+                Result.failure(Exception("Error al crear curso: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
             Log.e("CursoRepository", "Error al crear curso", e)
@@ -31,7 +46,7 @@ class CursoRepository {
 
                 if (lista.isEmpty()) {
                     Log.w("CursoRepository", "No se encontraron cursos en el backend todavía.")
-                    Result.success(emptyList()) // Retorna lista vacía para no romper la UI
+                    Result.success(emptyList())
                 } else {
                     Result.success(lista)
                 }

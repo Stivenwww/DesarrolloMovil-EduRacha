@@ -1,3 +1,5 @@
+// Archivo: app/src/main/java/com/stiven/desarrollomovil/PreguntasIAValidacionAdapter.kt
+
 package com.stiven.desarrollomovil
 
 import android.view.LayoutInflater
@@ -8,6 +10,10 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.stiven.desarrollomovil.databinding.ItemPreguntaValidacionBinding
+
+// --- ¡CORRECCIÓN! ---
+// Se añade el import que faltaba para que el archivo reconozca la clase PreguntaIA.
+import com.stiven.desarrollomovil.models.PreguntaIA
 
 // Typealias específico para este adapter
 typealias OnPreguntaIAClickListener = (PreguntaIA) -> Unit
@@ -47,13 +53,12 @@ class PreguntasIAValidacionAdapter(
         }
 
         fun bind(pregunta: PreguntaIA) {
-            // --- CORRECCIÓN 1: Se usa 'pregunta.texto' en lugar de 'pregunta.pregunta' ---
+            // El 'import' añadido soluciona los errores aquí.
             binding.txtPregunta.text = pregunta.texto
 
             // Asigna el texto a cada opción y oculta las que no se usan
             for (i in cards.indices) {
                 if (i < pregunta.opciones.size) {
-                    // --- CORRECCIÓN 2: Se accede a la propiedad '.texto' del objeto OpcionRespuesta ---
                     texts[i].text = pregunta.opciones[i].texto
                     cards[i].visibility = View.VISIBLE
                 } else {
@@ -72,7 +77,11 @@ class PreguntasIAValidacionAdapter(
         }
 
         private fun resetearEstilos() {
-            val defaultBackgroundColor = ContextCompat.getColor(itemView.context, R.color.surface_variant)
+
+            val defaultBackgroundColor = ContextCompat.getColor(
+                itemView.context,
+                com.google.android.material.R.color.material_on_surface_disabled
+            )
             val transparentColor = ContextCompat.getColor(itemView.context, android.R.color.transparent)
 
             cards.forEach { card ->
@@ -82,14 +91,15 @@ class PreguntasIAValidacionAdapter(
             }
         }
 
-        private fun marcarRespuestaCorrecta(pregunta: PreguntaIA) {
-            // La propiedad 'respuestaCorrecta' ahora se calcula en la data class
-            val indiceCorrecto = pregunta.respuestaCorrecta
 
-            if (indiceCorrecto in cards.indices) {
+        private fun marcarRespuestaCorrecta(pregunta: PreguntaIA) {
+            // --- ¡CORRECCIÓN DE LÓGICA! ---
+            // Buscamos el índice de la primera opción que tenga 'esCorrecta = true'.
+            val indiceCorrecto = pregunta.opciones.indexOfFirst { it.esCorrecta }
+
+            if (indiceCorrecto != -1 && indiceCorrecto in cards.indices) {
                 val cardCorrecta = cards[indiceCorrecto]
                 val successColor = ContextCompat.getColor(itemView.context, R.color.success)
-                // Usando un color más sutil para el fondo de la respuesta correcta
                 val successBackgroundColor = ContextCompat.getColor(itemView.context, R.color.success_container)
 
                 cardCorrecta.setCardBackgroundColor(successBackgroundColor)
@@ -99,6 +109,9 @@ class PreguntasIAValidacionAdapter(
         }
     }
 
+    /**
+     * Actualiza la lista de preguntas en el adaptador y notifica al RecyclerView para que se redibuje.
+     */
     fun actualizarPreguntas(nuevasPreguntas: List<PreguntaIA>) {
         preguntas = nuevasPreguntas
         // Es más eficiente usar DiffUtil, pero para simplicidad mantenemos notifyDataSetChanged()

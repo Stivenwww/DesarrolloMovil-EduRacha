@@ -4,6 +4,7 @@ package com.stiven.desarrollomovil.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.stiven.desarrollomovil.models.OpcionIA
 import com.stiven.desarrollomovil.models.PreguntaIA
 import com.stiven.desarrollomovil.repository.PreguntasRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,38 +28,35 @@ class ValidacionPreguntasViewModel : ViewModel() {
 
     fun cargarPreguntasPendientes(cursoId: String, temaId: String) {
         viewModelScope.launch {
-            // Inicia el estado de carga
             _uiState.update { it.copy(isLoading = true, error = null) }
-
             repository.obtenerPreguntasPendientes(cursoId, temaId)
                 .onSuccess { preguntasRecibidas ->
-                    // En caso de éxito, actualiza el estado con las preguntas
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            isLoading = false,
-                            preguntas = preguntasRecibidas
-                        )
-                    }
+                    _uiState.update { it.copy(isLoading = false, preguntas = preguntasRecibidas) }
                 }
                 .onFailure { exception ->
-                    // En caso de fallo, actualiza el estado con el mensaje de error
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            isLoading = false,
-                            error = "Error al cargar: ${exception.message}"
-                        )
-                    }
+                    _uiState.update { it.copy(isLoading = false, error = "Error al cargar: ${exception.message}") }
                 }
         }
     }
 
-    fun aprobarPregunta(preguntaId: String, notas: String = "Pregunta aprobada sin modificaciones") {
+    fun cargarTodasLasPreguntasPendientes() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            repository.obtenerTodasLasPreguntasPendientes()
+                .onSuccess { listaCompleta ->
+                    _uiState.update { it.copy(isLoading = false, preguntas = listaCompleta) }
+                }
+                .onFailure { exception ->
+                    _uiState.update { it.copy(isLoading = false, error = exception.message, preguntas = emptyList()) }
+                }
+        }
+    }
+
+    fun aprobarPregunta(preguntaId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
-            repository.aprobarPregunta(preguntaId, notas)
+            repository.aprobarPregunta(preguntaId)
                 .onSuccess {
-                    // Si la API aprueba la pregunta, la filtramos de la lista local
                     _uiState.update { currentState ->
                         currentState.copy(
                             isLoading = false,
@@ -76,7 +74,6 @@ class ValidacionPreguntasViewModel : ViewModel() {
     fun rechazarPregunta(preguntaId: String, motivo: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
             repository.rechazarPregunta(preguntaId, motivo)
                 .onSuccess {
                     _uiState.update { currentState ->
@@ -93,15 +90,12 @@ class ValidacionPreguntasViewModel : ViewModel() {
         }
     }
 
-    fun actualizarPregunta(pregunta: PreguntaIA, notas: String) {
+    fun actualizarPregunta(pregunta: PreguntaIA) {
         viewModelScope.launch {
-            val id = pregunta.id ?: return@launch // No hacer nada si no hay ID
-
+            val id = pregunta.id ?: return@launch
             _uiState.update { it.copy(isLoading = true) }
-
             repository.actualizarPregunta(id, pregunta)
                 .onSuccess {
-                    // Al actualizar, también la eliminamos de la lista de pendientes
                     _uiState.update { currentState ->
                         currentState.copy(
                             isLoading = false,
@@ -116,24 +110,9 @@ class ValidacionPreguntasViewModel : ViewModel() {
         }
     }
 
-    fun generarPreguntasIA(cursoId: String, temaId: String, temaTexto: String, cantidad: Int) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            repository.generarPreguntasIA(cursoId, temaId, temaTexto, cantidad)
-                .onSuccess { response ->
-                    _uiState.update { it.copy(isLoading = false, successMessage = "✓ ${response.total} preguntas generadas") }
-                    // Después de generar, recargamos la lista para ver las nuevas preguntas
-                    cargarPreguntasPendientes(cursoId, temaId)
-                }
-                .onFailure { exception ->
-                    _uiState.update { it.copy(isLoading = false, error = "Error al generar: ${exception.message}") }
-                }
-        }
-    }
-
     /**
-     * Limpia los mensajes de error y éxito de la UI para que no se muestren repetidamente.
+     * --- ¡FUNCIÓN AÑADIDA! ---
+     * Limpia los mensajes de error y éxito para que no se muestren repetidamente.
      */
     fun limpiarMensajes() {
         _uiState.update { it.copy(error = null, successMessage = null) }

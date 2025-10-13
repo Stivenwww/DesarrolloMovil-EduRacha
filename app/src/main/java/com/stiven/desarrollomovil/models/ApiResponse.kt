@@ -1,65 +1,63 @@
 package com.stiven.desarrollomovil.models
 
+import kotlinx.serialization.Serializable
+
+// ========================================================================
+// MODELOS DE "SOBRE" (PETICIONES Y RESPUESTAS)
+// ========================================================================
+
+/**
+ * SOBRE GENÉRICO: Respuesta simple de la API con un mensaje.
+ * Útil para operaciones de crear, actualizar o eliminar.
+ */
+@Serializable
 data class ApiResponse(
     val message: String,
-    val id: String? = null,
-    val estado: String? = null // Agregar para respuestas de revisión
+    val id: String? = null
 )
 
-// Agregar nuevos modelos para IA
-data class PreguntaIA(
-    val id: String? = null,
-    val cursoId: String = "",
-    val temaId: String = "",
-    val texto: String = "",
-    val opciones: List<OpcionIA> = emptyList(),
-    val fuente: String = "",
-    val estado: String = "",
-    val dificultad: String? = null,
-    val creadoPor: String = "",
-    val fechaCreacion: String = "",
-    val metadatosIA: MetadatosIA? = null,
-    val revisadoPor: String? = null,
-    val fechaRevision: String? = null,
-    val notasRevision: String? = null,
-    val modificada: Boolean = false
-)
-
-data class OpcionIA(
-    val id: Int = 0,
-    val texto: String = "",
-    val esCorrecta: Boolean = false
-)
-
-data class MetadatosIA(
-    val generadoPor: String? = null,
-    val instruccion: String? = null,
-    val loteId: String? = null,
-    val versionOriginal: VersionOriginal? = null
-)
-
-data class VersionOriginal(
-    val texto: String? = null,
-    val opciones: List<String>? = null
-)
-
-// Request para generar preguntas
+/**
+ * SOBRE DE PETICIÓN: Datos necesarios para solicitar la generación de preguntas.
+ */
+@Serializable
 data class GenerarPreguntasRequest(
     val cursoId: String,
     val temaId: String,
     val temaTexto: String,
-    val cantidad: String = "5"
+    val cantidad: Int = 5 // Usamos Int, es más correcto para una cantidad.
 )
 
-// Response de generación
+/**
+ * SOBRE DE RESPUESTA: Lo que la API devuelve al generar preguntas.
+ * Fíjate que USA la clase `PreguntaIA`, pero NO la define aquí.
+ */
+@Serializable
 data class PreguntasIAResponse(
     val message: String,
     val total: Int,
-    val preguntas: List<PreguntaIA>
+    val preguntas: List<PreguntaIA> // Usa el modelo de dominio central
 )
 
-// Request para revisar
+/**
+ * SOBRE DE PETICIÓN: Datos para revisar una pregunta (aprobar, rechazar o editar).
+ */
+@Serializable
 data class RevisarPreguntaRequest(
-    val estado: String, // "aprobada" o "rechazada"
-    val notas: String = ""
+    val estado: EstadoValidacion, // Usamos el enum para evitar errores de texto
+    val notas: String = "",
+    val preguntaEditada: PreguntaIA? = null // Opcional, si se edita
 )
+
+// ========================================================================
+// ¡IMPORTANTE!
+//
+// Las siguientes clases FUERON ELIMINADAS de este archivo porque son
+// MODELOS DE DOMINIO y deben vivir en su propio archivo (ej: PreguntaModels.kt)
+// para evitar el error de "Redeclaration".
+//
+// - data class PreguntaIA(...)
+// - data class OpcionIA(...)
+// - data class MetadatosIA(...)
+// - data class VersionOriginal(...)
+//
+// ========================================================================

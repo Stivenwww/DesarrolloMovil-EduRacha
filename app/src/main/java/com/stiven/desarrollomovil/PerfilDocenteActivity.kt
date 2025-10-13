@@ -1,3 +1,5 @@
+// Archivo: C:/Users/solar/StudioProjects/DesarrolloMovil-EduRacha/app/src/main/java/com/stiven/desarrollomovil/PerfilDocenteActivity.kt
+
 package com.stiven.desarrollomovil
 
 import android.os.Bundle
@@ -9,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -26,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.desarrollomovil.ui.theme.*
-import com.stiven.desarrollomovil.ui.theme.components.*
 import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 
 class PerfilDocenteActivity : ComponentActivity() {
@@ -54,25 +56,29 @@ class PerfilDocenteActivity : ComponentActivity() {
 fun PerfilDocenteScreen(
     viewModel: CursoViewModel,
     onBackClick: () -> Unit
-) {
+) { // <--- LLAVE DE APERTURA DE LA FUNCIÓN
+
     // Obtener datos reales de Firebase
     val user = FirebaseAuth.getInstance().currentUser
     val userName = user?.displayName ?: "Docente"
     val userEmail = user?.email ?: "correo@uniautonoma.edu.co"
 
-    // Observar datos del ViewModel
-    val cursos by viewModel.cursos.collectAsState()
+    // Se observa el uiState unificado del ViewModel
+    val uiState by viewModel.uiState.collectAsState()
+    val cursos = uiState.cursos
 
     // Cargar cursos al iniciar
     LaunchedEffect(Unit) {
         viewModel.obtenerCursos()
     }
 
-    // Calcular estadísticas desde la API
+    // Calcular estadísticas desde la lista de cursos obtenida
     val totalCursos = cursos.size
-    val cursosActivos = cursos.count { it.estado == "activo" }
-    val cursosBorrador = cursos.count { it.estado == "borrador" }
+    val cursosActivos = cursos.count { it.estado.equals("activo", ignoreCase = true) }
+    val cursosBorrador = cursos.count { it.estado.equals("borrador", ignoreCase = true) }
+    val cursosInactivos = cursos.count { it.estado.equals("inactivo", ignoreCase = true) || it.estado.equals("archivado", ignoreCase = true) }
 
+    // --- ¡CORRECCIÓN! El Scaffold y todo su contenido DEBEN estar DENTRO de la función Composable ---
     Scaffold(
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
@@ -80,7 +86,7 @@ fun PerfilDocenteScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = Spacing.large)
+            contentPadding = PaddingValues(bottom = 16.dp) // Spacing.large
         ) {
             // Header con datos del docente
             item {
@@ -91,21 +97,20 @@ fun PerfilDocenteScreen(
                 )
             }
 
-            item { Spacer(modifier = Modifier.height(Spacing.large)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
 
             // Sección de estadísticas de cursos
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.screenPadding)
+                        .padding(horizontal = 16.dp) // Spacing.screenPadding
                 ) {
                     Text(
                         text = "Estadísticas de Cursos",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
                         color = EduRachaColors.TextPrimary,
-                        modifier = Modifier.padding(bottom = Spacing.medium)
+                        modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
                     )
 
                     // Tarjetas de estadísticas en fila
@@ -113,7 +118,6 @@ fun PerfilDocenteScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Total de cursos
                         EduRachaCompactStatsCard(
                             title = "Total",
                             value = totalCursos.toString(),
@@ -121,8 +125,6 @@ fun PerfilDocenteScreen(
                             iconColor = EduRachaColors.Primary,
                             modifier = Modifier.weight(1f)
                         )
-
-                        // Cursos activos
                         EduRachaCompactStatsCard(
                             title = "Activos",
                             value = cursosActivos.toString(),
@@ -130,8 +132,6 @@ fun PerfilDocenteScreen(
                             iconColor = EduRachaColors.Success,
                             modifier = Modifier.weight(1f)
                         )
-
-                        // Cursos en borrador
                         EduRachaCompactStatsCard(
                             title = "Borradores",
                             value = cursosBorrador.toString(),
@@ -143,56 +143,44 @@ fun PerfilDocenteScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(Spacing.large)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
 
             // Información del docente
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.screenPadding)
+                        .padding(horizontal = 16.dp) // Spacing.screenPadding
                 ) {
                     Text(
                         text = "Información de la Cuenta",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
                         color = EduRachaColors.TextPrimary,
-                        modifier = Modifier.padding(bottom = Spacing.medium)
+                        modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
                     )
 
-                    EduRachaCard {
+                    Card(
+                        shape = RoundedCornerShape(16.dp), // CustomShapes.Card
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
+                    ) {
                         Column(
-                            verticalArrangement = Arrangement.spacedBy(Spacing.medium)
+                            modifier = Modifier.padding(16.dp), // Spacing.cardPadding
+                            verticalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
                         ) {
-                            InfoDocenteItem(
-                                icon = Icons.Default.Person,
-                                label = "Nombre completo",
-                                value = userName
-                            )
-                            EduRachaDivider()
-                            InfoDocenteItem(
-                                icon = Icons.Default.Email,
-                                label = "Correo electrónico",
-                                value = userEmail
-                            )
-                            EduRachaDivider()
-                            InfoDocenteItem(
-                                icon = Icons.Default.AccountCircle,
-                                label = "Rol",
-                                value = "Docente"
-                            )
-                            EduRachaDivider()
-                            InfoDocenteItem(
-                                icon = Icons.Default.School,
-                                label = "Institución",
-                                value = "UNIAUTÓNOMA"
-                            )
+                            InfoDocenteItem(Icons.Default.Person, "Nombre completo", userName)
+                            Divider(color = EduRachaColors.Border)
+                            InfoDocenteItem(Icons.Default.Email, "Correo electrónico", userEmail)
+                            Divider(color = EduRachaColors.Border)
+                            InfoDocenteItem(Icons.Default.AccountCircle, "Rol", "Docente")
+                            Divider(color = EduRachaColors.Border)
+                            InfoDocenteItem(Icons.Default.School, "Institución", "UNIAUTÓNOMA")
                         }
                     }
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(Spacing.large)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
 
             // Resumen de cursos por estado
             if (totalCursos > 0) {
@@ -200,45 +188,33 @@ fun PerfilDocenteScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = Spacing.screenPadding)
+                            .padding(horizontal = 16.dp) // Spacing.screenPadding
                     ) {
                         Text(
                             text = "Resumen de Cursos",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
                             color = EduRachaColors.TextPrimary,
-                            modifier = Modifier.padding(bottom = Spacing.medium)
+                            modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
                         )
 
-                        EduRachaCard {
+                        Card(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
+                        ) {
                             Column(
-                                modifier = Modifier.padding(Spacing.cardPadding),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.medium)
+                                modifier = Modifier.padding(16.dp), // Spacing.cardPadding
+                                verticalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
                             ) {
-                                ResumenCursoRow(
-                                    estado = "Activo",
-                                    cantidad = cursosActivos,
-                                    color = EduRachaColors.Success,
-                                    total = totalCursos
-                                )
-                                ResumenCursoRow(
-                                    estado = "Borrador",
-                                    cantidad = cursosBorrador,
-                                    color = EduRachaColors.Warning,
-                                    total = totalCursos
-                                )
-                                ResumenCursoRow(
-                                    estado = "Inactivo",
-                                    cantidad = totalCursos - cursosActivos - cursosBorrador,
-                                    color = EduRachaColors.TextSecondary,
-                                    total = totalCursos
-                                )
+                                ResumenCursoRow("Activo", cursosActivos, EduRachaColors.Success, totalCursos)
+                                ResumenCursoRow("Borrador", cursosBorrador, EduRachaColors.Warning, totalCursos)
+                                ResumenCursoRow("Inactivos/Archivados", cursosInactivos, EduRachaColors.TextSecondary, totalCursos)
                             }
                         }
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(Spacing.large)) }
+                item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
             }
 
             // Footer institucional
@@ -247,11 +223,12 @@ fun PerfilDocenteScreen(
             }
         }
     }
-}
+} // <--- LLAVE DE CIERRE DE LA FUNCIÓN PerfilDocenteScreen
 
 // ============================================
-// HEADER DEL PERFIL DOCENTE
+// COMPONENTES DE UI
 // ============================================
+
 @Composable
 fun PerfilDocenteHeader(
     userName: String,
@@ -261,7 +238,7 @@ fun PerfilDocenteHeader(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = Elevation.medium),
+            .shadow(elevation = 4.dp), // Elevation.medium
         color = Color.Transparent
     ) {
         Box(
@@ -271,8 +248,8 @@ fun PerfilDocenteHeader(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            EduRachaColors.GradientStart,
-                            EduRachaColors.GradientEnd
+                            EduRachaColors.Primary.copy(0.9f), // GradientStart
+                            EduRachaColors.Primary // GradientEnd
                         )
                     )
                 )
@@ -280,7 +257,7 @@ fun PerfilDocenteHeader(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(Spacing.screenPadding)
+                    .padding(16.dp) // Spacing.screenPadding
             ) {
                 // Botón de volver
                 IconButton(
@@ -289,74 +266,36 @@ fun PerfilDocenteHeader(
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White
-                    )
+                    Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.height(Spacing.large))
+                Spacer(modifier = Modifier.height(16.dp)) // Spacing.large
 
                 // Avatar y datos del docente
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Avatar
                     Box(
                         modifier = Modifier
                             .size(100.dp)
-                            .shadow(
-                                elevation = Elevation.large,
-                                shape = CircleShape
-                            )
-                            .border(
-                                width = 4.dp,
-                                color = Color.White.copy(alpha = 0.3f),
-                                shape = CircleShape
-                            )
+                            .shadow(8.dp, CircleShape) // Elevation.large
+                            .border(4.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                             .background(Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Avatar",
-                            tint = EduRachaColors.Primary,
-                            modifier = Modifier.size(60.dp)
-                        )
+                        Icon(Icons.Default.Person, "Avatar", tint = EduRachaColors.Primary, modifier = Modifier.size(60.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(Spacing.medium))
-
-                    // Nombre
-                    Text(
-                        text = userName,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(Spacing.extraSmall))
-
-                    // Email
-                    Text(
-                        text = userEmail,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color.White.copy(alpha = 0.9f),
-                        textAlign = TextAlign.Center
-                    )
+                    Spacer(modifier = Modifier.height(12.dp)) // Spacing.medium
+                    Text(userName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(4.dp)) // Spacing.extraSmall
+                    Text(userEmail, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), textAlign = TextAlign.Center)
                 }
             }
         }
     }
 }
 
-// ============================================
-// TARJETA COMPACTA DE ESTADÍSTICAS
-// ============================================
 @Composable
 fun EduRachaCompactStatsCard(
     title: String,
@@ -367,16 +306,16 @@ fun EduRachaCompactStatsCard(
 ) {
     Card(
         modifier = modifier,
-        shape = CustomShapes.Card,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.small)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.medium),
+                .padding(12.dp), // Spacing.medium
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.small)
+            verticalArrangement = Arrangement.spacedBy(8.dp) // Spacing.small
         ) {
             Box(
                 modifier = Modifier
@@ -384,34 +323,14 @@ fun EduRachaCompactStatsCard(
                     .background(iconColor.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
             }
-
-            Text(
-                text = value,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = iconColor
-            )
-
-            Text(
-                text = title,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = EduRachaColors.TextSecondary
-            )
+            Text(value, style = MaterialTheme.typography.headlineSmall, color = iconColor)
+            Text(title, style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
         }
     }
 }
 
-// ============================================
-// FILA DE RESUMEN DE CURSO
-// ============================================
 @Composable
 fun ResumenCursoRow(
     estado: String,
@@ -419,62 +338,35 @@ fun ResumenCursoRow(
     color: Color,
     total: Int
 ) {
-    val porcentaje = if (total > 0) (cantidad * 100) / total else 0
+    val porcentaje = if (total > 0) (cantidad.toFloat() / total.toFloat()) else 0f
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+        horizontalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
     ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .background(color, CircleShape)
-        )
-
+        Box(modifier = Modifier
+            .size(12.dp)
+            .background(color, CircleShape))
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = estado,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = EduRachaColors.TextPrimary
-                )
-                Text(
-                    text = "$cantidad cursos",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color
-                )
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text(estado, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = EduRachaColors.TextPrimary)
+                Text("$cantidad cursos", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
             }
-
             Spacer(modifier = Modifier.height(4.dp))
-
-            // Barra de progreso
-            Box(
+            LinearProgressIndicator(
+                progress = { porcentaje },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(CustomShapes.Badge)
-                    .background(color.copy(alpha = 0.2f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(porcentaje / 100f)
-                        .fillMaxHeight()
-                        .background(color)
-                )
-            }
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)), // CustomShapes.Badge
+                color = color,
+                trackColor = color.copy(alpha = 0.2f)
+            )
         }
     }
 }
 
-// ============================================
-// ITEM DE INFORMACIÓN DEL DOCENTE
-// ============================================
 @Composable
 fun InfoDocenteItem(
     icon: ImageVector,
@@ -484,92 +376,44 @@ fun InfoDocenteItem(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.medium)
+        horizontalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(
-                    color = EduRachaColors.PrimaryContainer,
-                    shape = CircleShape
-                ),
+                .background(EduRachaColors.PrimaryContainer, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = EduRachaColors.Primary,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(icon, null, tint = EduRachaColors.Primary, modifier = Modifier.size(20.dp))
         }
-
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = EduRachaColors.TextSecondary
-            )
+            Text(label, style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = EduRachaColors.TextPrimary
-            )
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = EduRachaColors.TextPrimary)
         }
     }
 }
 
-// ============================================
-// FOOTER INSTITUCIONAL
-// ============================================
 @Composable
 fun FooterInstitucional() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.screenPadding),
-        shape = CustomShapes.Card,
+            .padding(horizontal = 16.dp), // Spacing.screenPadding
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
         color = EduRachaColors.PrimaryContainer
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.large),
+                .padding(16.dp)
+                .fillMaxWidth(), // Spacing.large
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.small)
+            verticalArrangement = Arrangement.spacedBy(8.dp) // Spacing.small
         ) {
-            Icon(
-                imageVector = Icons.Default.School,
-                contentDescription = null,
-                tint = EduRachaColors.Primary,
-                modifier = Modifier.size(40.dp)
-            )
-
-            Text(
-                text = "Corporación Universitaria",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Autónoma del Cauca",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.Primary,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "EduRacha - Sistema de Gestión Académica",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = EduRachaColors.TextTertiary,
-                textAlign = TextAlign.Center
-            )
+            Icon(Icons.Default.School, null, tint = EduRachaColors.Primary, modifier = Modifier.size(40.dp))
+            Text("Corporación Universitaria", style = MaterialTheme.typography.bodyMedium, color = EduRachaColors.TextSecondary, textAlign = TextAlign.Center)
+            Text("Autónoma del Cauca", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = EduRachaColors.Primary, textAlign = TextAlign.Center)
+            Text("EduRacha - Sistema de Gestión Académica", style = MaterialTheme.typography.labelSmall, color = EduRachaColors.TextSecondary, textAlign = TextAlign.Center)
         }
     }
 }

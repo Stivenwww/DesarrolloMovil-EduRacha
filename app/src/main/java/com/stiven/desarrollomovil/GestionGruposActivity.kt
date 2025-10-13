@@ -10,6 +10,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -18,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,16 +30,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.stiven.desarrollomovil.models.Curso
 import androidx.compose.ui.unit.sp
+import com.stiven.desarrollomovil.models.Curso
 import com.stiven.desarrollomovil.ui.theme.EduRachaColors
 import com.stiven.desarrollomovil.ui.theme.EduRachaTheme
 import com.stiven.desarrollomovil.viewmodel.CursoViewModel
 import kotlinx.coroutines.delay
+import kotlin.text.count
+import kotlin.text.lowercase
+import kotlin.text.sumOf
 
-// ============================================
-// ACTIVITY
-// ============================================
 class GestionGruposActivity : ComponentActivity() {
 
     private val cursoViewModel: CursoViewModel by viewModels()
@@ -48,6 +51,7 @@ class GestionGruposActivity : ComponentActivity() {
                 GestionGruposScreen(
                     viewModel = cursoViewModel,
                     onNavigateBack = {
+                        // Navegación segura para volver al panel del docente
                         val intent = Intent(this, PanelDocenteActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         startActivity(intent)
@@ -68,10 +72,6 @@ class GestionGruposActivity : ComponentActivity() {
     }
 }
 
-// ============================================
-// SCREEN PRINCIPAL
-// ============================================
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GestionGruposScreen(
     viewModel: CursoViewModel,
@@ -79,12 +79,15 @@ fun GestionGruposScreen(
     onCursoClick: (Curso) -> Unit,
     onCrearCurso: () -> Unit
 ) {
-    // Observar los estados del ViewModel
-    val cursos by viewModel.cursos.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.error.collectAsState()
+    // --- ¡CORRECCIÓN! Se observa el uiState unificado del ViewModel ---
+    val uiState by viewModel.uiState.collectAsState()
+    val cursos = uiState.cursos
+    val isLoading = uiState.isLoading
+    val errorMessage = uiState.error
 
-    // Cargar cursos al iniciar
+    // El LaunchedEffect que llama a obtenerCursos ya no es estrictamente necesario
+    // si el ViewModel lo hace en su bloque `init`, pero no causa ningún daño dejarlo.
+    // Lo mantendremos por claridad.
     LaunchedEffect(Unit) {
         viewModel.obtenerCursos()
     }
@@ -97,8 +100,10 @@ fun GestionGruposScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // El resto del código no necesita cambios, ya que ahora las variables
+            // `cursos`, `isLoading` y `errorMessage` se obtienen del nuevo `uiState`.
             when {
-                isLoading -> {
+                isLoading && cursos.isEmpty() -> { // Muestra el loading solo si la lista está vacía
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -111,73 +116,40 @@ fun GestionGruposScreen(
                 }
 
                 errorMessage != null -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        GestionGruposHeader(onNavigateBack = onNavigateBack)
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = EduRachaColors.Error,
-                                modifier = Modifier.size(80.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Error al cargar",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = errorMessage ?: "Error desconocido",
-                                fontSize = 14.sp,
-                                color = EduRachaColors.TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Button(
-                                onClick = { viewModel.obtenerCursos() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = EduRachaColors.Primary
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Reintentar")
-                            }
-                        }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // El header se muestra incluso si hay un error para poder navegar hacia atrás
+                        GestionGruposHeader(
+                            onNavigateBack = onNavigateBack,
+                            totalCursos = 0
+                        )
+                        ErrorStateGrupos(
+                            errorMessage = errorMessage,
+                            onRetry = { viewModel.obtenerCursos() }
+                        )
                     }
                 }
 
                 cursos.isEmpty() -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        GestionGruposHeader(onNavigateBack = onNavigateBack)
+                        GestionGruposHeader(
+                            onNavigateBack = onNavigateBack,
+                            totalCursos = 0
+                        )
                         EmptyStateGrupos(onCrearCurso = onCrearCurso)
                     }
                 }
 
                 else -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        GestionGruposHeader(onNavigateBack = onNavigateBack)
+                        GestionGruposHeader(
+                            onNavigateBack = onNavigateBack,
+                            totalCursos = cursos.size
+                        )
 
                         EstadisticasGruposCard(
                             totalCursos = cursos.size,
+                            totalTemas = cursos.sumOf { it.temas?.size ?: 0 },
+                            cursosActivos = cursos.count { it.estado.equals("activo", ignoreCase = true) },
                             modifier = Modifier.padding(20.dp)
                         )
 
@@ -212,11 +184,62 @@ fun GestionGruposScreen(
     }
 }
 
-// ============================================
-// HEADER
-// ============================================
+// Se crea un Composable específico para el estado de error para limpiar el `when`
 @Composable
-fun GestionGruposHeader(onNavigateBack: () -> Unit) {
+fun ErrorStateGrupos(errorMessage: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.ErrorOutline,
+            contentDescription = null,
+            tint = EduRachaColors.Error,
+            modifier = Modifier.size(80.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Error al cargar",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = errorMessage,
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Reintentar",
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Reintentar")
+        }
+    }
+}
+
+
+// --- EL RESTO DE TUS COMPOSABLES ESTÁN PERFECTOS Y NO NECESITAN CAMBIOS ---
+// (GestionGruposHeader, EstadisticasGruposCard, CursoGrupoCard, etc.)
+
+@Composable
+fun GestionGruposHeader(
+    onNavigateBack: () -> Unit,
+    totalCursos: Int
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -252,8 +275,36 @@ fun GestionGruposHeader(onNavigateBack: () -> Unit) {
                         tint = Color.White
                     )
                 }
+
+                if (totalCursos > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = EduRachaColors.Secondary
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.School,
+                                null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "$totalCursos",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "Gestión de Grupos",
                 color = Color.White,
@@ -270,12 +321,11 @@ fun GestionGruposHeader(onNavigateBack: () -> Unit) {
     }
 }
 
-// ============================================
-// ESTADÍSTICAS CARD
-// ============================================
 @Composable
 fun EstadisticasGruposCard(
     totalCursos: Int,
+    totalTemas: Int,
+    cursosActivos: Int,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -291,18 +341,39 @@ fun EstadisticasGruposCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            Icon(
-                imageVector = Icons.Default.GroupAdd,
-                contentDescription = null,
-                tint = EduRachaColors.Primary,
-                modifier = Modifier.size(48.dp)
-            )
-
             StatItemGrupos(
                 icon = Icons.Default.School,
                 value = totalCursos.toString(),
                 label = "Total Cursos",
+                color = EduRachaColors.Primary
+            )
+
+            Divider(
+                modifier = Modifier
+                    .height(50.dp)
+                    .width(1.dp),
+                color = EduRachaColors.Background
+            )
+
+            StatItemGrupos(
+                icon = Icons.Default.BookmarkAdded,
+                value = totalTemas.toString(),
+                label = "Total Temas",
                 color = EduRachaColors.Success
+            )
+
+            Divider(
+                modifier = Modifier
+                    .height(50.dp)
+                    .width(1.dp),
+                color = EduRachaColors.Background
+            )
+
+            StatItemGrupos(
+                icon = Icons.Default.CheckCircle,
+                value = cursosActivos.toString(),
+                label = "Activos",
+                color = EduRachaColors.Accent
             )
         }
     }
@@ -343,9 +414,6 @@ fun StatItemGrupos(
     }
 }
 
-// ============================================
-// SECTION HEADER
-// ============================================
 @Composable
 fun SectionHeaderGrupos(
     title: String,
@@ -372,14 +440,13 @@ fun SectionHeaderGrupos(
     }
 }
 
-// ============================================
-// CURSO CARD
-// ============================================
 @Composable
 fun CursoGrupoCard(
     curso: Curso,
     onClick: () -> Unit
 ) {
+    val cantidadTemas = curso.temas?.size ?: 0
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -394,7 +461,6 @@ fun CursoGrupoCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono del curso
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -419,7 +485,6 @@ fun CursoGrupoCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Información del curso
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = curso.titulo,
@@ -429,16 +494,14 @@ fun CursoGrupoCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Código del curso
                 Text(
                     text = "Código: ${curso.codigo}",
                     fontSize = 12.sp,
                     color = EduRachaColors.TextSecondary
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Duración y estado
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -460,7 +523,26 @@ fun CursoGrupoCard(
                         )
                     }
 
-                    // Estado
+                    if (cantidadTemas > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BookmarkAdded,
+                                contentDescription = null,
+                                tint = EduRachaColors.Success,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "$cantidadTemas tema${if (cantidadTemas > 1) "s" else ""}",
+                                fontSize = 12.sp,
+                                color = EduRachaColors.Success,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = when (curso.estado.lowercase()) {
@@ -484,7 +566,6 @@ fun CursoGrupoCard(
                 }
             }
 
-            // Icono de navegación
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Ver más",
@@ -495,9 +576,6 @@ fun CursoGrupoCard(
     }
 }
 
-// ============================================
-// EMPTY STATE
-// ============================================
 @Composable
 fun EmptyStateGrupos(onCrearCurso: () -> Unit) {
     Column(
