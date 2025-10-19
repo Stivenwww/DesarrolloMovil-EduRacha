@@ -1,6 +1,6 @@
 
 
-package com.stiven.desarrollomovil.ui.theme
+package com.stiven.sos.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes

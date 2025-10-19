@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.stiven.desarrollomovil"
+    namespace = "com.stiven.sos"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.stiven.desarrollomovil"
+        applicationId = "com.stiven.sos"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

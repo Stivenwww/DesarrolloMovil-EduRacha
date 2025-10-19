@@ -1,6 +1,6 @@
 
 
-package com.stiven.desarrollomovil.ui.theme.components
+package com.stiven.sos.ui.theme.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.BorderStroke
-import com.stiven.desarrollomovil.ui.theme.*
+import com.stiven.sos.ui.theme.*
 
 // ============================================
 // CHIP PREMIUM

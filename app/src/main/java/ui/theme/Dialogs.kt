@@ -1,5 +1,5 @@
 
-package com.stiven.desarrollomovil.ui.theme.components
+package com.stiven.sos.ui.theme.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
@@ -7,8 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import com.stiven.desarrollomovil.ui.theme.CustomShapes
-import com.stiven.desarrollomovil.ui.theme.EduRachaColors
+import com.stiven.sos.ui.theme.CustomShapes
+import com.stiven.sos.ui.theme.EduRachaColors
 
 @Composable
 fun EduRachaPrimaryButton(

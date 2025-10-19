@@ -1,6 +1,6 @@
 
 
-package com.stiven.desarrollomovil.ui.theme
+package com.stiven.sos.ui.theme
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp

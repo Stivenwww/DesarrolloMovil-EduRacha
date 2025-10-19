@@ -1,4 +1,4 @@
-package com.stiven.desarrollomovil.ui.theme.components
+package com.stiven.sos.ui.theme.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,8 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stiven.desarrollomovil.ui.theme.EduRachaColors
-import com.stiven.desarrollomovil.ui.theme.Spacing
+import com.stiven.sos.ui.theme.EduRachaColors
+import com.stiven.sos.ui.theme.Spacing
 
 // ===============================================
 // Componente de Tarjeta de Acción (Ej: Crear Asignatura)

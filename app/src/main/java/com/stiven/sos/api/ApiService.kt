@@ -1,0 +1,85 @@
+// Archivo: app/src/main/java/com/stiven/desarrollomovil/api/ApiService.kt
+
+package com.stiven.sos.api
+
+import com.stiven.sos.models.*
+import retrofit2.Response
+import retrofit2.http.*
+
+/**
+ * Interfaz que define todos los endpoints de la API de EduRacha usando Retrofit.
+ */
+interface ApiService {
+
+    // ============================================
+    // ENDPOINTS DE CURSOS
+    // ============================================
+
+    // Dentro de tu interfaz ApiService.kt// Después (La forma correcta)
+    @POST("api/cursos")
+    suspend fun crearCurso(@Body curso: CursoRequest): Response<ApiResponse>
+
+    @GET("api/cursos")
+    suspend fun obtenerCursos(): Response<List<Curso>>
+
+    @GET("api/cursos/{id}")
+    suspend fun obtenerCursoPorId(@Path("id") id: String): Response<Curso>
+
+    @PUT("api/cursos/{id}")
+    suspend fun actualizarCurso(
+        @Path("id") id: String,
+        @Body curso: Curso
+    ): Response<ApiResponse>
+
+    @DELETE("api/cursos/{id}")
+    suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
+
+    // ============================================
+    // ENDPOINTS DE PREGUNTAS - CRUD
+    // ============================================
+
+    @GET("api/preguntas")
+    suspend fun obtenerPreguntas(
+        @Query("cursoId") cursoId: String? = null,
+        @Query("estado") estado: String? = null
+    ): Response<List<Pregunta>>
+
+    @GET("api/preguntas/{id}")
+    suspend fun obtenerPreguntaPorId(
+        @Path("id") id: String
+    ): Response<Pregunta>
+
+    @POST("api/preguntas")
+    suspend fun crearPregunta(
+        @Body pregunta: Pregunta
+    ): Response<ApiResponse>
+
+    @PUT("api/preguntas/{id}")
+    suspend fun actualizarPregunta(
+        @Path("id") id: String,
+        @Body pregunta: Pregunta
+    ): Response<ApiResponse>
+
+    @DELETE("api/preguntas/{id}")
+    suspend fun eliminarPregunta(
+        @Path("id") id: String
+    ): Response<ApiResponse>
+
+    @PUT("api/preguntas/{id}/estado")
+    suspend fun actualizarEstadoPregunta(
+        @Path("id") id: String,
+        @Body request: ActualizarEstadoRequest
+    ): Response<EstadoUpdateResponse>
+
+    @DELETE("api/preguntas/cache")
+    suspend fun limpiarCachePreguntas(): Response<ApiResponse>
+
+    // ============================================
+    // ENDPOINTS DE IA - GENERACIÓN DE PREGUNTAS
+    // ============================================
+
+    @POST("api/preguntas/ia/generar")
+    suspend fun generarPreguntasIA(
+        @Body request: GenerarPreguntasRequest
+    ): Response<PreguntasIAResponse>
+}

@@ -4,7 +4,7 @@
 // 📱 Cabeceras, AppBars y Componentes de Navegación
 // ============================================
 
-package com.stiven.desarrollomovil.ui.theme.components
+package com.stiven.sos.ui.theme.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 // --- Y ASEGÚRATE DE TENER ESTA OTRA IMPORTACIÓN ---
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import com.stiven.desarrollomovil.ui.theme.*
+import com.stiven.sos.ui.theme.*
 
 // ============================================
 // HEADER DE PERFIL PREMIUM (Como en tu imagen)
