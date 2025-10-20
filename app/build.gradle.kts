@@ -29,13 +29,16 @@ android {
     }
 
     buildFeatures {
-        viewBinding = true
+        // viewBinding
+        viewBinding = false
         compose = true
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        //Habilitar desugarización para APIs modernas (como java.time)
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -61,6 +64,9 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
+    // Dependencia para desugarización de APIs de Java
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
     // Jetpack Compose BOM
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
@@ -69,28 +75,25 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Activity Compose
+    // Activity, ViewModel & Navigation para Compose
     implementation("androidx.activity:activity-compose:1.8.2")
-
-    // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-
-    // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Firebase BOM
+    // Firebase BOM (Plataforma de Versiones)
     implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
-    implementation(libs.firebase.auth)
+
+    // Dependencias de Firebase
+    implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-analytics")
 
-    // Google Sign-In
+    // Google Sign-In & Credentials
     implementation("com.google.android.gms:play-services-auth:21.2.0")
-
-    // Credentials
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
-    // Para cargar imágenes desde una URL de forma asíncrona
+
+    // Otras librerías
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation(libs.firebase.appdistribution.gradle)
 
@@ -98,22 +101,22 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-
-    // Compose Testing
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-
-    //dependencias para consumir APIs
+    // Ktor (API Client)
     implementation("io.ktor:ktor-client-core:2.3.3")
     implementation("io.ktor:ktor-client-cio:2.3.3")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.3")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.3")
-    //retrofit
+
+    // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 }

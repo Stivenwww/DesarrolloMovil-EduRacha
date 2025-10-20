@@ -12,6 +12,26 @@ import retrofit2.http.*
 interface ApiService {
 
     // ============================================
+    // ENDPOINT DE REGISTRO - NUEVO
+    // ============================================
+
+    /**
+     * Registra un nuevo usuario (estudiante o docente) en el sistema.
+     */
+    @POST("registro")
+    suspend fun registrarUsuario(
+        @Body registro: RegistroRequest
+    ): Response<Map<String, String>>
+    @PUT("api/usuarios/{uid}")
+
+    suspend fun actualizarPerfil(
+        @Path("uid") uid: String,
+        @Body perfilUpdate: ActualizarPerfilRequest
+    ): Response<Map<String, String>>
+
+
+
+// ============================================
     // ENDPOINTS DE CURSOS
     // ============================================
 

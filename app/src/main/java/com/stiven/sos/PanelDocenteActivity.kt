@@ -1,7 +1,6 @@
-// Archivo: app/src/main/java/com/stiven/sos/PanelDocenteActivity.kt
-
 package com.stiven.sos
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -24,13 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
 import com.stiven.sos.models.EstadoPregunta
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.models.UserPreferences
 import com.stiven.sos.viewmodel.CursoViewModel
 import com.stiven.sos.viewmodel.PreguntaViewModel
 import java.util.*
@@ -42,13 +42,11 @@ class PanelDocenteActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Cargar datos iniciales
         cargarDatos()
     }
 
     override fun onResume() {
         super.onResume()
-        // Recargar datos cada vez que volvemos a esta pantalla
         cargarDatos()
 
         setContent {
@@ -71,10 +69,7 @@ class PanelDocenteActivity : ComponentActivity() {
     }
 
     private fun cargarDatos() {
-        // Cargar cursos
         cursoViewModel.obtenerCursos()
-
-        // Cargar SOLO preguntas pendientes de revisión
         preguntasViewModel.cargarPreguntas(
             cursoId = null,
             estado = EstadoPregunta.PENDIENTE_REVISION
@@ -111,31 +106,47 @@ fun PanelDocenteScreen(
     onNavigateToStudents: () -> Unit,
     onNavigateToCourses: () -> Unit
 ) {
+    val context = LocalContext.current
     val greeting = remember { getGreeting() }
-    val user = FirebaseAuth.getInstance().currentUser
-    val userName = user?.displayName?.split(" ")?.firstOrNull() ?: "Docente"
-    val userEmail = user?.email ?: "docente@uniautonoma.edu.co"
+
+    // ✅ Estados para almacenar datos del usuario
+    var fullName by remember { mutableStateOf("") }
+    var userEmail by remember { mutableStateOf("") }
+    var userRole by remember { mutableStateOf("") }
+    var userUid by remember { mutableStateOf("") }
+
+    // ✅ Leer datos directamente desde SharedPreferences cada vez que se compone
+    LaunchedEffect(Unit) {
+        // Acceso directo a SharedPreferences para asegurar lectura actualizada
+        val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
+
+        fullName = prefs.getString("user_name", null) ?: "Usuario"
+        userEmail = prefs.getString("user_email", null) ?: ""
+        userRole = prefs.getString("user_role", null) ?: "estudiante"
+        userUid = prefs.getString("user_uid", null) ?: ""
+
+        android.util.Log.d("PanelDocente", "=== LEYENDO DATOS DEL USUARIO ===")
+        android.util.Log.d("PanelDocente", "Nombre completo: $fullName")
+        android.util.Log.d("PanelDocente", "Email: $userEmail")
+        android.util.Log.d("PanelDocente", "Rol: $userRole")
+        android.util.Log.d("PanelDocente", "UID: $userUid")
+    }
 
     val cursoUiState by cursoViewModel.uiState.collectAsState()
     val preguntasUiState by preguntasViewModel.uiState.collectAsState()
 
     val totalCursos = cursoUiState.cursos.size
 
-    // CORRECCIÓN TEMPORAL: Filtrar en el cliente porque el backend no filtra correctamente
     val preguntasPendientes = remember(preguntasUiState.preguntas) {
         preguntasUiState.preguntas.count {
             it.estado == EstadoPregunta.PENDIENTE_REVISION
         }
     }
 
-    // Debug log para verificar
     LaunchedEffect(preguntasUiState.preguntas) {
         android.util.Log.d("PanelDocente", "Total preguntas cargadas: ${preguntasUiState.preguntas.size}")
         val pendientes = preguntasUiState.preguntas.count { it.estado == EstadoPregunta.PENDIENTE_REVISION }
         android.util.Log.d("PanelDocente", "Preguntas realmente pendientes: $pendientes")
-        preguntasUiState.preguntas.forEach { pregunta ->
-            android.util.Log.d("PanelDocente", "Pregunta ID: ${pregunta.id}, Estado: ${pregunta.estado}")
-        }
     }
 
     Column(
@@ -146,8 +157,9 @@ fun PanelDocenteScreen(
     ) {
         UserHeader(
             greeting = greeting,
-            userName = userName,
+            fullName = fullName,
             userEmail = userEmail,
+            userRole = userRole,
             onNavigateToProfile = onNavigateToProfile,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToSettings = onNavigateToSettings
@@ -177,7 +189,7 @@ fun PanelDocenteScreen(
             )
             CompactStatCard(
                 label = "Estudiantes",
-                value = "124", // Simulado - puedes conectar esto a un ViewModel cuando esté disponible
+                value = "124",
                 icon = Icons.Outlined.Groups,
                 iconColor = EduRachaColors.Success,
                 modifier = Modifier.weight(1f),
@@ -234,8 +246,9 @@ fun PanelDocenteScreen(
 @Composable
 fun UserHeader(
     greeting: String,
-    userName: String,
+    fullName: String,
     userEmail: String,
+    userRole: String,
     onNavigateToProfile: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToSettings: () -> Unit
@@ -251,15 +264,17 @@ fun UserHeader(
                 modifier = Modifier
                     .size(60.dp)
                     .clip(CircleShape)
+                    .background(EduRachaColors.Primary.copy(alpha = 0.1f))
                     .border(2.dp, EduRachaColors.Primary, CircleShape)
                     .clickable(onClick = onNavigateToProfile),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Outlined.Person,
-                    contentDescription = "Perfil",
-                    modifier = Modifier.size(32.dp),
-                    tint = EduRachaColors.Primary
+                // Mostrar inicial del nombre
+                Text(
+                    text = fullName.firstOrNull()?.uppercase() ?: "U",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaColors.Primary
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -267,10 +282,10 @@ fun UserHeader(
                 Text(
                     text = greeting,
                     fontSize = 14.sp,
-                    color = EduRachaColors.TextPrimary
+                    color = EduRachaColors.TextSecondary
                 )
                 Text(
-                    text = userName,
+                    text = fullName,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = EduRachaColors.TextPrimary
@@ -281,6 +296,21 @@ fun UserHeader(
                         fontSize = 12.sp,
                         color = EduRachaColors.TextSecondary,
                         modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                // Mostrar badge del rol
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (userRole == "docente") EduRachaColors.Primary.copy(alpha = 0.15f)
+                    else EduRachaColors.Success.copy(alpha = 0.15f),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Text(
+                        text = if (userRole == "docente") "👨‍🏫 Docente" else "👨‍🎓 Estudiante",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (userRole == "docente") EduRachaColors.Primary else EduRachaColors.Success,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }

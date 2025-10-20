@@ -1,7 +1,6 @@
-// Archivo: C:/Users/solar/StudioProjects/DesarrolloMovil-EduRacha/app/src/main/java/com/stiven/desarrollomovil/PerfilDocenteActivity.kt
-
 package com.stiven.sos
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,10 +22,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.google.firebase.auth.FirebaseAuth
+import com.stiven.sos.models.EstadoPregunta
 import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.CursoViewModel
 
@@ -36,6 +36,12 @@ class PerfilDocenteActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // NO establecer contenido aquí
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // ✅ Establecer contenido en onResume para recargar datos cada vez
         setContent {
             EduRachaTheme {
                 PerfilDocenteScreen(
@@ -47,20 +53,35 @@ class PerfilDocenteActivity : ComponentActivity() {
     }
 }
 
-// ============================================
-// PANTALLA PRINCIPAL DE PERFIL DOCENTE
-// ============================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PerfilDocenteScreen(
     viewModel: CursoViewModel,
     onBackClick: () -> Unit
-) { // <--- LLAVE DE APERTURA DE LA FUNCIÓN
+) {
+    val context = LocalContext.current
 
-    // Obtener datos reales de Firebase
-    val user = FirebaseAuth.getInstance().currentUser
-    val userName = user?.displayName ?: "Docente"
-    val userEmail = user?.email ?: "correo@uniautonoma.edu.co"
+    // ✅ Leer datos desde SharedPreferences (NO de Firebase)
+    var userName by remember { mutableStateOf("") }
+    var userEmail by remember { mutableStateOf("") }
+    var userRole by remember { mutableStateOf("") }
+    var userNickname by remember { mutableStateOf("") }
+
+    // ✅ Leer datos directamente desde SharedPreferences
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
+
+        userName = prefs.getString("user_name", null) ?: "Docente"
+        userEmail = prefs.getString("user_email", null) ?: "correo@uniautonoma.edu.co"
+        userRole = prefs.getString("user_role", null) ?: "docente"
+        userNickname = prefs.getString("user_nickname", null) ?: ""
+
+        android.util.Log.d("PerfilDocente", "=== DATOS CARGADOS EN PERFIL ===")
+        android.util.Log.d("PerfilDocente", "Nombre: $userName")
+        android.util.Log.d("PerfilDocente", "Email: $userEmail")
+        android.util.Log.d("PerfilDocente", "Rol: $userRole")
+        android.util.Log.d("PerfilDocente", "Nickname: $userNickname")
+    }
 
     // Se observa el uiState unificado del ViewModel
     val uiState by viewModel.uiState.collectAsState()
@@ -77,7 +98,6 @@ fun PerfilDocenteScreen(
     val cursosBorrador = cursos.count { it.estado.equals("borrador", ignoreCase = true) }
     val cursosInactivos = cursos.count { it.estado.equals("inactivo", ignoreCase = true) || it.estado.equals("archivado", ignoreCase = true) }
 
-    // --- ¡CORRECCIÓN! El Scaffold y todo su contenido DEBEN estar DENTRO de la función Composable ---
     Scaffold(
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
@@ -85,7 +105,7 @@ fun PerfilDocenteScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 16.dp) // Spacing.large
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             // Header con datos del docente
             item {
@@ -96,20 +116,20 @@ fun PerfilDocenteScreen(
                 )
             }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
+            item { Spacer(modifier = Modifier.height(16.dp)) }
 
             // Sección de estadísticas de cursos
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp) // Spacing.screenPadding
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(
                         text = "Estadísticas de Cursos",
                         style = MaterialTheme.typography.titleLarge,
                         color = EduRachaColors.TextPrimary,
-                        modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
 
                     // Tarjetas de estadísticas en fila
@@ -142,36 +162,42 @@ fun PerfilDocenteScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
+            item { Spacer(modifier = Modifier.height(16.dp)) }
 
             // Información del docente
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp) // Spacing.screenPadding
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(
                         text = "Información de la Cuenta",
                         style = MaterialTheme.typography.titleLarge,
                         color = EduRachaColors.TextPrimary,
-                        modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
 
                     Card(
-                        shape = RoundedCornerShape(16.dp), // CustomShapes.Card
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp), // Spacing.cardPadding
-                            verticalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             InfoDocenteItem(Icons.Default.Person, "Nombre completo", userName)
                             Divider(color = EduRachaColors.Border)
                             InfoDocenteItem(Icons.Default.Email, "Correo electrónico", userEmail)
                             Divider(color = EduRachaColors.Border)
-                            InfoDocenteItem(Icons.Default.AccountCircle, "Rol", "Docente")
+                            InfoDocenteItem(Icons.Default.AccountCircle, "Rol", if (userRole == "docente") "Docente" else "Estudiante")
+
+                            if (userNickname.isNotEmpty()) {
+                                Divider(color = EduRachaColors.Border)
+                                InfoDocenteItem(Icons.Default.Badge, "Nombre de usuario", userNickname)
+                            }
+
                             Divider(color = EduRachaColors.Border)
                             InfoDocenteItem(Icons.Default.School, "Institución", "UNIAUTÓNOMA")
                         }
@@ -179,7 +205,7 @@ fun PerfilDocenteScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
+            item { Spacer(modifier = Modifier.height(16.dp)) }
 
             // Resumen de cursos por estado
             if (totalCursos > 0) {
@@ -187,23 +213,23 @@ fun PerfilDocenteScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp) // Spacing.screenPadding
+                            .padding(horizontal = 16.dp)
                     ) {
                         Text(
                             text = "Resumen de Cursos",
                             style = MaterialTheme.typography.titleLarge,
                             color = EduRachaColors.TextPrimary,
-                            modifier = Modifier.padding(bottom = 12.dp) // Spacing.medium
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
 
                         Card(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(16.dp), // Spacing.cardPadding
-                                verticalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 ResumenCursoRow("Activo", cursosActivos, EduRachaColors.Success, totalCursos)
                                 ResumenCursoRow("Borrador", cursosBorrador, EduRachaColors.Warning, totalCursos)
@@ -213,7 +239,7 @@ fun PerfilDocenteScreen(
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(16.dp)) } // Spacing.large
+                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
 
             // Footer institucional
@@ -222,11 +248,7 @@ fun PerfilDocenteScreen(
             }
         }
     }
-} // <--- LLAVE DE CIERRE DE LA FUNCIÓN PerfilDocenteScreen
-
-// ============================================
-// COMPONENTES DE UI
-// ============================================
+}
 
 @Composable
 fun PerfilDocenteHeader(
@@ -237,7 +259,7 @@ fun PerfilDocenteHeader(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 4.dp), // Elevation.medium
+            .shadow(elevation = 4.dp),
         color = Color.Transparent
     ) {
         Box(
@@ -247,8 +269,8 @@ fun PerfilDocenteHeader(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            EduRachaColors.Primary.copy(0.9f), // GradientStart
-                            EduRachaColors.Primary // GradientEnd
+                            EduRachaColors.Primary.copy(0.9f),
+                            EduRachaColors.Primary
                         )
                     )
                 )
@@ -256,7 +278,7 @@ fun PerfilDocenteHeader(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp) // Spacing.screenPadding
+                    .padding(16.dp)
             ) {
                 // Botón de volver
                 IconButton(
@@ -268,7 +290,7 @@ fun PerfilDocenteHeader(
                     Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp)) // Spacing.large
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Avatar y datos del docente
                 Column(
@@ -278,17 +300,33 @@ fun PerfilDocenteHeader(
                     Box(
                         modifier = Modifier
                             .size(100.dp)
-                            .shadow(8.dp, CircleShape) // Elevation.large
+                            .shadow(8.dp, CircleShape)
                             .border(4.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                             .background(Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, "Avatar", tint = EduRachaColors.Primary, modifier = Modifier.size(60.dp))
+                        Text(
+                            text = userName.firstOrNull()?.uppercase() ?: "U",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.Primary
+                        )
                     }
-                    Spacer(modifier = Modifier.height(12.dp)) // Spacing.medium
-                    Text(userName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.height(4.dp)) // Spacing.extraSmall
-                    Text(userEmail, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        userName,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        userEmail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.9f),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -305,16 +343,16 @@ fun EduRachaCompactStatsCard(
 ) {
     Card(
         modifier = modifier,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Elevation.small
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp), // Spacing.medium
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp) // Spacing.small
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -342,15 +380,27 @@ fun ResumenCursoRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(modifier = Modifier
-            .size(12.dp)
-            .background(color, CircleShape))
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .background(color, CircleShape)
+        )
         Column(modifier = Modifier.weight(1f)) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text(estado, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = EduRachaColors.TextPrimary)
-                Text("$cantidad cursos", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
+                Text(
+                    estado,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = EduRachaColors.TextPrimary
+                )
+                Text(
+                    "$cantidad cursos",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
             }
             Spacer(modifier = Modifier.height(4.dp))
             LinearProgressIndicator(
@@ -358,7 +408,7 @@ fun ResumenCursoRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(50)), // CustomShapes.Badge
+                    .clip(RoundedCornerShape(50)),
                 color = color,
                 trackColor = color.copy(alpha = 0.2f)
             )
@@ -375,7 +425,7 @@ fun InfoDocenteItem(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp) // Spacing.medium
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
             modifier = Modifier
@@ -388,7 +438,12 @@ fun InfoDocenteItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = EduRachaColors.TextPrimary)
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = EduRachaColors.TextPrimary
+            )
         }
     }
 }
@@ -398,21 +453,37 @@ fun FooterInstitucional() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp), // Spacing.screenPadding
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), // CustomShapes.Card
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
         color = EduRachaColors.PrimaryContainer
     ) {
         Column(
             modifier = Modifier
                 .padding(16.dp)
-                .fillMaxWidth(), // Spacing.large
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp) // Spacing.small
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(Icons.Default.School, null, tint = EduRachaColors.Primary, modifier = Modifier.size(40.dp))
-            Text("Corporación Universitaria", style = MaterialTheme.typography.bodyMedium, color = EduRachaColors.TextSecondary, textAlign = TextAlign.Center)
-            Text("Autónoma del Cauca", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = EduRachaColors.Primary, textAlign = TextAlign.Center)
-            Text("EduRacha - Sistema de Gestión Académica", style = MaterialTheme.typography.labelSmall, color = EduRachaColors.TextSecondary, textAlign = TextAlign.Center)
+            Text(
+                "Corporación Universitaria",
+                style = MaterialTheme.typography.bodyMedium,
+                color = EduRachaColors.TextSecondary,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                "Autónoma del Cauca",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = EduRachaColors.Primary,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                "EduRacha - Sistema de Gestión Académica",
+                style = MaterialTheme.typography.labelSmall,
+                color = EduRachaColors.TextSecondary,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

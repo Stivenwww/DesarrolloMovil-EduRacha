@@ -2,6 +2,7 @@ package com.stiven.sos
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -28,7 +29,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.UserProfileChangeRequest
+import com.stiven.sos.api.ApiClient
+import com.stiven.sos.models.RegistroRequest
+import com.stiven.sos.models.UserPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class RegisterActivity : ComponentActivity() {
 
@@ -46,8 +53,9 @@ class RegisterActivity : ComponentActivity() {
                 RegisterScreen(
                     userType = userType,
                     auth = auth,
+                    context = this@RegisterActivity,
                     onNavigateToLogin = {
-                        val intent = Intent(this, LoginActivity::class.java)
+                        val intent = Intent(this@RegisterActivity, LoginActivity::class.java)
                         intent.putExtra("user_type", userType)
                         startActivity(intent)
                         finish()
@@ -65,6 +73,8 @@ class RegisterActivity : ComponentActivity() {
             Intent(this, MainActivity::class.java)
         }
         intent.putExtra("user_type", userType)
+        // ✅ Limpiar todas las actividades anteriores del stack
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
     }
@@ -75,10 +85,10 @@ class RegisterActivity : ComponentActivity() {
 fun RegisterScreen(
     userType: String,
     auth: FirebaseAuth,
+    context: android.content.Context,
     onNavigateToLogin: () -> Unit,
     onNavigateToMain: () -> Unit
 ) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     var fullName by remember { mutableStateOf("") }
@@ -103,7 +113,6 @@ fun RegisterScreen(
     val backgroundColor = Color(0xFFF5F5F5)
     val errorColor = Color(0xFFD32F2F)
 
-    // Funciones de validación
     fun validateFullName(name: String): String {
         return when {
             name.trim().isEmpty() -> "El nombre completo es obligatorio"
@@ -158,7 +167,6 @@ fun RegisterScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            // Header institucional con gradiente (igual que login)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -207,7 +215,6 @@ fun RegisterScreen(
                 }
             }
 
-            // Card del formulario
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,7 +249,6 @@ fun RegisterScreen(
                             .padding(bottom = 32.dp)
                     )
 
-                    // Campo Nombre Completo
                     OutlinedTextField(
                         value = fullName,
                         onValueChange = {
@@ -289,7 +295,6 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Campo Nombre de Usuario
                     OutlinedTextField(
                         value = username,
                         onValueChange = {
@@ -336,7 +341,6 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Campo Email
                     OutlinedTextField(
                         value = email,
                         onValueChange = {
@@ -383,7 +387,6 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Campo Contraseña
                     OutlinedTextField(
                         value = password,
                         onValueChange = {
@@ -443,7 +446,6 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Campo Confirmar Contraseña
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = {
@@ -503,7 +505,6 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Botón Registrar
                     Button(
                         onClick = {
                             fullNameError = validateFullName(fullName)
@@ -517,39 +518,102 @@ fun RegisterScreen(
                                 confirmPasswordError.isEmpty()) {
 
                                 isLoading = true
-                                auth.createUserWithEmailAndPassword(email.trim(), password)
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            val user = auth.currentUser
-                                            val displayName = "$fullName ($username) - ${if (userType == "teacher") "Docente" else "Estudiante"}"
 
-                                            val profileUpdates = UserProfileChangeRequest.Builder()
-                                                .setDisplayName(displayName)
-                                                .build()
+                                val rol = if (userType == "teacher") "docente" else "estudiante"
 
-                                            user?.updateProfile(profileUpdates)
-                                                ?.addOnCompleteListener { updateTask ->
+                                val registroRequest = RegistroRequest(
+                                    nombreCompleto = fullName.trim(),
+                                    apodo = username.trim(),
+                                    correo = email.trim(),
+                                    contrasena = password,
+                                    rol = rol
+                                )
+
+                                Log.d("RegisterActivity", "=== INICIANDO REGISTRO ===")
+                                Log.d("RegisterActivity", "Nombre completo a enviar: ${registroRequest.nombreCompleto}")
+                                Log.d("RegisterActivity", "Correo a enviar: ${registroRequest.correo}")
+                                Log.d("RegisterActivity", "Rol a enviar: ${registroRequest.rol}")
+
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
+                                        Log.d("RegisterActivity", "Enviando petición al servidor...")
+                                        val response = ApiClient.apiService.registrarUsuario(registroRequest)
+
+                                        Log.d("RegisterActivity", "=== RESPUESTA RECIBIDA ===")
+                                        Log.d("RegisterActivity", "Código de respuesta: ${response.code()}")
+
+                                        withContext(Dispatchers.Main) {
+                                            if (response.isSuccessful) {
+                                                Log.d("RegisterActivity", "Respuesta exitosa")
+
+                                                if (response.body() != null) {
+                                                    val responseBody = response.body()!!
+
+                                                    val uid = try { responseBody["uid"] as? String ?: "" } catch (e: Exception) { "" }
+                                                    val nombre = try { responseBody["nombreCompleto"] as? String ?: fullName.trim() } catch (e: Exception) { fullName.trim() }
+                                                    val apodo = try { responseBody["apodo"] as? String ?: username.trim() } catch (e: Exception) { username.trim() }
+                                                    val correo = try { responseBody["correo"] as? String ?: email.trim() } catch (e: Exception) { email.trim() }
+                                                    val rolRespuesta = try { responseBody["rol"] as? String ?: rol } catch (e: Exception) { rol }
+
+                                                    Log.d("RegisterActivity", "UID recibido: $uid")
+                                                    Log.d("RegisterActivity", "Nombre recibido: $nombre")
+                                                    Log.d("RegisterActivity", "Correo recibido: $correo")
+
+                                                    // 🔑 PRIMERO: Limpiar datos anteriores
+                                                    Log.d("RegisterActivity", "=== LIMPIANDO DATOS ANTERIORES ===")
+                                                    UserPreferences.clearUserData(context)
+
+                                                    // 🔑 SEGUNDO: GUARDAR EN SHAREDPREFERENCES CON commit() (SÍNCRONO)
+                                                    Log.d("RegisterActivity", "=== GUARDANDO NUEVOS DATOS EN SHAREDPREFERENCES ===")
+                                                    UserPreferences.saveUserData(
+                                                        context = context,
+                                                        uid = uid,
+                                                        nombreCompleto = nombre,
+                                                        apodo = apodo,
+                                                        correo = correo,
+                                                        rol = rolRespuesta
+                                                    )
+
+                                                    Log.d("RegisterActivity", "✓ Datos guardados en SharedPreferences")
+
+                                                    // Verificar que se guardó correctamente
+                                                    Log.d("RegisterActivity", "Verificación post-guardado: ${UserPreferences.getUserName(context)}")
+
+                                                    Toast.makeText(
+                                                        context,
+                                                        "¡Registro exitoso! Bienvenido $nombre",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+
                                                     isLoading = false
-                                                    if (updateTask.isSuccessful) {
-                                                        Toast.makeText(context, "¡Registro exitoso! Bienvenido", Toast.LENGTH_SHORT).show()
-                                                        onNavigateToMain()
-                                                    } else {
-                                                        Toast.makeText(context, "Error al actualizar perfil", Toast.LENGTH_SHORT).show()
-                                                        onNavigateToMain()
-                                                    }
+                                                    // ✅ Navegar inmediatamente (sin delay)
+                                                    onNavigateToMain()
+                                                } else {
+                                                    Log.e("RegisterActivity", "Body es nulo")
+                                                    isLoading = false
+                                                    Toast.makeText(context, "Error: respuesta vacía del servidor", Toast.LENGTH_LONG).show()
                                                 }
-                                        } else {
-                                            isLoading = false
-                                            val errorMessage = when {
-                                                task.exception?.message?.contains("already in use") == true ->
-                                                    "Este correo ya está registrado"
-                                                task.exception?.message?.contains("network") == true ->
-                                                    "Error de conexión. Verifica tu internet"
-                                                else -> "Error al registrar: ${task.exception?.message}"
+                                            } else {
+                                                Log.e("RegisterActivity", "Respuesta no exitosa: ${response.code()}")
+                                                isLoading = false
+
+                                                val errorMsg = when (response.code()) {
+                                                    400 -> "Datos inválidos. Verifica la información"
+                                                    409 -> "Este correo ya está registrado"
+                                                    500 -> "Error en el servidor. Intenta más tarde"
+                                                    else -> "Error ${response.code()}: ${response.message()}"
+                                                }
+                                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
                                             }
-                                            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("RegisterActivity", "Error: ${e.message}", e)
+                                        withContext(Dispatchers.Main) {
+                                            isLoading = false
+                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                                         }
                                     }
+                                }
                             }
                         },
                         modifier = Modifier
@@ -587,7 +651,6 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Divisor
             Box(
                 modifier = Modifier
                     .width(80.dp)
@@ -598,7 +661,6 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Sección de login
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -622,20 +684,20 @@ fun RegisterScreen(
                     ),
                     shape = RoundedCornerShape(28.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, primaryColor)
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF0D47A1))
                 ) {
                     Text(
                         text = "INICIAR SESIÓN",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
-                        color = primaryColor
+                        color = Color(0xFF0D47A1)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(
                         imageVector = Icons.Default.ArrowForward,
                         contentDescription = null,
-                        tint = primaryColor,
+                        tint = Color(0xFF0D47A1),
                         modifier = Modifier.size(20.dp)
                     )
                 }

@@ -2,6 +2,7 @@ package com.stiven.sos
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -19,8 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -39,7 +38,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
-// Importa el tema centralizado
+import com.stiven.sos.models.UserPreferences
 
 class LoginActivity : ComponentActivity() {
 
@@ -56,14 +55,14 @@ class LoginActivity : ComponentActivity() {
         setupGoogleSignIn()
 
         setContent {
-            // 1. APLICA TU TEMA PERSONALIZADO AQUÍ
             EduRachaTheme {
                 LoginScreen(
                     userType = userType,
                     auth = auth,
                     googleClient = googleClient,
+                    context = this@LoginActivity,
                     onNavigateToRegister = {
-                        val intent = Intent(this, RegisterActivity::class.java)
+                        val intent = Intent(this@LoginActivity, RegisterActivity::class.java)
                         intent.putExtra("user_type", userType)
                         startActivity(intent)
                         finish()
@@ -100,10 +99,10 @@ fun LoginScreen(
     userType: String,
     auth: FirebaseAuth,
     googleClient: GoogleSignInClient,
+    context: android.content.Context,
     onNavigateToRegister: () -> Unit,
     onNavigateToMain: () -> Unit
 ) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     var email by remember { mutableStateOf("") }
@@ -118,8 +117,6 @@ fun LoginScreen(
     val backgroundColor = Color(0xFFF5F5F5)
     val errorColor = Color(0xFFD32F2F)
 
-
-    // Funciones de validación
     fun validateEmail(email: String): String {
         return when {
             email.trim().isEmpty() -> "El correo electrónico es obligatorio"
@@ -137,10 +134,8 @@ fun LoginScreen(
         }
     }
 
-    // Títulos según tipo de usuario
     val title = if (userType == "teacher") "Inicio de sesión - Docente" else "Inicio de sesión - Estudiante"
 
-    // Launcher para Google Sign In
     val googleLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -183,7 +178,6 @@ fun LoginScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            // Header institucional con gradiente
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -204,7 +198,7 @@ fun LoginScreen(
                         modifier = Modifier.size(80.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.School, // MANTENIENDO EL ICONO
+                            imageVector = Icons.Default.School,
                             contentDescription = "Logo institucional",
                             tint = Color.White,
                             modifier = Modifier
@@ -232,7 +226,6 @@ fun LoginScreen(
                 }
             }
 
-            // Card del formulario
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -249,7 +242,7 @@ fun LoginScreen(
                         text = title,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121), // MANTENIENDO TU COLOR ORIGINAL
+                        color = Color(0xFF212121),
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -257,7 +250,6 @@ fun LoginScreen(
                         letterSpacing = 0.2.sp
                     )
 
-                    // Campo Email
                     OutlinedTextField(
                         value = email,
                         onValueChange = {
@@ -297,7 +289,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Campo Contraseña
                     OutlinedTextField(
                         value = password,
                         onValueChange = {
@@ -350,7 +341,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Botón Login principal
                     Button(
                         onClick = {
                             emailError = validateEmail(email)
@@ -358,19 +348,77 @@ fun LoginScreen(
 
                             if (emailError.isEmpty() && passwordError.isEmpty()) {
                                 isLoading = true
+                                Log.d("LoginActivity", "=== INICIANDO SESIÓN ===")
+                                Log.d("LoginActivity", "Email: $email")
+
                                 auth.signInWithEmailAndPassword(email.trim(), password)
                                     .addOnCompleteListener { task ->
-                                        isLoading = false
                                         if (task.isSuccessful) {
-                                            Toast.makeText(context, "¡Bienvenido! Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
-                                            onNavigateToMain()
+                                            Log.d("LoginActivity", "✓ Autenticación exitosa en Firebase")
+
+                                            val user = auth.currentUser
+                                            if (user != null) {
+                                                Log.d("LoginActivity", "=== OBTENIENDO DATOS DEL USUARIO ===")
+                                                Log.d("LoginActivity", "Email de Firebase: ${user.email}")
+                                                Log.d("LoginActivity", "UID de Firebase: ${user.uid}")
+
+                                                // Obtener datos guardados en SharedPreferences
+                                                val nombreGuardado = UserPreferences.getUserName(context)
+                                                val rolGuardado = UserPreferences.getUserRole(context)
+                                                val emailGuardado = UserPreferences.getUserEmail(context)
+                                                val uidGuardado = UserPreferences.getUserUid(context)
+
+                                                Log.d("LoginActivity", "Nombre en SharedPreferences: $nombreGuardado")
+                                                Log.d("LoginActivity", "Rol en SharedPreferences: $rolGuardado")
+                                                Log.d("LoginActivity", "Email en SharedPreferences: $emailGuardado")
+                                                Log.d("LoginActivity", "UID en SharedPreferences: $uidGuardado")
+
+                                                // Verificar si los datos corresponden al usuario que está iniciando sesión
+                                                if (emailGuardado != user.email) {
+                                                    Log.d("LoginActivity", "⚠️ El usuario logueado no coincide con los datos guardados")
+                                                    Log.d("LoginActivity", "Esperado: ${user.email}, Guardado: $emailGuardado")
+
+                                                    // Limpiar SharedPreferences para este nuevo usuario
+                                                    Log.d("LoginActivity", "Limpiando SharedPreferences para el nuevo usuario...")
+                                                    UserPreferences.clearUserData(context)
+
+                                                    // Los datos se van a actualizar cuando el usuario inicie sesión nuevamente
+                                                    // o puedes guardar datos genéricos de Firebase
+                                                    val rolDefault = if (userType == "teacher") "docente" else "estudiante"
+                                                    UserPreferences.saveUserData(
+                                                        context = context,
+                                                        uid = user.uid,
+                                                        nombreCompleto = user.displayName ?: "Usuario",
+                                                        apodo = "",
+                                                        correo = user.email ?: "",
+                                                        rol = rolDefault
+                                                    )
+                                                }
+
+                                                Log.d("LoginActivity", "✓ Navegando a pantalla principal")
+                                                isLoading = false
+                                                // Pequeño delay para asegurar que SharedPreferences se actualice
+                                                Thread.sleep(500)
+                                                (context as? android.app.Activity)?.let {
+                                                    val intent = if (userType == "teacher") {
+                                                        Intent(it, PanelDocenteActivity::class.java)
+                                                    } else {
+                                                        Intent(it, MainActivity::class.java)
+                                                    }
+                                                    intent.putExtra("user_type", userType)
+                                                    it.startActivity(intent)
+                                                    it.finish()
+                                                }
+                                            }
                                         } else {
+                                            isLoading = false
                                             val errorMessage = when {
                                                 task.exception?.message?.contains("password") == true -> "Contraseña incorrecta"
                                                 task.exception?.message?.contains("user") == true -> "No existe una cuenta con este correo"
                                                 task.exception?.message?.contains("network") == true -> "Error de conexión. Verifica tu internet"
                                                 else -> "Error: ${task.exception?.message}"
                                             }
+                                            Log.e("LoginActivity", "✗ Error: $errorMessage")
                                             Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                                         }
                                     }
@@ -381,7 +429,7 @@ fun LoginScreen(
                             .height(56.dp),
                         enabled = !isLoading,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0D47A1), // MANTENIENDO TU COLOR ORIGINAL
+                            containerColor = Color(0xFF0D47A1),
                             disabledContainerColor = Color(0xFF1565C0).copy(alpha = 0.6f)
                         ),
                         shape = RoundedCornerShape(28.dp),
@@ -409,7 +457,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Botón Google
                     OutlinedButton(
                         onClick = {
                             val signInIntent = googleClient.signInIntent
@@ -419,7 +466,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(56.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White, // MANTENIENDO TU COLOR ORIGINAL
+                            containerColor = Color.White,
                             contentColor = Color(0xFF424242)
                         ),
                         shape = RoundedCornerShape(28.dp),
@@ -435,7 +482,7 @@ fun LoginScreen(
                             text = "Iniciar sesión con Google",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF424242) // MANTENIENDO TU COLOR ORIGINAL
+                            color = Color(0xFF424242)
                         )
                     }
                 }
@@ -453,7 +500,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Sección de registro
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -463,7 +509,7 @@ fun LoginScreen(
                 Text(
                     text = "¿No tienes cuenta?",
                     fontSize = 15.sp,
-                    color = Color(0xFF757575), // MANTENIENDO TU COLOR ORIGINAL
+                    color = Color(0xFF757575),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -473,7 +519,7 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White // MANTENIENDO TU COLOR ORIGINAL
+                        containerColor = Color.White
                     ),
                     shape = RoundedCornerShape(28.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
