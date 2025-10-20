@@ -43,9 +43,6 @@ data class CursoRequest(
     val fechaCreacion: String
 )
 
-// --- 🔥 ESTA SECCIÓN HA SIDO ELIMINADA 🔥 ---
-// data class ApiResponse( ... )
-
 
 // Función de extensión para convertir Curso a CursoRequest
 fun Curso.toRequest(): CursoRequest {

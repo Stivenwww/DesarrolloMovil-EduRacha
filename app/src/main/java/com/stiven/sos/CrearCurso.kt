@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.Tema
+import com.stiven.sos.models.UserPreferences
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import kotlinx.coroutines.CoroutineScope
@@ -102,11 +103,13 @@ fun CrearCursoConTemasScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
+    // 🔑 OBTENER EL UID DEL USUARIO LOGUEADO AUTOMÁTICAMENTE
+    val docenteId = remember { UserPreferences.getUserUid(context) }
+
     // Estados del curso
     var titulo by remember { mutableStateOf("") }
     var codigo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
-    var docenteId by remember { mutableStateOf("") }
     var duracionDias by remember { mutableStateOf("") }
     var estado by remember { mutableStateOf("activo") }
 
@@ -114,7 +117,6 @@ fun CrearCursoConTemasScreen(
     var tituloError by remember { mutableStateOf(false) }
     var codigoError by remember { mutableStateOf(false) }
     var descripcionError by remember { mutableStateOf(false) }
-    var docenteIdError by remember { mutableStateOf(false) }
     var duracionError by remember { mutableStateOf(false) }
 
     // Lista de temas
@@ -345,14 +347,7 @@ fun CrearCursoConTemasScreen(
                             errorMessage = "La descripción es requerida"
                         )
 
-                        CustomTextField(
-                            value = docenteId,
-                            onValueChange = { docenteId = it; docenteIdError = false },
-                            label = "ID del docente *",
-                            icon = Icons.Default.Person,
-                            isError = docenteIdError,
-                            errorMessage = "El ID del docente es requerido"
-                        )
+                        // ✅ YA NO HAY CAMPO PARA ID DEL DOCENTE - SE OBTIENE AUTOMÁTICAMENTE
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -379,6 +374,45 @@ fun CrearCursoConTemasScreen(
                                 isError = false,
                                 modifier = Modifier.weight(1f)
                             )
+                        }
+
+                        // 💡 INDICADOR VISUAL DEL DOCENTE (OPCIONAL - INFORMATIVO)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = EduRachaColors.Success.copy(alpha = 0.1f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    null,
+                                    tint = EduRachaColors.Success,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Docente asignado automáticamente",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.TextPrimary
+                                    )
+                                    Text(
+                                        "ID: $docenteId",
+                                        fontSize = 12.sp,
+                                        color = EduRachaColors.TextSecondary
+                                    )
+                                }
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    null,
+                                    tint = EduRachaColors.Success,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -457,14 +491,23 @@ fun CrearCursoConTemasScreen(
                 // BOTÓN CREAR CURSO
                 Button(
                     onClick = {
-                        // Validaciones (esta parte ya estaba bien)
+                        // Validaciones
                         tituloError = titulo.isBlank()
                         codigoError = codigo.isBlank()
                         descripcionError = descripcion.isBlank()
-                        docenteIdError = docenteId.isBlank()
                         duracionError = duracionDias.isBlank() || duracionDias.toIntOrNull() == null
 
-                        if (tituloError || codigoError || descripcionError || docenteIdError || duracionError) {
+                        // ✅ VALIDACIÓN DEL DOCENTE ID
+                        if (docenteId.isNullOrBlank()) {
+                            Toast.makeText(
+                                context,
+                                "❌ Error: No se pudo obtener tu ID de usuario. Vuelve a iniciar sesión.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@Button
+                        }
+
+                        if (tituloError || codigoError || descripcionError || duracionError) {
                             Toast.makeText(context, "⚠️ Completa todos los campos obligatorios", Toast.LENGTH_LONG).show()
                             return@Button
                         }
@@ -474,9 +517,7 @@ fun CrearCursoConTemasScreen(
                             return@Button
                         }
 
-                        // --- INICIO DE LA CORRECCIÓN ---
-
-                        // 1. Crear el Mapa de temas como lo espera tu API.
+                        // Crear el Mapa de temas
                         val temasMap = temas.associate { temaTemp ->
                             temaTemp.id to Tema(
                                 id = temaTemp.id,
@@ -488,27 +529,24 @@ fun CrearCursoConTemasScreen(
                             )
                         }
 
-// 2. Crear un objeto 'CursoRequest', que es lo que la función 'crearCurso' de tu API espera.
+                        // ✅ USAR EL DOCENTE ID AUTOMÁTICO
                         val cursoParaEnviar = com.stiven.sos.models.CursoRequest(
                             titulo = titulo.trim(),
                             codigo = codigo.trim().uppercase(),
                             descripcion = descripcion.trim(),
-                            docenteId = docenteId.trim(),
+                            docenteId = docenteId, // 🔑 SE USA EL ID DEL USUARIO LOGUEADO
                             duracionDias = duracionDias.toInt(),
                             temas = temasMap,
                             estado = estado,
                             fechaCreacion = fechaActual
                         )
 
-                        // --- FIN DE LA CORRECCIÓN ---
-
-
                         isLoading = true
-                        Log.d("CREAR_CURSO", "Enviando curso: ${com.google.gson.Gson().toJson(cursoParaEnviar)}")
+                        Log.d("CREAR_CURSO", "Enviando curso con docenteId: $docenteId")
+                        Log.d("CREAR_CURSO", "Curso completo: ${com.google.gson.Gson().toJson(cursoParaEnviar)}")
 
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                // 3. Llamar a la API con el objeto 'cursoParaEnviar' que tiene el tipo correcto.
                                 val response = com.stiven.sos.api.ApiClient.apiService.crearCurso(cursoParaEnviar)
 
                                 withContext(Dispatchers.Main) {
@@ -539,7 +577,6 @@ fun CrearCursoConTemasScreen(
                             }
                         }
                     },
-                    // ... (el resto de las propiedades del botón se quedan igual)
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(60.dp),
@@ -548,9 +585,7 @@ fun CrearCursoConTemasScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary),
                     elevation = ButtonDefaults.buttonElevation(6.dp)
                 ) {
-
-
-                if (isLoading) {
+                    if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                         Spacer(Modifier.width(12.dp))
                         Text("Creando curso...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -603,7 +638,7 @@ fun TemaItemCardMejorado(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 160.dp), // Más alto
+            .heightIn(min = 160.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -611,7 +646,7 @@ fun TemaItemCardMejorado(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp) // Más padding
+                .padding(24.dp)
         ) {
             // Header del tema
             Row(
