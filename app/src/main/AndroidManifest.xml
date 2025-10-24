@@ -91,10 +91,11 @@
             android:name=".VisualizarGruposActivity"
             android:exported="false" />
 
-        <!-- Otras Activities -->
+
         <activity
-            android:name=".RankingActivity"
-            android:exported="false" />
+            android:name=".UsuariosAsignadosActivity"
+            android:exported="false"
+            android:label="Usuarios Asignados" />
 
     </application>
 

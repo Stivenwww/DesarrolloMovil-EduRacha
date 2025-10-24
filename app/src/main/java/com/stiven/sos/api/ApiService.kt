@@ -1,4 +1,4 @@
-// Archivo: app/src/main/java/com/stiven/desarrollomovil/api/ApiService.kt
+
 
 package com.stiven.sos.api
 
@@ -35,7 +35,7 @@ interface ApiService {
     // ENDPOINTS DE CURSOS
     // ============================================
 
-    // Dentro de tu interfaz ApiService.kt// Después (La forma correcta)
+
     @POST("api/cursos")
     suspend fun crearCurso(@Body curso: CursoRequest): Response<ApiResponse>
 
@@ -53,6 +53,20 @@ interface ApiService {
 
     @DELETE("api/cursos/{id}")
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
+
+
+
+    /**
+     * Obtener estudiantes asignados a un curso específico.
+     * Endpoint: GET /api/solicitudes/curso/{id}/estudiantes
+     */
+
+
+    @GET("api/solicitudes/curso/{id}/estudiantes")
+    suspend fun obtenerEstudiantesPorCurso(
+        @Path("id") cursoId: String
+    ): Response<List<UsuarioAsignado>>
+
 
     // ============================================
     // ENDPOINTS DE PREGUNTAS - CRUD

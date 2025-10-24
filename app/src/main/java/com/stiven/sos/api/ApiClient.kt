@@ -7,10 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    // IMPORTANTE: Cambia esta URL según tu caso:
-    // - Para emulador Android Studio: "http://10.0.2.2:8080/"
-    // - Para dispositivo físico en misma red: "http://TU_IP_LOCAL:8080/" (ej: "http://192.168.1.5:8080/")
-    // - Para servidor en la nube: "https://tu-dominio.com/"
+
     private const val BASE_URL = "http://10.0.2.2:8080/"
 
     // Logger para ver las peticiones en Logcat

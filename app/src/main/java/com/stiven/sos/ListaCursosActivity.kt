@@ -477,8 +477,11 @@ fun AnimatedCursoCard(
     }
 }
 
+// REEMPLAZAR tu CursoDetailDialog existente con esta versión:
+
 @Composable
 fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var modoEdicion by remember { mutableStateOf(false) }
     var titulo by remember { mutableStateOf(curso.titulo) }
     var descripcion by remember { mutableStateOf(curso.descripcion) }
@@ -514,12 +517,41 @@ fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> 
                     DetailRow("Estado", curso.estado.replaceFirstChar { it.uppercase() }, obtenerIconoEstado(curso.estado), obtenerColorEstado(curso.estado))
                     Spacer(Modifier.height(12.dp))
                     DetailRow("ID Docente", curso.docenteId, Icons.Outlined.Person, EduRachaColors.Secondary)
+
+                    // 🆕 NUEVO: Botón para ver usuarios asignados
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = EduRachaColors.Background)
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            val intent = Intent(context, UsuariosAsignadosActivity::class.java).apply {
+                                putExtra("CURSO_ID", curso.id)
+                                putExtra("CURSO_TITULO", curso.titulo)
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EduRachaColors.Info
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.People,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ver Usuarios Asignados", fontWeight = FontWeight.SemiBold)
+                    }
+
                     if (curso.descripcion.isNotEmpty()) {
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider(color = EduRachaColors.Background)
                         Spacer(Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.Top) {
-                            Icon(Icons.Outlined.Description, null, tint = EduRachaColors.Secondary, modifier = Modifier.size(20.dp))
+                           Icon(Icons.Outlined.Description, null, tint = EduRachaColors.Secondary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column {
                                 Text("Descripción", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
