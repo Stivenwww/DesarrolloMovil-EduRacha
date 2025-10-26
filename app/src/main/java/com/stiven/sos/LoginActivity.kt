@@ -32,6 +32,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -87,6 +92,7 @@ class LoginActivity : ComponentActivity() {
         } else {
             Intent(this, MainActivity::class.java)
         }
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         intent.putExtra("user_type", userType)
         startActivity(intent)
         finish()
@@ -341,9 +347,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Fragmento corregido del LoginActivity.kt
-// Solo la parte del botón de login
-
                     Button(
                         onClick = {
                             emailError = validateEmail(email)
@@ -355,57 +358,57 @@ fun LoginScreen(
                                 Log.d("LoginActivity", "Email: $email")
 
                                 auth.signInWithEmailAndPassword(email.trim(), password)
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            Log.d("LoginActivity", "✓ Autenticación exitosa")
+                                    .addOnSuccessListener { authResult ->
+                                        Log.d("LoginActivity", "✓ Autenticación exitosa")
 
-                                            val user = auth.currentUser
-                                            if (user != null) {
-                                                // ✅ Guardar datos en SharedPreferences (sincrónico y rápido)
-                                                val emailGuardado = UserPreferences.getUserEmail(context)
+                                        val user = authResult.user
+                                        if (user != null) {
+                                            val emailGuardado = UserPreferences.getUserEmail(context)
 
-                                                if (emailGuardado != user.email) {
-                                                    Log.d("LoginActivity", "Usuario diferente, limpiando datos")
-                                                    UserPreferences.clearUserData(context)
+                                            if (emailGuardado != user.email) {
+                                                Log.d("LoginActivity", "Usuario diferente, limpiando datos")
+                                                UserPreferences.clearUserData(context)
 
-                                                    val rolDefault = if (userType == "teacher") "docente" else "estudiante"
-                                                    UserPreferences.saveUserData(
-                                                        context = context,
-                                                        uid = user.uid,
-                                                        nombreCompleto = user.displayName ?: "Usuario",
-                                                        apodo = "",
-                                                        correo = user.email ?: "",
-                                                        rol = rolDefault
-                                                    )
-                                                }
-
-                                                Log.d("LoginActivity", "✓ Navegando a pantalla principal")
-
-                                                // ✅ Navegar inmediatamente sin delay
-                                                isLoading = false
-                                                val intent = if (userType == "teacher") {
-                                                    Intent(context, PanelDocenteActivity::class.java)
-                                                } else {
-                                                    Intent(context, MainActivity::class.java)
-                                                }
-                                                intent.putExtra("user_type", userType)
-                                                context.startActivity(intent)
-                                                (context as? ComponentActivity)?.finish()
+                                                val rolDefault = if (userType == "teacher") "docente" else "estudiante"
+                                                UserPreferences.saveUserData(
+                                                    context = context,
+                                                    uid = user.uid,
+                                                    nombreCompleto = user.displayName ?: "Usuario",
+                                                    apodo = "",
+                                                    correo = user.email ?: "",
+                                                    rol = rolDefault
+                                                )
                                             }
-                                        } else {
+
+                                            Log.d("LoginActivity", "✓ Navegando a pantalla principal")
                                             isLoading = false
-                                            val errorMessage = when {
-                                                task.exception?.message?.contains("password") == true ->
-                                                    "Contraseña incorrecta"
-                                                task.exception?.message?.contains("user") == true ->
-                                                    "No existe una cuenta con este correo"
-                                                task.exception?.message?.contains("network") == true ->
-                                                    "Error de conexión. Verifica tu internet"
-                                                else -> "Error: ${task.exception?.message}"
+
+                                            val intent = if (userType == "teacher") {
+                                                Intent(context, PanelDocenteActivity::class.java)
+                                            } else {
+                                                Intent(context, MainActivity::class.java)
                                             }
-                                            Log.e("LoginActivity", "✗ Error: $errorMessage")
-                                            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                            intent.putExtra("user_type", userType)
+                                            context.startActivity(intent)
+                                            (context as? ComponentActivity)?.finish()
                                         }
+                                    }
+                                    .addOnFailureListener { exception ->
+                                        isLoading = false
+                                        val errorMessage = when {
+                                            exception.message?.contains("password", ignoreCase = true) == true ->
+                                                "Contraseña incorrecta"
+                                            exception.message?.contains("user", ignoreCase = true) == true ->
+                                                "No existe una cuenta con este correo"
+                                            exception.message?.contains("network", ignoreCase = true) == true ->
+                                                "Error de conexión. Verifica tu internet"
+                                            exception.message?.contains("timeout", ignoreCase = true) == true ->
+                                                "Tiempo de espera agotado. Intenta nuevamente"
+                                            else -> "Error: ${exception.message}"
+                                        }
+                                        Log.e("LoginActivity", "✗ Error de autenticación: $errorMessage", exception)
+                                        Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                                     }
                             }
                         },
