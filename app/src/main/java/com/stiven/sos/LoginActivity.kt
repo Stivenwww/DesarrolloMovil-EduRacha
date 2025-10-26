@@ -341,6 +341,9 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
+                    // Fragmento corregido del LoginActivity.kt
+// Solo la parte del botón de login
+
                     Button(
                         onClick = {
                             emailError = validateEmail(email)
@@ -354,36 +357,17 @@ fun LoginScreen(
                                 auth.signInWithEmailAndPassword(email.trim(), password)
                                     .addOnCompleteListener { task ->
                                         if (task.isSuccessful) {
-                                            Log.d("LoginActivity", "✓ Autenticación exitosa en Firebase")
+                                            Log.d("LoginActivity", "✓ Autenticación exitosa")
 
                                             val user = auth.currentUser
                                             if (user != null) {
-                                                Log.d("LoginActivity", "=== OBTENIENDO DATOS DEL USUARIO ===")
-                                                Log.d("LoginActivity", "Email de Firebase: ${user.email}")
-                                                Log.d("LoginActivity", "UID de Firebase: ${user.uid}")
-
-                                                // Obtener datos guardados en SharedPreferences
-                                                val nombreGuardado = UserPreferences.getUserName(context)
-                                                val rolGuardado = UserPreferences.getUserRole(context)
+                                                // ✅ Guardar datos en SharedPreferences (sincrónico y rápido)
                                                 val emailGuardado = UserPreferences.getUserEmail(context)
-                                                val uidGuardado = UserPreferences.getUserUid(context)
 
-                                                Log.d("LoginActivity", "Nombre en SharedPreferences: $nombreGuardado")
-                                                Log.d("LoginActivity", "Rol en SharedPreferences: $rolGuardado")
-                                                Log.d("LoginActivity", "Email en SharedPreferences: $emailGuardado")
-                                                Log.d("LoginActivity", "UID en SharedPreferences: $uidGuardado")
-
-                                                // Verificar si los datos corresponden al usuario que está iniciando sesión
                                                 if (emailGuardado != user.email) {
-                                                    Log.d("LoginActivity", "⚠️ El usuario logueado no coincide con los datos guardados")
-                                                    Log.d("LoginActivity", "Esperado: ${user.email}, Guardado: $emailGuardado")
-
-                                                    // Limpiar SharedPreferences para este nuevo usuario
-                                                    Log.d("LoginActivity", "Limpiando SharedPreferences para el nuevo usuario...")
+                                                    Log.d("LoginActivity", "Usuario diferente, limpiando datos")
                                                     UserPreferences.clearUserData(context)
 
-                                                    // Los datos se van a actualizar cuando el usuario inicie sesión nuevamente
-                                                    // o puedes guardar datos genéricos de Firebase
                                                     val rolDefault = if (userType == "teacher") "docente" else "estudiante"
                                                     UserPreferences.saveUserData(
                                                         context = context,
@@ -396,26 +380,27 @@ fun LoginScreen(
                                                 }
 
                                                 Log.d("LoginActivity", "✓ Navegando a pantalla principal")
+
+                                                // ✅ Navegar inmediatamente sin delay
                                                 isLoading = false
-                                                // Pequeño delay para asegurar que SharedPreferences se actualice
-                                                Thread.sleep(500)
-                                                (context as? android.app.Activity)?.let {
-                                                    val intent = if (userType == "teacher") {
-                                                        Intent(it, PanelDocenteActivity::class.java)
-                                                    } else {
-                                                        Intent(it, MainActivity::class.java)
-                                                    }
-                                                    intent.putExtra("user_type", userType)
-                                                    it.startActivity(intent)
-                                                    it.finish()
+                                                val intent = if (userType == "teacher") {
+                                                    Intent(context, PanelDocenteActivity::class.java)
+                                                } else {
+                                                    Intent(context, MainActivity::class.java)
                                                 }
+                                                intent.putExtra("user_type", userType)
+                                                context.startActivity(intent)
+                                                (context as? ComponentActivity)?.finish()
                                             }
                                         } else {
                                             isLoading = false
                                             val errorMessage = when {
-                                                task.exception?.message?.contains("password") == true -> "Contraseña incorrecta"
-                                                task.exception?.message?.contains("user") == true -> "No existe una cuenta con este correo"
-                                                task.exception?.message?.contains("network") == true -> "Error de conexión. Verifica tu internet"
+                                                task.exception?.message?.contains("password") == true ->
+                                                    "Contraseña incorrecta"
+                                                task.exception?.message?.contains("user") == true ->
+                                                    "No existe una cuenta con este correo"
+                                                task.exception?.message?.contains("network") == true ->
+                                                    "Error de conexión. Verifica tu internet"
                                                 else -> "Error: ${task.exception?.message}"
                                             }
                                             Log.e("LoginActivity", "✗ Error: $errorMessage")

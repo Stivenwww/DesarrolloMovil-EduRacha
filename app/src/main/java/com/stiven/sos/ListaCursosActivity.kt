@@ -477,7 +477,7 @@ fun AnimatedCursoCard(
     }
 }
 
-// REEMPLAZAR tu CursoDetailDialog existente con esta versión:
+
 
 @Composable
 fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> Unit) {

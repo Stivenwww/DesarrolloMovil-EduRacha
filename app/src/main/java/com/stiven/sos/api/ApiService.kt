@@ -67,7 +67,6 @@ interface ApiService {
         @Path("id") cursoId: String
     ): Response<List<UsuarioAsignado>>
 
-
     // ============================================
     // ENDPOINTS DE PREGUNTAS - CRUD
     // ============================================

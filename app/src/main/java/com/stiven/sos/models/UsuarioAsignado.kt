@@ -1,25 +1,28 @@
-// Archivo: app/src/main/java/com/stiven/sos/models/Usuario.kt
-
 package com.stiven.sos.models
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * Modelo para un usuario asignado a un curso.
- * Representa un estudiante individual.
- */
+
 data class UsuarioAsignado(
+    @SerializedName("id")
     val uid: String = "",
+
     val nombre: String = "",
+
+    @SerializedName("email")
     val correo: String = "",
+
     val rol: String = "estudiante",
+
     val estado: String = "activo",
+
     @SerializedName("fechaRegistro")
     val fechaRegistro: String? = null
 )
 
-
-
+/**
+ * Respuesta del endpoint /api/solicitudes/curso/{id}/estudiantes
+ */
 data class EstudiantesCursoResponse(
     val message: String = "",
     val cursoId: String = "",

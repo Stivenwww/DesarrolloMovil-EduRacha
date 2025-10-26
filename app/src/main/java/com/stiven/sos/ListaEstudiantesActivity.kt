@@ -31,10 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 
-// ===================================================================
-// CORRECCIÓN 3: Añadir la clase Activity que faltaba en este archivo.
-// Esta es la clase que PanelDocenteActivity está buscando.
-// ===================================================================
 class ListaEstudiantesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
