@@ -198,7 +198,6 @@ fun DetalleHeader(
                             .align(Alignment.BottomEnd)
                             .offset(x = 8.dp, y = 8.dp),
                         shape = CircleShape,
-                        color = getRankingColor(ranking),
                         shadowElevation = 4.dp
                     ) {
                         Text(

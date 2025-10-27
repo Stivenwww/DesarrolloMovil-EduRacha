@@ -18,8 +18,8 @@ class UsuarioRepository {
             if (response.isSuccessful) {
                 val estudiantes = response.body() ?: emptyList()
 
-                Log.d("UsuarioRepository", "✅ Estudiantes obtenidos exitosamente")
-                Log.d("UsuarioRepository", "📊 Total: ${estudiantes.size}")
+                Log.d("UsuarioRepository", " Estudiantes obtenidos exitosamente")
+                Log.d("UsuarioRepository", " Total: ${estudiantes.size}")
 
                 // Verificar que los UIDs no estén vacíos
                 estudiantes.forEach { estudiante ->

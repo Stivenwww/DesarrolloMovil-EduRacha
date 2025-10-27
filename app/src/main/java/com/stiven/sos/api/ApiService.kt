@@ -67,6 +67,16 @@ interface ApiService {
         @Path("id") cursoId: String
     ): Response<List<UsuarioAsignado>>
 
+    @POST("api/solicitudes/curso/{cursoId}/estudiante/{estudianteId}/estado")
+    suspend fun cambiarEstadoEstudiante(
+        @Path("cursoId") cursoId: String,
+        @Path("estudianteId") estudianteId: String,
+        @Body estado: Map<String, String>
+    ): Response<Map<String, String>>
+
+
+
+
     // ============================================
     // ENDPOINTS DE PREGUNTAS - CRUD
     // ============================================

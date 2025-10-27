@@ -18,6 +18,7 @@ data class UsuarioAsignado(
 
     @SerializedName("fechaRegistro")
     val fechaRegistro: String? = null
+
 )
 
 /**

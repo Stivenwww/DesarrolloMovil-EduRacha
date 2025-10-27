@@ -202,11 +202,12 @@ fun EstudianteItem(estudiante: Estudiante, onClick: () -> Unit, modifier: Modifi
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(getRankingColor(estudiante.posicionRanking)),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(EduRachaColors.Primary), // <-- CORRECCIÓN AQUÍ
                 contentAlignment = Alignment.Center
             ) {
                 Text("#${estudiante.posicionRanking}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
+
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text("${estudiante.nombre} ${estudiante.apellido}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = EduRachaColors.TextPrimary)
