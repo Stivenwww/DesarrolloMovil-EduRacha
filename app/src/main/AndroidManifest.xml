@@ -16,6 +16,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DesarrolloMovil"
         tools:targetApi="31">
+        <activity android:name=".CursosDisponiblesActivity" />
+        <activity android:name=".MisSolicitudesActivity" />
+        <activity android:name=".CursosInscritosActivity" />
+        <activity android:name=".RankingActivity" />
 
         <!-- Activity principal (pantalla de inicio) -->
         <activity
@@ -90,6 +94,7 @@
         <activity
             android:name=".VisualizarGruposActivity"
             android:exported="false" />
+
 
 
         <activity

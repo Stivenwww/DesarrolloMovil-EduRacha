@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,7 +10,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -18,8 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,24 +29,36 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.Curso
+import com.stiven.sos.models.EstadoSolicitud
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.CursoViewModel
+import com.stiven.sos.viewmodel.SolicitudViewModel
 import kotlinx.coroutines.delay
-import kotlin.text.lowercase
 
 class GestionGruposActivity : ComponentActivity() {
 
     private val cursoViewModel: CursoViewModel by viewModels()
+    private val solicitudViewModel: SolicitudViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Cargar datos
+        val prefs = getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
+        val docenteId = prefs.getString("user_uid", "") ?: ""
+
+        cursoViewModel.obtenerCursos()
+        if (docenteId.isNotEmpty()) {
+            solicitudViewModel.cargarSolicitudesDocente(docenteId)
+        }
+
         setContent {
             EduRachaTheme {
                 GestionGruposScreen(
-                    viewModel = cursoViewModel,
+                    cursoViewModel = cursoViewModel,
+                    solicitudViewModel = solicitudViewModel,
                     onNavigateBack = {
-                        // Navegación segura para volver al panel del docente
                         val intent = Intent(this, PanelDocenteActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         startActivity(intent)
@@ -71,22 +81,29 @@ class GestionGruposActivity : ComponentActivity() {
 
 @Composable
 fun GestionGruposScreen(
-    viewModel: CursoViewModel,
+    cursoViewModel: CursoViewModel,
+    solicitudViewModel: SolicitudViewModel,
     onNavigateBack: () -> Unit,
     onCursoClick: (Curso) -> Unit,
     onCrearCurso: () -> Unit
 ) {
-    // --- ¡CORRECCIÓN! Se observa el uiState unificado del ViewModel ---
-    val uiState by viewModel.uiState.collectAsState()
-    val cursos = uiState.cursos
-    val isLoading = uiState.isLoading
-    val errorMessage = uiState.error
+    val cursoUiState by cursoViewModel.uiState.collectAsState()
+    val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
-    // El LaunchedEffect que llama a obtenerCursos ya no es estrictamente necesario
-    // si el ViewModel lo hace en su bloque `init`, pero no causa ningún daño dejarlo.
-    // Lo mantendremos por claridad.
+    val cursos = cursoUiState.cursos
+    val isLoading = cursoUiState.isLoading
+    val errorMessage = cursoUiState.error
+
+    // Contar solicitudes pendientes por curso
+    val solicitudesPorCurso = remember(solicitudUiState.solicitudes) {
+        solicitudUiState.solicitudes
+            .filter { it.estado == EstadoSolicitud.PENDIENTE }
+            .groupBy { it.cursoId }
+            .mapValues { it.value.size }
+    }
+
     LaunchedEffect(Unit) {
-        viewModel.obtenerCursos()
+        cursoViewModel.obtenerCursos()
     }
 
     Scaffold(
@@ -97,10 +114,8 @@ fun GestionGruposScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // El resto del código no necesita cambios, ya que ahora las variables
-            // `cursos`, `isLoading` y `errorMessage` se obtienen del nuevo `uiState`.
             when {
-                isLoading && cursos.isEmpty() -> { // Muestra el loading solo si la lista está vacía
+                isLoading && cursos.isEmpty() -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -114,14 +129,13 @@ fun GestionGruposScreen(
 
                 errorMessage != null -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // El header se muestra incluso si hay un error para poder navegar hacia atrás
                         GestionGruposHeader(
                             onNavigateBack = onNavigateBack,
                             totalCursos = 0
                         )
                         ErrorStateGrupos(
                             errorMessage = errorMessage,
-                            onRetry = { viewModel.obtenerCursos() }
+                            onRetry = { cursoViewModel.obtenerCursos() }
                         )
                     }
                 }
@@ -147,6 +161,7 @@ fun GestionGruposScreen(
                             totalCursos = cursos.size,
                             totalTemas = cursos.sumOf { it.temas?.size ?: 0 },
                             cursosActivos = cursos.count { it.estado.equals("activo", ignoreCase = true) },
+                            totalSolicitudes = solicitudesPorCurso.values.sum(),
                             modifier = Modifier.padding(20.dp)
                         )
 
@@ -170,6 +185,7 @@ fun GestionGruposScreen(
                             ) { curso ->
                                 CursoGrupoCard(
                                     curso = curso,
+                                    solicitudesPendientes = solicitudesPorCurso[curso.id] ?: 0,
                                     onClick = { onCursoClick(curso) }
                                 )
                             }
@@ -181,7 +197,6 @@ fun GestionGruposScreen(
     }
 }
 
-// Se crea un Composable específico para el estado de error para limpiar el `when`
 @Composable
 fun ErrorStateGrupos(errorMessage: String, onRetry: () -> Unit) {
     Column(
@@ -227,10 +242,6 @@ fun ErrorStateGrupos(errorMessage: String, onRetry: () -> Unit) {
         }
     }
 }
-
-
-// --- EL RESTO DE TUS COMPOSABLES ESTÁN PERFECTOS Y NO NECESITAN CAMBIOS ---
-// (GestionGruposHeader, EstadisticasGruposCard, CursoGrupoCard, etc.)
 
 @Composable
 fun GestionGruposHeader(
@@ -309,7 +320,7 @@ fun GestionGruposHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Organiza estudiantes por curso",
+                text = "Aspirantes y estudiantes asignados",
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 14.sp,
                 modifier = Modifier.padding(top = 4.dp)
@@ -323,6 +334,7 @@ fun EstadisticasGruposCard(
     totalCursos: Int,
     totalTemas: Int,
     cursosActivos: Int,
+    totalSolicitudes: Int,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -341,7 +353,7 @@ fun EstadisticasGruposCard(
             StatItemGrupos(
                 icon = Icons.Default.School,
                 value = totalCursos.toString(),
-                label = "Total Cursos",
+                label = "Cursos",
                 color = EduRachaColors.Primary
             )
 
@@ -353,10 +365,10 @@ fun EstadisticasGruposCard(
             )
 
             StatItemGrupos(
-                icon = Icons.Default.BookmarkAdded,
-                value = totalTemas.toString(),
-                label = "Total Temas",
-                color = EduRachaColors.Success
+                icon = Icons.Default.PersonAdd,
+                value = totalSolicitudes.toString(),
+                label = "Aspirantes",
+                color = EduRachaColors.Accent
             )
 
             Divider(
@@ -370,7 +382,7 @@ fun EstadisticasGruposCard(
                 icon = Icons.Default.CheckCircle,
                 value = cursosActivos.toString(),
                 label = "Activos",
-                color = EduRachaColors.Accent
+                color = EduRachaColors.Success
             )
         }
     }
@@ -440,6 +452,7 @@ fun SectionHeaderGrupos(
 @Composable
 fun CursoGrupoCard(
     curso: Curso,
+    solicitudesPendientes: Int,
     onClick: () -> Unit
 ) {
     val cantidadTemas = curso.temas?.size ?: 0
@@ -452,123 +465,92 @@ fun CursoGrupoCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary,
-                                EduRachaColors.Primary.copy(alpha = 0.7f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    EduRachaColors.Primary,
+                                    EduRachaColors.Primary.copy(alpha = 0.7f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.School,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = curso.titulo,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Código: ${curso.codigo}",
+                        fontSize = 12.sp,
+                        color = EduRachaColors.TextSecondary
+                    )
+                }
+
                 Icon(
-                    imageVector = Icons.Default.School,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Ver más",
+                    tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = curso.titulo,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Código: ${curso.codigo}",
-                    fontSize = 12.sp,
-                    color = EduRachaColors.TextSecondary
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Badge de solicitudes pendientes
+            if (solicitudesPendientes > 0) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = EduRachaColors.Accent.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
+                        modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CalendarToday,
+                            Icons.Default.PersonAdd,
                             contentDescription = null,
-                            tint = EduRachaColors.TextSecondary,
-                            modifier = Modifier.size(12.dp)
+                            tint = EduRachaColors.Accent,
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "${curso.duracionDias} días",
-                            fontSize = 12.sp,
-                            color = EduRachaColors.TextSecondary
-                        )
-                    }
-
-                    if (cantidadTemas > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.BookmarkAdded,
-                                contentDescription = null,
-                                tint = EduRachaColors.Success,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "$cantidadTemas tema${if (cantidadTemas > 1) "s" else ""}",
-                                fontSize = 12.sp,
-                                color = EduRachaColors.Success,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = when (curso.estado.lowercase()) {
-                            "activo" -> EduRachaColors.Success.copy(alpha = 0.15f)
-                            "inactivo" -> EduRachaColors.Error.copy(alpha = 0.15f)
-                            else -> EduRachaColors.TextSecondary.copy(alpha = 0.15f)
-                        }
-                    ) {
-                        Text(
-                            text = curso.estado.replaceFirstChar { it.uppercase() },
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = when (curso.estado.lowercase()) {
-                                "activo" -> EduRachaColors.Success
-                                "inactivo" -> EduRachaColors.Error
-                                else -> EduRachaColors.TextSecondary
-                            },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            text = "$solicitudesPendientes aspirante${if (solicitudesPendientes > 1) "s" else ""} esperando aprobación",
+                            fontSize = 13.sp,
+                            color = EduRachaColors.Accent,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Ver más",
-                tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
-                modifier = Modifier.size(24.dp)
-            )
         }
     }
 }

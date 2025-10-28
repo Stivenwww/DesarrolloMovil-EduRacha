@@ -32,11 +32,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -44,17 +39,20 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.stiven.sos.models.UserPreferences
+import com.stiven.sos.utils.SessionManager
 
 class LoginActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var googleClient: GoogleSignInClient
+    private lateinit var sessionManager: SessionManager
     private var userType: String = "student"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         auth = FirebaseAuth.getInstance()
+        sessionManager = SessionManager.getInstance(this)
         userType = intent.getStringExtra("user_type") ?: "student"
 
         setupGoogleSignIn()
@@ -66,6 +64,7 @@ class LoginActivity : ComponentActivity() {
                     auth = auth,
                     googleClient = googleClient,
                     context = this@LoginActivity,
+                    sessionManager = sessionManager,
                     onNavigateToRegister = {
                         val intent = Intent(this@LoginActivity, RegisterActivity::class.java)
                         intent.putExtra("user_type", userType)
@@ -106,6 +105,7 @@ fun LoginScreen(
     auth: FirebaseAuth,
     googleClient: GoogleSignInClient,
     context: android.content.Context,
+    sessionManager: SessionManager,
     onNavigateToRegister: () -> Unit,
     onNavigateToMain: () -> Unit
 ) {
@@ -153,6 +153,27 @@ fun LoginScreen(
                 if (authTask.isSuccessful) {
                     val user = auth.currentUser
                     val currentDisplayName = user?.displayName ?: account.displayName ?: "Usuario"
+
+                    // ✅ GUARDAR EN SessionManager
+                    val rol = if (userType == "teacher") "docente" else "estudiante"
+                    sessionManager.saveUserSession(
+                        userId = user?.uid ?: "",
+                        userName = currentDisplayName,
+                        userEmail = user?.email ?: "",
+                        userRol = rol
+                    )
+
+                    Log.d("LoginActivity", "✓ SessionManager guardado - UserID: ${user?.uid}, Rol: $rol")
+
+                    // También guardar en UserPreferences para compatibilidad
+                    UserPreferences.saveUserData(
+                        context = context,
+                        uid = user?.uid ?: "",
+                        nombreCompleto = currentDisplayName,
+                        apodo = "",
+                        correo = user?.email ?: "",
+                        rol = rol
+                    )
 
                     if (!currentDisplayName.contains("Docente") && !currentDisplayName.contains("Estudiante")) {
                         val newDisplayName = "$currentDisplayName - ${if (userType == "teacher") "Docente" else "Estudiante"}"
@@ -363,22 +384,36 @@ fun LoginScreen(
 
                                         val user = authResult.user
                                         if (user != null) {
-                                            val emailGuardado = UserPreferences.getUserEmail(context)
+                                            // ✅ CAMBIO PRINCIPAL: Guardar en SessionManager
+                                            val rol = if (userType == "teacher") "docente" else "estudiante"
 
+                                            sessionManager.saveUserSession(
+                                                userId = user.uid,
+                                                userName = user.displayName ?: "Usuario",
+                                                userEmail = user.email ?: "",
+                                                userRol = rol
+                                            )
+
+                                            Log.d("LoginActivity", "✓ SessionManager guardado:")
+                                            Log.d("LoginActivity", "  - UserID: ${user.uid}")
+                                            Log.d("LoginActivity", "  - Email: ${user.email}")
+                                            Log.d("LoginActivity", "  - Rol: $rol")
+
+                                            // También guardar en UserPreferences para compatibilidad
+                                            val emailGuardado = UserPreferences.getUserEmail(context)
                                             if (emailGuardado != user.email) {
                                                 Log.d("LoginActivity", "Usuario diferente, limpiando datos")
                                                 UserPreferences.clearUserData(context)
-
-                                                val rolDefault = if (userType == "teacher") "docente" else "estudiante"
-                                                UserPreferences.saveUserData(
-                                                    context = context,
-                                                    uid = user.uid,
-                                                    nombreCompleto = user.displayName ?: "Usuario",
-                                                    apodo = "",
-                                                    correo = user.email ?: "",
-                                                    rol = rolDefault
-                                                )
                                             }
+
+                                            UserPreferences.saveUserData(
+                                                context = context,
+                                                uid = user.uid,
+                                                nombreCompleto = user.displayName ?: "Usuario",
+                                                apodo = "",
+                                                correo = user.email ?: "",
+                                                rol = rol
+                                            )
 
                                             Log.d("LoginActivity", "✓ Navegando a pantalla principal")
                                             isLoading = false

@@ -22,13 +22,13 @@ interface ApiService {
     suspend fun registrarUsuario(
         @Body registro: RegistroRequest
     ): Response<Map<String, String>>
+
     @PUT("api/usuarios/{uid}")
 
     suspend fun actualizarPerfil(
         @Path("uid") uid: String,
         @Body perfilUpdate: ActualizarPerfilRequest
     ): Response<Map<String, String>>
-
 
 
 // ============================================
@@ -55,7 +55,6 @@ interface ApiService {
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
 
 
-
     /**
      * Obtener estudiantes asignados a un curso específico.
      * Endpoint: GET /api/solicitudes/curso/{id}/estudiantes
@@ -73,8 +72,6 @@ interface ApiService {
         @Path("estudianteId") estudianteId: String,
         @Body estado: Map<String, String>
     ): Response<Map<String, String>>
-
-
 
 
     // ============================================
@@ -125,4 +122,46 @@ interface ApiService {
     suspend fun generarPreguntasIA(
         @Body request: GenerarPreguntasRequest
     ): Response<PreguntasIAResponse>
+
+// ============================================
+// ENDPOINTS DE SOLICITUDES
+// ============================================
+
+    /**
+     * Crear una solicitud para unirse a un curso
+     */
+    @POST("api/solicitudes/unirse")
+    suspend fun crearSolicitudCurso(
+        @Body solicitud: SolicitudRequest
+    ): Response<ApiResponse>
+
+    /**
+     * Obtener solicitudes de un estudiante específico
+     */
+    @GET("api/solicitudes/estudiante/{estudianteId}")
+    suspend fun obtenerSolicitudesEstudiante(
+        @Path("estudianteId") estudianteId: String
+    ): Response<List<SolicitudCurso>>
+
+    /**
+     * Obtener solicitudes pendientes para un docente
+     */
+    @GET("api/solicitudes/docente/{docenteId}")
+    suspend fun obtenerSolicitudesDocente(
+        @Path("docenteId") docenteId: String
+    ): Response<List<SolicitudCurso>>
+
+    @GET("api/solicitudes/curso/{cursoId}")
+    suspend fun obtenerSolicitudesPorCurso(
+        @Path("cursoId") cursoId: String
+    ): Response<List<SolicitudCurso>>
+
+    /**
+     * Responder a una solicitud (aceptar o rechazar)
+     */
+    @PUT("api/solicitudes/{id}/responder")
+    suspend fun responderSolicitud(
+        @Path("id") solicitudId: String,
+        @Body respuesta: RespuestaSolicitudRequest
+    ): Response<ApiResponse>
 }
