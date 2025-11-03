@@ -35,16 +35,30 @@ class QuizActivity : ComponentActivity() {
         temaId = intent.getStringExtra("tema_id") ?: ""
         temaTitulo = intent.getStringExtra("tema_titulo") ?: "Quiz"
 
-        // Iniciar el quiz automáticamente
-        quizViewModel.iniciarQuiz(cursoId, temaId)
+        // ❌ NO iniciar aquí - dejar que lo haga LaunchedEffect en el Composable
 
         setContent {
             EduRachaTheme {
                 QuizScreen(
+                    cursoId = cursoId,
+                    temaId = temaId,
                     temaTitulo = temaTitulo,
                     quizViewModel = quizViewModel,
                     onNavigateToResultado = {
+                        // ✅ Pasar el resultado al Intent
+                        val resultado = quizViewModel.uiState.value.resultadoQuiz
+                        val quizId = quizViewModel.uiState.value.quizActivo?.quizId
+
                         val intent = Intent(this, ResultadoQuizActivity::class.java)
+                        intent.putExtra("preguntasCorrectas", resultado?.preguntasCorrectas ?: 0)
+                        intent.putExtra("preguntasIncorrectas", resultado?.preguntasIncorrectas ?: 0)
+                        intent.putExtra("experienciaGanada", resultado?.experienciaGanada ?: 0)
+                        intent.putExtra("vidasRestantes", resultado?.vidasRestantes ?: 0)
+                        intent.putExtra("bonificacionRapidez", resultado?.bonificaciones?.rapidez ?: 0)
+                        intent.putExtra("bonificacionPrimeraVez", resultado?.bonificaciones?.primeraVez ?: 0)
+                        intent.putExtra("bonificacionTodoCorrecto", resultado?.bonificaciones?.todoCorrecto ?: 0)
+                        intent.putExtra("quizId", quizId ?: "")
+
                         startActivity(intent)
                         finish()
                     }
@@ -57,6 +71,8 @@ class QuizActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuizScreen(
+    cursoId: String,
+    temaId: String,
     temaTitulo: String,
     quizViewModel: QuizViewModel,
     onNavigateToResultado: () -> Unit
@@ -65,6 +81,11 @@ fun QuizScreen(
 
     // Variable para controlar si ya se navegó a resultados
     var yaNavego by remember { mutableStateOf(false) }
+
+    // ✅ Iniciar quiz SOLO UNA VEZ cuando se crea el Composable
+    LaunchedEffect(Unit) {
+        quizViewModel.iniciarQuiz(cursoId, temaId)
+    }
 
     // Navegar automáticamente a resultados cuando se finaliza
     LaunchedEffect(uiState.resultadoQuiz) {
@@ -158,23 +179,26 @@ fun QuizScreen(
                 val preguntaActual = quiz.preguntas.getOrNull(uiState.preguntaActual)
 
                 if (preguntaActual != null) {
-                    PreguntaScreen(
-                        pregunta = preguntaActual,
-                        numeroPregunta = uiState.preguntaActual + 1,
-                        totalPreguntas = quiz.preguntas.size,
-                        onRespuestaSeleccionada = { opcionId ->
-                            // Registrar la respuesta
-                            quizViewModel.responderPregunta(
-                                preguntaId = preguntaActual.id,
-                                respuestaSeleccionada = opcionId
-                            )
+                    // ✅ CRÍTICO: key para forzar recomposición en cada pregunta nueva
+                    key(uiState.preguntaActual) {
+                        PreguntaScreen(
+                            pregunta = preguntaActual,
+                            numeroPregunta = uiState.preguntaActual + 1,
+                            totalPreguntas = quiz.preguntas.size,
+                            onRespuestaSeleccionada = { opcionId ->
+                                // Registrar la respuesta
+                                quizViewModel.responderPregunta(
+                                    preguntaId = preguntaActual.id,
+                                    respuestaSeleccionada = opcionId
+                                )
 
-                            // Si es la última pregunta, finalizar el quiz
-                            if (uiState.preguntaActual + 1 >= quiz.preguntas.size) {
-                                quizViewModel.finalizarQuiz()
+                                // Si es la última pregunta, finalizar el quiz
+                                if (uiState.preguntaActual + 1 >= quiz.preguntas.size) {
+                                    quizViewModel.finalizarQuiz()
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -188,8 +212,9 @@ fun PreguntaScreen(
     totalPreguntas: Int,
     onRespuestaSeleccionada: (Int) -> Unit
 ) {
-    var respuestaSeleccionada by remember { mutableStateOf<Int?>(null) }
-    var botonPresionado by remember { mutableStateOf(false) } // ← Nueva variable
+    // ✅ CRÍTICO: Resetear estado cuando cambia la pregunta
+    var respuestaSeleccionada by remember(pregunta.id) { mutableStateOf<Int?>(null) }
+    var botonPresionado by remember(pregunta.id) { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -260,7 +285,7 @@ fun PreguntaScreen(
                 index = index,
                 isSelected = respuestaSeleccionada == index,
                 onClick = {
-                    if (!botonPresionado) { // ← Solo permitir si no se presionó el botón
+                    if (!botonPresionado) {
                         respuestaSeleccionada = index
                     }
                 }
@@ -273,7 +298,7 @@ fun PreguntaScreen(
         Button(
             onClick = {
                 respuestaSeleccionada?.let {
-                    if (!botonPresionado) { // ← Evitar doble clic
+                    if (!botonPresionado) {
                         botonPresionado = true
                         onRespuestaSeleccionada(it)
                     }
@@ -282,7 +307,7 @@ fun PreguntaScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = respuestaSeleccionada != null && !botonPresionado, // ← Deshabilitar después del clic
+            enabled = respuestaSeleccionada != null && !botonPresionado,
             colors = ButtonDefaults.buttonColors(
                 containerColor = EduRachaColors.Primary
             ),
@@ -312,8 +337,7 @@ fun OpcionCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)

@@ -42,7 +42,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     fun obtenerCursos() {
         // ✅ Prevenir llamadas duplicadas
         if (isLoadingCursos) {
-            Log.w("CursoViewModel", "️ Ya se están cargando cursos, ignorando llamada duplicada")
+            Log.w("CursoViewModel", "⚠️ Ya se están cargando cursos, ignorando llamada duplicada")
             return
         }
 
@@ -52,12 +52,12 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
 
             repository.obtenerCursos()
                 .onSuccess { listaCursos ->
-                    Log.d("CursoViewModel", " Cursos obtenidos: ${listaCursos.size}")
+                    Log.d("CursoViewModel", "✅ Cursos obtenidos: ${listaCursos.size}")
                     _uiState.update { it.copy(isLoading = false, cursos = listaCursos) }
                     cargarSolicitudesPendientes()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", " Error obteniendo cursos", exception)
+                    Log.e("CursoViewModel", "❌ Error obteniendo cursos", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -74,7 +74,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     private fun cargarSolicitudesPendientes() {
         // ✅ Prevenir llamadas duplicadas
         if (isLoadingSolicitudes) {
-            Log.w("CursoViewModel", "⚠ Ya se están cargando solicitudes, ignorando")
+            Log.w("CursoViewModel", "⚠️ Ya se están cargando solicitudes, ignorando")
             return
         }
 
@@ -83,20 +83,20 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 isLoadingSolicitudes = true
 
                 val docenteId = obtenerDocenteId()
-                Log.d("CursoViewModel", " Cargando solicitudes para docente: $docenteId")
+                Log.d("CursoViewModel", "🔍 Cargando solicitudes para docente: $docenteId")
 
                 val response = ApiClient.apiService.obtenerSolicitudesDocente(docenteId)
 
                 if (response.isSuccessful) {
                     val solicitudes = response.body() ?: emptyList()
-                    Log.d("CursoViewModel", " Total solicitudes recibidas: ${solicitudes.size}")
+                    Log.d("CursoViewModel", "📨 Total solicitudes recibidas: ${solicitudes.size}")
 
                     // Filtrar solicitudes pendientes
                     val solicitudesPendientes = solicitudes.filter {
                         it.estado == EstadoSolicitud.PENDIENTE
                     }
 
-                    Log.d("CursoViewModel", " Solicitudes PENDIENTES: ${solicitudesPendientes.size}")
+                    Log.d("CursoViewModel", "📊 Solicitudes PENDIENTES: ${solicitudesPendientes.size}")
 
                     val solicitudesPorCurso = solicitudesPendientes
                         .groupBy { it.cursoId }
@@ -106,18 +106,18 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                             count
                         }
 
-                    Log.d("CursoViewModel", " Total cursos con solicitudes: ${solicitudesPorCurso.size}")
+                    Log.d("CursoViewModel", "✅ Total cursos con solicitudes: ${solicitudesPorCurso.size}")
                     _uiState.update { it.copy(solicitudesPorCurso = solicitudesPorCurso) }
 
                 } else if (response.code() == 404) {
-                    Log.i("CursoViewModel", "ℹ No hay solicitudes pendientes (404)")
+                    Log.i("CursoViewModel", "ℹ️ No hay solicitudes pendientes (404)")
                     _uiState.update { it.copy(solicitudesPorCurso = emptyMap()) }
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("CursoViewModel", " Error ${response.code()}: $errorBody")
+                    Log.e("CursoViewModel", "❌ Error ${response.code()}: $errorBody")
                 }
             } catch (e: Exception) {
-                Log.e("CursoViewModel", " Excepción al cargar solicitudes", e)
+                Log.e("CursoViewModel", "❌ Excepción al cargar solicitudes", e)
             } finally {
                 isLoadingSolicitudes = false
             }
@@ -137,7 +137,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.crearCurso(curso)
                 .onSuccess { response ->
-                    Log.d("CursoViewModel", " Curso creado exitosamente")
+                    Log.d("CursoViewModel", "✅ Curso creado exitosamente")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -147,7 +147,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", " Error creando curso", exception)
+                    Log.e("CursoViewModel", "❌ Error creando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -175,7 +175,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.actualizarCurso(id, curso)
                 .onSuccess {
-                    Log.d("CursoViewModel", " Curso ${curso.titulo} actualizado")
+                    Log.d("CursoViewModel", "✅ Curso ${curso.titulo} actualizado")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -185,7 +185,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "Error actualizando curso", exception)
+                    Log.e("CursoViewModel", "❌ Error actualizando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -211,7 +211,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", " Error eliminando curso", exception)
+                    Log.e("CursoViewModel", "❌ Error eliminando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
