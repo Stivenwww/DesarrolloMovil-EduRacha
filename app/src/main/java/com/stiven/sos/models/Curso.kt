@@ -2,17 +2,26 @@
 
 package com.stiven.sos.models
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 // ========================================
-// MODELO TEMA
+// MODELO TEMA (ACTUALIZADO CON EXPLICACIÓN)
 // ========================================
+@Parcelize
 data class Tema(
     val id: String = "",
     val titulo: String = "",
     val contenido: String = "",
     val archivoUrl: String = "",
     val tipo: String = "",
-    val fechaCreacion: String = ""
-)
+    val fechaCreacion: String = "",
+    // NUEVAS PROPIEDADES PARA QUIZZES
+    val descripcion: String = "", // Descripción corta del tema
+    val explicacion: String = "", // Explicación completa para mostrar antes del quiz
+    val orden: Int = 0, // Orden de visualización
+    val cursoId: String = "" // ID del curso al que pertenece
+) : Parcelable
 
 // ========================================
 // MODELO CURSO (Para recibir datos - GET)
@@ -26,8 +35,15 @@ data class Curso(
     val duracionDias: Int = 0,
     val temas: Map<String, Tema>? = null,
     val estado: String = "",
-    val fechaCreacion: String = ""
-)
+    val fechaCreacion: String = "",
+    // NUEVAS PROPIEDADES OPCIONALES (no rompen código existente)
+    val nombre: String = titulo // Alias para compatibilidad con código nuevo
+) {
+    // Función helper para obtener temas como lista ordenada
+    fun getTemasLista(): List<Tema> {
+        return temas?.values?.toList()?.sortedBy { it.orden } ?: emptyList()
+    }
+}
 
 // ========================================
 // MODELO CURSO REQUEST (Para enviar datos - POST)

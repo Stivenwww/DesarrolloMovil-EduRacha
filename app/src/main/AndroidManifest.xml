@@ -95,12 +95,26 @@
             android:name=".VisualizarGruposActivity"
             android:exported="false" />
 
-
-
         <activity
             android:name=".UsuariosAsignadosActivity"
             android:exported="false"
             android:label="Usuarios Asignados" />
+        <!-- NUEVAS ACTIVIDADES DE QUIZ -->
+        <activity
+            android:name=".TemasDelCursoActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ExplicacionTemaActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".QuizActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ResultadoQuizActivity"
+            android:exported="false" />
 
     </application>
 

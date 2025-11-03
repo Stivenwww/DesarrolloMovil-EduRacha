@@ -15,22 +15,28 @@ object ApiClient {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
+    private val authInterceptor = AuthInterceptor()
+
+    // Se configura el cliente OkHttp para usar ambos interceptores
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
+        .addInterceptor(authInterceptor) //  Se añade el interceptor de autenticación
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true) // Reintentar en caso de fallo
+        .retryOnConnectionFailure(true) // Se mantiene la configuración de reintentos
         .build()
 
+    // Se mantiene la inicialización 'lazy' para Retrofit, usando el nuevo okHttpClient
     val instance: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient)
+            .client(okHttpClient) // Se usa el cliente OkHttp ya configurado con ambos interceptores
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
+    // Se mantiene la inicialización 'lazy' para ApiService
     val apiService: ApiService by lazy {
         instance.create(ApiService::class.java)
     }

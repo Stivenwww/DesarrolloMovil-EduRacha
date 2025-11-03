@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -53,21 +55,21 @@ class RegisterActivity : ComponentActivity() {
         userType = intent.getStringExtra("user_type") ?: "student"
 
         setContent {
-            EduRachaTheme {
-                RegisterScreen(
-                    userType = userType,
-                    auth = auth,
-                    context = this@RegisterActivity,
-                    sessionManager = sessionManager,
-                    onNavigateToLogin = {
-                        val intent = Intent(this@RegisterActivity, LoginActivity::class.java)
-                        intent.putExtra("user_type", userType)
-                        startActivity(intent)
-                        finish()
-                    },
-                    onNavigateToMain = { goToMain() }
-                )
-            }
+            // EduRachaTheme {
+            RegisterScreen(
+                userType = userType,
+                auth = auth,
+                context = this@RegisterActivity,
+                sessionManager = sessionManager,
+                onNavigateToLogin = {
+                    val intent = Intent(this@RegisterActivity, LoginActivity::class.java)
+                    intent.putExtra("user_type", userType)
+                    startActivity(intent)
+                    finish()
+                },
+                onNavigateToMain = { goToMain() }
+            )
+            // }
         }
     }
 
@@ -121,6 +123,9 @@ fun RegisterScreen(
     }
 
     fun validateInputs(): Boolean {
+        // 🔥 CORRECCIÓN: Se usa una expresión regular más flexible para la validación del correo.
+        val emailRegex = Regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\$")
+
         when {
             fullName.trim().isEmpty() -> {
                 showError("Campo requerido", "Por favor ingresa tu nombre completo")
@@ -146,7 +151,8 @@ fun RegisterScreen(
                 showError("Campo requerido", "Por favor ingresa tu correo electrónico")
                 return false
             }
-            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+            // 🔥 CORRECCIÓN: Se reemplaza la validación de Patterns.EMAIL_ADDRESS
+            !emailRegex.matches(email.trim()) -> {
                 showError("Correo inválido", "Por favor ingresa un correo electrónico válido")
                 return false
             }
@@ -170,7 +176,8 @@ fun RegisterScreen(
         return true
     }
 
-    // 🔥 FUNCIÓN: Obtiene el rol desde Firebase Auth (igual que en Login)
+
+
     suspend fun obtenerRolDeFirebaseAuth(userId: String): String? {
         return try {
             val user = auth.currentUser
@@ -178,19 +185,19 @@ fun RegisterScreen(
                 val tokenResult = user.getIdToken(true).await()
                 val claims = tokenResult.claims
                 val rol = claims["rol"] as? String
-                Log.d("RegisterActivity", "📊 Rol obtenido de Firebase Auth: $rol")
+                Log.d("RegisterActivity", " Rol obtenido de Firebase Auth: $rol")
                 rol
             } else {
-                Log.e("RegisterActivity", "❌ Usuario no coincide o es null")
+                Log.e("RegisterActivity", " Usuario no coincide o es null")
                 null
             }
         } catch (e: Exception) {
-            Log.e("RegisterActivity", "❌ Error al obtener rol: ${e.message}")
+            Log.e("RegisterActivity", " Error al obtener rol: ${e.message}")
             null
         }
     }
 
-    // 🔥 FUNCIÓN: Guarda datos en SharedPreferences (igual que en Login)
+    //  FUNCIÓN: Guarda datos en SharedPreferences (igual que en Login)
     fun guardarDatosEnPreferences(
         userId: String,
         rol: String,
@@ -207,7 +214,7 @@ fun RegisterScreen(
             putString("user_nickname", apodo)
             apply()
         }
-        Log.d("RegisterActivity", "✅ Datos guardados en SharedPreferences")
+        Log.d("RegisterActivity", " Datos guardados en SharedPreferences")
         Log.d("RegisterActivity", "   UID: $userId")
         Log.d("RegisterActivity", "   Rol: $rol")
         Log.d("RegisterActivity", "   Nombre: $nombre")

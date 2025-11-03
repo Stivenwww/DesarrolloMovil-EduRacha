@@ -179,4 +179,45 @@ interface ApiService {
         @Path("solicitudId") solicitudId: String,
         @Body request: RespuestaSolicitudRequest
     ): Response<Unit>
+
+
+    // ============================================
+    // QUIZ - CON AUTENTICACIÓN
+    // ============================================
+
+    @POST("quiz/explicacion/marcar-vista")
+    suspend fun marcarExplicacionVista(
+        @Body request: Map<String, String>
+    ): Response<Map<String, String>>
+
+    @POST("quiz/iniciar")
+    suspend fun iniciarQuiz(
+        @Body request: IniciarQuizRequest
+    ): Response<IniciarQuizResponse>
+
+    @POST("quiz/finalizar")
+    suspend fun finalizarQuiz(
+        @Body request: FinalizarQuizRequest
+    ): Response<FinalizarQuizResponse>
+
+    @GET("quiz/revision/{quizId}")
+    suspend fun obtenerRevisionQuiz(
+        @Path("quizId") quizId: String
+    ): Response<RevisionQuizResponse>
+
+    @GET("quiz/historial")
+    suspend fun obtenerHistorialQuizzes(
+        @Query("cursoId") cursoId: String? = null
+    ): Response<HistorialQuizzesResponse>
+
+    @GET("quiz/curso/{cursoId}/vidas")
+    suspend fun obtenerVidas(
+        @Path("cursoId") cursoId: String
+    ): Response<VidasResponse>
+
+    @GET("quiz/curso/{cursoId}/tema/{temaId}/info")
+    suspend fun obtenerTemaInfo(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<TemaInfoResponse>
 }
