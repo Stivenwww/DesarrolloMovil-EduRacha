@@ -1,7 +1,6 @@
 package com.stiven.sos.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.stiven.sos.api.ApiClient
@@ -29,194 +28,130 @@ class SolicitudDocenteViewModel(application: Application) : AndroidViewModel(app
     val uiState: StateFlow<SolicitudDocenteUiState> = _uiState.asStateFlow()
 
     /**
-     * ✅ Cargar solicitudes usando el endpoint específico de curso
+     * Cargar solicitudes filtradas por curso
      */
     fun cargarSolicitudesPorCurso(cursoId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                Log.d("SolicitudDocente", "════════════════════════════════")
-                Log.d("SolicitudDocente", "🔍 Buscando solicitudes para cursoId: $cursoId")
-
-                // ✅ Usar el endpoint específico del curso
                 val response = ApiClient.apiService.obtenerSolicitudesPorCurso(cursoId)
 
-                when {
-                    response.isSuccessful -> {
-                        val solicitudes = response.body() ?: emptyList()
-
-                        Log.d("SolicitudDocente", "✅ Solicitudes encontradas: ${solicitudes.size}")
-                        solicitudes.forEach {
-                            Log.d("SolicitudDocente", "  - ${it.estudianteNombre} (${it.estado})")
-                        }
-                        Log.d("SolicitudDocente", "════════════════════════════════")
-
-                        _uiState.update {
-                            it.copy(
-                                solicitudes = solicitudes,
-                                isLoading = false
-                            )
-                        }
-                    }
-
-                    response.code() == 404 -> {
-                        Log.w("SolicitudDocente", "⚠️ 404: No hay solicitudes para este curso")
-                        _uiState.update {
-                            it.copy(
-                                solicitudes = emptyList(),
-                                isLoading = false
-                            )
-                        }
-                    }
-
-                    else -> {
-                        Log.e("SolicitudDocente", "❌ Error HTTP: ${response.code()}")
-                        val errorBody = response.errorBody()?.string()
-                        Log.e("SolicitudDocente", "Error body: $errorBody")
-
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = "Error al cargar solicitudes: ${response.code()}"
-                            )
-                        }
+                if (response.isSuccessful) {
+                    val solicitudes = response.body() ?: emptyList()
+                    _uiState.update { it.copy(solicitudes = solicitudes, isLoading = false) }
+                } else {
+                    _uiState.update {
+                        it.copy(isLoading = false, error = "Error al cargar solicitudes: ${response.code()}")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocente", "❌ Excepción:", e)
                 _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "Error de conexión: ${e.localizedMessage}"
-                    )
+                    it.copy(isLoading = false, error = "Error de conexión: ${e.localizedMessage}")
                 }
             }
         }
     }
 
     /**
-     * Aceptar una solicitud
+     * ✅ Aceptar solicitud con mensaje opcional
      */
     fun aceptarSolicitud(solicitudId: String, mensaje: String? = null) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    solicitudEnProceso = solicitudId,
-                    error = null,
-                    mensajeExito = null
-                )
-            }
+            _uiState.update { it.copy(solicitudEnProceso = solicitudId, error = null, mensajeExito = null) }
 
             try {
-                Log.d("SolicitudDocente", "✅ Aceptando solicitud: $solicitudId")
-
                 val respuesta = RespuestaSolicitudRequest(
                     aceptar = true,
-                    mensaje = mensaje ?: "¡Bienvenido al curso! Tu solicitud ha sido aceptada."
+                    mensaje = mensaje
                 )
 
                 val response = ApiClient.apiService.responderSolicitud(solicitudId, respuesta)
 
                 if (response.isSuccessful) {
-                    Log.d("SolicitudDocente", "✅ Solicitud aceptada correctamente")
-
                     _uiState.update {
                         it.copy(
                             solicitudEnProceso = null,
                             mensajeExito = "Solicitud aceptada correctamente",
                             solicitudes = it.solicitudes.map { sol ->
                                 if (sol.id == solicitudId) {
-                                    sol.copy(estado = EstadoSolicitud.ACEPTADA)
+                                    // ✅ Crear nueva solicitud con el mensaje actualizado
+                                    sol.copy(
+                                        estado = EstadoSolicitud.ACEPTADA,
+                                        mensaje = mensaje,  // Backend usa "mensaje" para ambos
+                                        fechaRespuesta = System.currentTimeMillis().toString()
+                                    )
                                 } else sol
                             }
                         )
                     }
                 } else {
-                    Log.e("SolicitudDocente", "❌ Error al aceptar: ${response.code()}")
-
                     _uiState.update {
                         it.copy(
                             solicitudEnProceso = null,
-                            error = "Error al aceptar solicitud: ${response.code()}"
+                            error = "Error al aceptar solicitud: ${response.code()} - ${response.message()}"
                         )
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocente", "❌ Excepción al aceptar:", e)
-
+                e.printStackTrace()
                 _uiState.update {
-                    it.copy(
-                        solicitudEnProceso = null,
-                        error = "Error: ${e.localizedMessage}"
-                    )
+                    it.copy(solicitudEnProceso = null, error = "Error al aceptar: ${e.localizedMessage}")
                 }
             }
         }
     }
 
     /**
-     * Rechazar una solicitud
+     * ✅ Rechazar una solicitud con mensaje
      */
     fun rechazarSolicitud(solicitudId: String, mensaje: String? = null) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    solicitudEnProceso = solicitudId,
-                    error = null,
-                    mensajeExito = null
-                )
-            }
+            _uiState.update { it.copy(solicitudEnProceso = solicitudId, error = null, mensajeExito = null) }
 
             try {
-                Log.d("SolicitudDocente", "⛔ Rechazando solicitud: $solicitudId")
-
                 val respuesta = RespuestaSolicitudRequest(
                     aceptar = false,
-                    mensaje = mensaje ?: "Lo sentimos, tu solicitud no pudo ser aceptada en este momento."
+                    mensaje = mensaje
                 )
 
                 val response = ApiClient.apiService.responderSolicitud(solicitudId, respuesta)
 
                 if (response.isSuccessful) {
-                    Log.d("SolicitudDocente", "✅ Solicitud rechazada correctamente")
-
                     _uiState.update {
                         it.copy(
                             solicitudEnProceso = null,
                             mensajeExito = "Solicitud rechazada",
                             solicitudes = it.solicitudes.map { sol ->
                                 if (sol.id == solicitudId) {
-                                    sol.copy(estado = EstadoSolicitud.RECHAZADA)
+                                    sol.copy(
+                                        estado = EstadoSolicitud.RECHAZADA,
+                                        mensaje = mensaje,  // Backend usa "mensaje" para ambos
+                                        fechaRespuesta = System.currentTimeMillis().toString()
+                                    )
                                 } else sol
                             }
                         )
                     }
                 } else {
-                    Log.e("SolicitudDocente", "❌ Error al rechazar: ${response.code()}")
-
                     _uiState.update {
                         it.copy(
                             solicitudEnProceso = null,
-                            error = "Error al rechazar solicitud: ${response.code()}"
+                            error = "Error al rechazar solicitud: ${response.code()} - ${response.message()}"
                         )
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocente", "❌ Excepción al rechazar:", e)
-
+                e.printStackTrace()
                 _uiState.update {
-                    it.copy(
-                        solicitudEnProceso = null,
-                        error = "Error: ${e.localizedMessage}"
-                    )
+                    it.copy(solicitudEnProceso = null, error = "Error al rechazar: ${e.localizedMessage}")
                 }
             }
         }
     }
 
     /**
-     * Limpiar mensajes de error y éxito
+     * Reset de mensajes UI
      */
     fun clearMessages() {
         _uiState.update { it.copy(error = null, mensajeExito = null) }

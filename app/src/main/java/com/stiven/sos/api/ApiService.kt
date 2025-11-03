@@ -31,6 +31,18 @@ interface ApiService {
     ): Response<Map<String, String>>
 
 
+    @GET("api/usuarios/{uid}")
+    suspend fun obtenerUsuarioPorUid(
+        @Path("uid") uid: String
+    ): Response<Map<String, Any>>
+
+    @PUT("usuario/me")
+    suspend fun actualizarUsuario(
+        @Header("Authorization") token: String,
+        @Body request: Map<String, Any>
+    ): Response<Map<String, Any>>
+
+
 // ============================================
     // ENDPOINTS DE CURSOS
     // ============================================
@@ -123,9 +135,9 @@ interface ApiService {
         @Body request: GenerarPreguntasRequest
     ): Response<PreguntasIAResponse>
 
-// ============================================
-// ENDPOINTS DE SOLICITUDES
-// ============================================
+    // ============================================
+    // ENDPOINTS DE SOLICITUDES
+    // ============================================
 
     /**
      * Crear una solicitud para unirse a un curso
@@ -151,17 +163,20 @@ interface ApiService {
         @Path("docenteId") docenteId: String
     ): Response<List<SolicitudCurso>>
 
+    /**
+     * Obtener solicitudes por curso
+     */
     @GET("api/solicitudes/curso/{cursoId}")
     suspend fun obtenerSolicitudesPorCurso(
         @Path("cursoId") cursoId: String
     ): Response<List<SolicitudCurso>>
 
     /**
-     * Responder a una solicitud (aceptar o rechazar)
+     *  Responder a una solicitud (aceptar o rechazar)
      */
-    @PUT("api/solicitudes/{id}/responder")
+    @POST("api/solicitudes/responder/{solicitudId}")
     suspend fun responderSolicitud(
-        @Path("id") solicitudId: String,
-        @Body respuesta: RespuestaSolicitudRequest
-    ): Response<ApiResponse>
+        @Path("solicitudId") solicitudId: String,
+        @Body request: RespuestaSolicitudRequest
+    ): Response<Unit>
 }

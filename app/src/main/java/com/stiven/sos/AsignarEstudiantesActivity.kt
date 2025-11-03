@@ -1,12 +1,17 @@
 package com.stiven.sos
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,42 +30,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import com.stiven.sos.models.EstadoSolicitud
 import com.stiven.sos.models.SolicitudCurso
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
-import com.stiven.sos.viewmodel.SolicitudDocenteViewModel
-import kotlinx.coroutines.delay
+import com.stiven.sos.viewmodel.SolicitudViewModel
 
 class AsignarEstudiantesActivity : ComponentActivity() {
 
-    // ✅ CAMBIO PRINCIPAL: Pasar application al ViewModel
-    private val solicitudViewModel: SolicitudDocenteViewModel by viewModels {
-        object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return SolicitudDocenteViewModel(application) as T
-            }
-        }
-    }
+    private val solicitudViewModel: SolicitudViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val cursoTitulo = intent.getStringExtra("CURSO_TITULO") ?: "Curso"
-        val cursoCodigo = intent.getStringExtra("CURSO_CODIGO") ?: ""
         val cursoId = intent.getStringExtra("CURSO_ID") ?: ""
+        val cursoCodigo = intent.getStringExtra("CURSO_CODIGO") ?: ""
+
+        val prefs = getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
+        val docenteId = prefs.getString("user_uid", "") ?: ""
+
+        if (docenteId.isNotEmpty()) {
+            solicitudViewModel.cargarSolicitudesDocente(docenteId)
+        }
 
         setContent {
             EduRachaTheme {
-                AsignarEstudiantesScreen(
-                    viewModel = solicitudViewModel,
+                GestionSolicitudesScreen(
                     cursoTitulo = cursoTitulo,
-                    cursoCodigo = cursoCodigo,
                     cursoId = cursoId,
+                    cursoCodigo = cursoCodigo,
+                    docenteId = docenteId,
+                    solicitudViewModel = solicitudViewModel,
                     onNavigateBack = { finish() }
                 )
             }
@@ -68,169 +69,151 @@ class AsignarEstudiantesActivity : ComponentActivity() {
     }
 }
 
-// ... El resto del código de Composables sin cambios ...
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AsignarEstudiantesScreen(
-    viewModel: SolicitudDocenteViewModel,
+fun GestionSolicitudesScreen(
     cursoTitulo: String,
-    cursoCodigo: String,
     cursoId: String,
+    cursoCodigo: String,
+    docenteId: String,
+    solicitudViewModel: SolicitudViewModel,
     onNavigateBack: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val solicitudes = uiState.solicitudes
-    val isLoading = uiState.isLoading
-    val error = uiState.error
-    val mensajeExito = uiState.mensajeExito
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
-    val solicitudesPendientes = solicitudes.filter { it.estado == EstadoSolicitud.PENDIENTE }
-    val solicitudesAceptadas = solicitudes.filter { it.estado == EstadoSolicitud.ACEPTADA }
-    val solicitudesRechazadas = solicitudes.filter { it.estado == EstadoSolicitud.RECHAZADA }
+    var solicitudSeleccionada by remember { mutableStateOf<SolicitudCurso?>(null) }
+    var showRechazarDialog by remember { mutableStateOf(false) }
+    var showAceptarDialog by remember { mutableStateOf(false) }
+    var mensajeRespuesta by remember { mutableStateOf("") }
+    var mensajePredeterminadoSeleccionado by remember { mutableStateOf<String?>(null) }
+    var modoPersonalizado by remember { mutableStateOf(false) }
 
-    var solicitudParaResponder by remember { mutableStateOf<SolicitudCurso?>(null) }
-    var mostrarDialogoAceptar by remember { mutableStateOf(false) }
-    var mostrarDialogoRechazar by remember { mutableStateOf(false) }
-
-    LaunchedEffect(cursoId) {
-        viewModel.cargarSolicitudesPorCurso(cursoId)
+    val solicitudesCurso = remember(solicitudUiState.solicitudes, cursoId) {
+        solicitudUiState.solicitudes.filter {
+            it.cursoId == cursoId && it.estado == EstadoSolicitud.PENDIENTE
+        }
     }
 
-    LaunchedEffect(mensajeExito, error) {
-        if (mensajeExito != null || error != null) {
-            delay(3000)
-            viewModel.clearMessages()
+    LaunchedEffect(solicitudUiState.mensajeExito) {
+        solicitudUiState.mensajeExito?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            solicitudViewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(solicitudUiState.error) {
+        solicitudUiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            solicitudViewModel.clearMessages()
         }
     }
 
     Scaffold(
-        containerColor = EduRachaColors.Background,
-        snackbarHost = {
-            if (mensajeExito != null) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    containerColor = EduRachaColors.Success
-                ) {
-                    Text(mensajeExito, color = Color.White)
-                }
-            }
-            if (error != null) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    containerColor = EduRachaColors.Error
-                ) {
-                    Text(error, color = Color.White)
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            "Aspirantes al Curso",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            cursoTitulo,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 13.sp
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            "Volver",
+                            tint = Color.White
+                        )
+                    }
+                },
+                actions = {
+                    if (solicitudesCurso.isNotEmpty()) {
+                        Surface(
+                            color = Color.White.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PendingActions,
+                                    null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "${solicitudesCurso.size}",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = EduRachaColors.Primary
+                )
+            )
+        },
+        containerColor = EduRachaColors.Background
+    ) { padding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(padding)
         ) {
-            AsignarEstudiantesHeader(
-                cursoTitulo = cursoTitulo,
-                cursoCodigo = cursoCodigo,
-                totalPendientes = solicitudesPendientes.size,
-                onNavigateBack = onNavigateBack
-            )
-
             when {
-                isLoading && solicitudes.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            CircularProgressIndicator(color = EduRachaColors.Primary)
-                            Text("Cargando solicitudes...", color = EduRachaColors.TextSecondary)
-                        }
-                    }
+                solicitudUiState.isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = EduRachaColors.Primary
+                    )
                 }
 
-                solicitudes.isEmpty() -> {
-                    EmptyStateSolicitudes()
+                solicitudesCurso.isEmpty() -> {
+                    EmptyAspirantesView()
                 }
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        if (solicitudesPendientes.isNotEmpty()) {
-                            item {
-                                SectionHeader(
-                                    title = "SOLICITUDES PENDIENTES",
-                                    count = solicitudesPendientes.size,
-                                    color = EduRachaColors.Primary
-                                )
-                            }
-
-                            items(
-                                items = solicitudesPendientes,
-                                key = { it.id ?: it.estudianteId }
-                            ) { solicitud ->
-                                SolicitudCard(
-                                    solicitud = solicitud,
-                                    onAceptar = {
-                                        solicitudParaResponder = solicitud
-                                        mostrarDialogoAceptar = true
-                                    },
-                                    onRechazar = {
-                                        solicitudParaResponder = solicitud
-                                        mostrarDialogoRechazar = true
-                                    },
-                                    isProcessing = uiState.solicitudEnProceso == solicitud.id
-                                )
-                            }
-
-                            item { Spacer(modifier = Modifier.height(8.dp)) }
-                        }
-
-                        if (solicitudesAceptadas.isNotEmpty()) {
-                            item {
-                                SectionHeader(
-                                    title = "ACEPTADAS",
-                                    count = solicitudesAceptadas.size,
-                                    color = EduRachaColors.Success
-                                )
-                            }
-
-                            items(
-                                items = solicitudesAceptadas,
-                                key = { it.id ?: it.estudianteId }
-                            ) { solicitud ->
-                                SolicitudCardReadOnly(
-                                    solicitud = solicitud,
-                                    estado = EstadoSolicitud.ACEPTADA
-                                )
-                            }
-
-                            item { Spacer(modifier = Modifier.height(8.dp)) }
-                        }
-
-                        if (solicitudesRechazadas.isNotEmpty()) {
-                            item {
-                                SectionHeader(
-                                    title = "RECHAZADAS",
-                                    count = solicitudesRechazadas.size,
-                                    color = EduRachaColors.Error
-                                )
-                            }
-
-                            items(
-                                items = solicitudesRechazadas,
-                                key = { it.id ?: it.estudianteId }
-                            ) { solicitud ->
-                                SolicitudCardReadOnly(
-                                    solicitud = solicitud,
-                                    estado = EstadoSolicitud.RECHAZADA
-                                )
-                            }
+                        items(
+                            items = solicitudesCurso,
+                            key = { it.id ?: it.estudianteId }
+                        ) { solicitud ->
+                            SolicitudAspiranteCard(
+                                solicitud = solicitud,
+                                onAceptarClick = {
+                                    solicitudSeleccionada = solicitud
+                                    mensajeRespuesta = ""
+                                    mensajePredeterminadoSeleccionado = null
+                                    modoPersonalizado = false
+                                    showAceptarDialog = true
+                                },
+                                onRechazarClick = {
+                                    solicitudSeleccionada = solicitud
+                                    mensajeRespuesta = ""
+                                    mensajePredeterminadoSeleccionado = null
+                                    modoPersonalizado = false
+                                    showRechazarDialog = true
+                                }
+                            )
                         }
                     }
                 }
@@ -238,205 +221,499 @@ fun AsignarEstudiantesScreen(
         }
     }
 
-    if (mostrarDialogoAceptar && solicitudParaResponder != null) {
-        DialogoResponderSolicitud(
-            solicitud = solicitudParaResponder!!,
-            esAceptar = true,
-            onConfirm = { mensaje ->
-                viewModel.aceptarSolicitud(solicitudParaResponder!!.id ?: "", mensaje)
-                mostrarDialogoAceptar = false
-                solicitudParaResponder = null
+    // Diálogo para aceptar solicitud
+    if (showAceptarDialog && solicitudSeleccionada != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showAceptarDialog = false
+                solicitudSeleccionada = null
+                mensajeRespuesta = ""
+                mensajePredeterminadoSeleccionado = null
+                modoPersonalizado = false
             },
-            onDismiss = {
-                mostrarDialogoAceptar = false
-                solicitudParaResponder = null
-            }
-        )
-    }
-
-    if (mostrarDialogoRechazar && solicitudParaResponder != null) {
-        DialogoResponderSolicitud(
-            solicitud = solicitudParaResponder!!,
-            esAceptar = false,
-            onConfirm = { mensaje ->
-                viewModel.rechazarSolicitud(solicitudParaResponder!!.id ?: "", mensaje)
-                mostrarDialogoRechazar = false
-                solicitudParaResponder = null
-            },
-            onDismiss = {
-                mostrarDialogoRechazar = false
-                solicitudParaResponder = null
-            }
-        )
-    }
-}
-
-@Composable
-fun AsignarEstudiantesHeader(
-    cursoTitulo: String,
-    cursoCodigo: String,
-    totalPendientes: Int,
-    onNavigateBack: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.85f)
-                    )
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    null,
+                    tint = EduRachaColors.Success,
+                    modifier = Modifier.size(52.dp)
                 )
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White
-                    )
-                }
-
-                if (totalPendientes > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = EduRachaColors.Error
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PersonAdd,
-                                null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                "$totalPendientes pendiente${if (totalPendientes > 1) "s" else ""}",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = cursoTitulo,
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.White.copy(alpha = 0.2f)
+            },
+            title = {
+                Text(
+                    "Aceptar Solicitud",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = cursoCodigo,
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        "Vas a aceptar a ${solicitudSeleccionada?.estudianteNombre} en el curso",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = 15.sp,
+                        color = EduRachaColors.TextPrimary
                     )
+
+                    val mensajeEst = solicitudSeleccionada?.mensajeEstudiante
+                    if (!mensajeEst.isNullOrBlank()) {
+                        Spacer(Modifier.height(16.dp))
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = EduRachaColors.Primary.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, EduRachaColors.Primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Message,
+                                        null,
+                                        tint = EduRachaColors.Primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Mensaje del estudiante",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.Primary
+                                    )
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = mensajeEst,
+                                    fontSize = 13.sp,
+                                    color = EduRachaColors.TextPrimary,
+                                    lineHeight = 19.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    Text(
+                        text = "Mensaje de bienvenida",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    )
+
+                    if (!modoPersonalizado) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val mensajesPredeterminadosAceptar = listOf(
+                                "Bienvenido al curso. Estoy seguro de que te irá muy bien.",
+                                "Me alegra tenerte en el curso. Espero que disfrutes el aprendizaje.",
+                                "Has sido aceptado. Estoy disponible si tienes alguna duda.",
+                                "Bienvenido. Prepárate para una gran experiencia de aprendizaje."
+                            )
+
+                            mensajesPredeterminadosAceptar.forEach { mensaje ->
+                                MensajePredeterminadoChip(
+                                    mensaje = mensaje,
+                                    seleccionado = mensajePredeterminadoSeleccionado == mensaje,
+                                    onClick = {
+                                        mensajePredeterminadoSeleccionado = if (mensajePredeterminadoSeleccionado == mensaje) {
+                                            null
+                                        } else {
+                                            mensaje
+                                        }
+                                    },
+                                    colorFondo = EduRachaColors.Success
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            TextButton(
+                                onClick = { modoPersonalizado = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Escribir mensaje personalizado")
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = mensajeRespuesta,
+                            onValueChange = { mensajeRespuesta = it },
+                            label = { Text("Escribe tu mensaje") },
+                            placeholder = { Text("Ej: Bienvenido al curso...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 4,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EduRachaColors.Success,
+                                focusedLabelColor = EduRachaColors.Success
+                            )
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = {
+                                modoPersonalizado = false
+                                mensajeRespuesta = ""
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Volver a mensajes predeterminados")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val mensajeFinal = if (modoPersonalizado) {
+                            mensajeRespuesta.ifBlank { null }
+                        } else {
+                            mensajePredeterminadoSeleccionado
+                        }
+
+                        solicitudSeleccionada?.id?.let { id ->
+                            solicitudViewModel.responderSolicitud(
+                                solicitudId = id,
+                                aceptar = true,
+                                mensaje = mensajeFinal,
+                                docenteId = docenteId
+                            )
+                        }
+                        showAceptarDialog = false
+                        solicitudSeleccionada = null
+                        mensajeRespuesta = ""
+                        mensajePredeterminadoSeleccionado = null
+                        modoPersonalizado = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EduRachaColors.Success
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Aceptar Estudiante", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showAceptarDialog = false
+                        solicitudSeleccionada = null
+                        mensajeRespuesta = ""
+                        mensajePredeterminadoSeleccionado = null
+                        modoPersonalizado = false
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text("Cancelar")
                 }
             }
+        )
+    }
 
-            Spacer(modifier = Modifier.height(8.dp))
+    // Diálogo para rechazar solicitud
+    if (showRechazarDialog && solicitudSeleccionada != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showRechazarDialog = false
+                solicitudSeleccionada = null
+                mensajeRespuesta = ""
+                mensajePredeterminadoSeleccionado = null
+                modoPersonalizado = false
+            },
+            icon = {
+                Icon(
+                    Icons.Default.Cancel,
+                    null,
+                    tint = EduRachaColors.Error,
+                    modifier = Modifier.size(52.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Rechazar Solicitud",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Vas a rechazar la solicitud de ${solicitudSeleccionada?.estudianteNombre}",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = 15.sp,
+                        color = EduRachaColors.TextPrimary
+                    )
 
-            Text(
-                text = "Gestiona las solicitudes de estudiantes",
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 14.sp
-            )
-        }
+                    val mensajeEst = solicitudSeleccionada?.mensajeEstudiante
+                    if (!mensajeEst.isNullOrBlank()) {
+                        Spacer(Modifier.height(16.dp))
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = EduRachaColors.Primary.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, EduRachaColors.Primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Message,
+                                        null,
+                                        tint = EduRachaColors.Primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Mensaje del estudiante",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.Primary
+                                    )
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = mensajeEst,
+                                    fontSize = 13.sp,
+                                    color = EduRachaColors.TextPrimary,
+                                    lineHeight = 19.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    Text(
+                        text = "Motivo del rechazo (opcional)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    )
+
+                    if (!modoPersonalizado) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val mensajesPredeterminadosRechazar = listOf(
+                                "Lo siento, el curso ha alcanzado su capacidad máxima.",
+                                "En este momento no hay cupos disponibles.",
+                                "No cumples con los requisitos previos del curso.",
+                                "La solicitud no cumple con los criterios de admisión."
+                            )
+
+                            mensajesPredeterminadosRechazar.forEach { mensaje ->
+                                MensajePredeterminadoChip(
+                                    mensaje = mensaje,
+                                    seleccionado = mensajePredeterminadoSeleccionado == mensaje,
+                                    onClick = {
+                                        mensajePredeterminadoSeleccionado = if (mensajePredeterminadoSeleccionado == mensaje) {
+                                            null
+                                        } else {
+                                            mensaje
+                                        }
+                                    },
+                                    colorFondo = EduRachaColors.Error
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            TextButton(
+                                onClick = { modoPersonalizado = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Escribir motivo personalizado")
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = mensajeRespuesta,
+                            onValueChange = { mensajeRespuesta = it },
+                            label = { Text("Escribe el motivo") },
+                            placeholder = { Text("Ej: El curso está lleno...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 4,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EduRachaColors.Error,
+                                focusedLabelColor = EduRachaColors.Error
+                            )
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = {
+                                modoPersonalizado = false
+                                mensajeRespuesta = ""
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Volver a motivos predeterminados")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val mensajeFinal = if (modoPersonalizado) {
+                            mensajeRespuesta.ifBlank { null }
+                        } else {
+                            mensajePredeterminadoSeleccionado
+                        }
+
+                        solicitudSeleccionada?.id?.let { id ->
+                            solicitudViewModel.responderSolicitud(
+                                solicitudId = id,
+                                aceptar = false,
+                                mensaje = mensajeFinal,
+                                docenteId = docenteId
+                            )
+                        }
+                        showRechazarDialog = false
+                        solicitudSeleccionada = null
+                        mensajeRespuesta = ""
+                        mensajePredeterminadoSeleccionado = null
+                        modoPersonalizado = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EduRachaColors.Error
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Icon(Icons.Default.Close, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Rechazar Solicitud", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showRechazarDialog = false
+                        solicitudSeleccionada = null
+                        mensajeRespuesta = ""
+                        mensajePredeterminadoSeleccionado = null
+                        modoPersonalizado = false
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
 @Composable
-fun SectionHeader(
-    title: String,
-    count: Int,
-    color: Color
+fun MensajePredeterminadoChip(
+    mensaje: String,
+    seleccionado: Boolean,
+    onClick: () -> Unit,
+    colorFondo: Color
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (seleccionado) colorFondo.copy(alpha = 0.15f) else Color.Transparent,
+        border = BorderStroke(
+            width = if (seleccionado) 2.dp else 1.dp,
+            color = if (seleccionado) colorFondo else EduRachaColors.TextSecondary.copy(alpha = 0.3f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(24.dp)
-                .background(color, RoundedCornerShape(2.dp))
-        )
-        Text(
-            text = title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            letterSpacing = 0.5.sp
-        )
-        Surface(
-            shape = CircleShape,
-            color = color.copy(alpha = 0.15f)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            RadioButton(
+                selected = seleccionado,
+                onClick = onClick,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = colorFondo,
+                    unselectedColor = EduRachaColors.TextSecondary
+                )
+            )
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = count.toString(),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                text = mensaje,
+                fontSize = 13.sp,
+                color = if (seleccionado) EduRachaColors.TextPrimary else EduRachaColors.TextSecondary,
+                fontWeight = if (seleccionado) FontWeight.Medium else FontWeight.Normal,
+                lineHeight = 18.sp,
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
 @Composable
-fun SolicitudCard(
+fun SolicitudAspiranteCard(
     solicitud: SolicitudCurso,
-    onAceptar: () -> Unit,
-    onRechazar: () -> Unit,
-    isProcessing: Boolean
+    onAceptarClick: () -> Unit,
+    onRechazarClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -444,70 +721,54 @@ fun SolicitudCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(60.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
                                     EduRachaColors.Primary,
-                                    EduRachaColors.Secondary
+                                    EduRachaColors.Primary.copy(alpha = 0.75f)
                                 )
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = solicitud.estudianteNombre.firstOrNull()?.uppercase() ?: "?",
+                        text = solicitud.estudianteNombre
+                            .split(" ")
+                            .take(2)
+                            .mapNotNull { it.firstOrNull() }
+                            .joinToString("")
+                            .uppercase(),
                         color = Color.White,
-                        fontSize = 20.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = solicitud.estudianteNombre,
-                        fontSize = 16.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
+                        color = EduRachaColors.TextPrimary,
+                        lineHeight = 22.sp
                     )
-                    Text(
-                        text = solicitud.estudianteEmail,
-                        fontSize = 13.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-            }
-
-            if (!solicitud.mensaje.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EduRachaColors.Background
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Message,
-                                contentDescription = null,
-                                tint = EduRachaColors.Primary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = "Mensaje:",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Primary
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(Modifier.height(3.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Email,
+                            null,
+                            tint = EduRachaColors.TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
                         Text(
-                            text = solicitud.mensaje,
+                            text = solicitud.estudianteEmail,
                             fontSize = 13.sp,
                             color = EduRachaColors.TextSecondary
                         )
@@ -515,198 +776,116 @@ fun SolicitudCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = EduRachaColors.SurfaceVariant.copy(alpha = 0.5f)
             ) {
-                Icon(
-                    imageVector = Icons.Default.AccessTime,
-                    contentDescription = null,
-                    tint = EduRachaColors.TextSecondary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "Solicitud enviada: ${solicitud.fechaSolicitud}",
-                    fontSize = 12.sp,
-                    color = EduRachaColors.TextSecondary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.CalendarToday,
+                        null,
+                        tint = EduRachaColors.Primary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = "Solicitó el ${solicitud.fechaSolicitud}",
+                        fontSize = 12.sp,
+                        color = EduRachaColors.TextSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            val mensajeEst = solicitud.mensajeEstudiante
+            if (!mensajeEst.isNullOrBlank()) {
+                Spacer(Modifier.height(14.dp))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = EduRachaColors.Primary.copy(alpha = 0.06f),
+                    border = BorderStroke(1.dp, EduRachaColors.Primary.copy(alpha = 0.15f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Message,
+                                null,
+                                tint = EduRachaColors.Primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Mensaje del estudiante",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.Primary
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = mensajeEst,
+                            fontSize = 13.sp,
+                            color = EduRachaColors.TextPrimary,
+                            lineHeight = 19.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
-                    onClick = onRechazar,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EduRachaColors.Error.copy(alpha = 0.1f)
+                OutlinedButton(
+                    onClick = onRechazarClick,
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = EduRachaColors.Error
                     ),
-                    enabled = !isProcessing
+                    border = BorderStroke(1.5.dp, EduRachaColors.Error),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        tint = EduRachaColors.Error,
-                        modifier = Modifier.size(18.dp)
+                        Icons.Default.Close,
+                        null,
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "Rechazar",
-                        color = EduRachaColors.Error,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Rechazar", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Button(
-                    onClick = onAceptar,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                    onClick = onAceptarClick,
+                    modifier = Modifier.weight(1f).height(48.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Success
                     ),
-                    enabled = !isProcessing
-                ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Aceptar", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SolicitudCardReadOnly(
-    solicitud: SolicitudCurso,
-    estado: EstadoSolicitud
-) {
-    val (backgroundColor, iconColor, estadoTexto, icon) = when (estado) {
-        EstadoSolicitud.ACEPTADA -> Quad(
-            EduRachaColors.Success.copy(alpha = 0.05f),
-            EduRachaColors.Success,
-            "Aceptada",
-            Icons.Default.CheckCircle
-        )
-        EstadoSolicitud.RECHAZADA -> Quad(
-            EduRachaColors.Error.copy(alpha = 0.05f),
-            EduRachaColors.Error,
-            "Rechazada",
-            Icons.Default.Cancel
-        )
-        else -> Quad(
-            Color.Gray.copy(alpha = 0.05f),
-            Color.Gray,
-            "Pendiente",
-            Icons.Default.HourglassEmpty
-        )
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(iconColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = solicitud.estudianteNombre.firstOrNull()?.uppercase() ?: "?",
-                        color = iconColor,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 2.dp,
+                        pressedElevation = 4.dp
                     )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = solicitud.estudianteNombre,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-                    Text(
-                        text = solicitud.estudianteEmail,
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = iconColor.copy(alpha = 0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = iconColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = estadoTexto,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = iconColor
-                        )
-                    }
-                }
-            }
-
-            if (!solicitud.fechaRespuesta.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.AccessTime,
-                        contentDescription = null,
-                        tint = EduRachaColors.TextSecondary,
-                        modifier = Modifier.size(12.dp)
+                        Icons.Default.Check,
+                        null,
+                        modifier = Modifier.size(19.dp)
                     )
-                    Text(
-                        text = "Respondida: ${solicitud.fechaRespuesta}",
-                        fontSize = 11.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Aceptar", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
@@ -714,142 +893,7 @@ fun SolicitudCardReadOnly(
 }
 
 @Composable
-fun DialogoResponderSolicitud(
-    solicitud: SolicitudCurso,
-    esAceptar: Boolean,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var mensaje by remember {
-        mutableStateOf(
-            if (esAceptar)
-                "¡Bienvenido al curso! Tu solicitud ha sido aceptada."
-            else
-                "Lo sentimos, tu solicitud no pudo ser aceptada en este momento."
-        )
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (esAceptar)
-                                    EduRachaColors.Success.copy(alpha = 0.15f)
-                                else
-                                    EduRachaColors.Error.copy(alpha = 0.15f)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (esAceptar) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                            contentDescription = null,
-                            tint = if (esAceptar) EduRachaColors.Success else EduRachaColors.Error,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = if (esAceptar) "Aceptar Solicitud" else "Rechazar Solicitud",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.TextPrimary
-                        )
-                        Text(
-                            text = solicitud.estudianteNombre,
-                            fontSize = 14.sp,
-                            color = EduRachaColors.TextSecondary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "Mensaje para el estudiante:",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = EduRachaColors.TextPrimary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = mensaje,
-                    onValueChange = { mensaje = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Escribe un mensaje...") },
-                    minLines = 3,
-                    maxLines = 5,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (esAceptar) EduRachaColors.Success else EduRachaColors.Error,
-                        unfocusedBorderColor = EduRachaColors.Background
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, EduRachaColors.Background)
-                    ) {
-                        Text(
-                            "Cancelar",
-                            color = EduRachaColors.TextSecondary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Button(
-                        onClick = { onConfirm(mensaje) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (esAceptar) EduRachaColors.Success else EduRachaColors.Error
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (esAceptar) Icons.Default.Check else Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            if (esAceptar) "Aceptar" else "Rechazar",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyStateSolicitudes() {
+fun EmptyAspirantesView() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -857,51 +901,36 @@ fun EmptyStateSolicitudes() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        var isVisible by remember { mutableStateOf(false) }
-
-        LaunchedEffect(Unit) {
-            delay(100)
-            isVisible = true
-        }
-
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = scaleIn() + fadeIn()
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(EduRachaColors.SurfaceVariant.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PersonAddDisabled,
-                    contentDescription = null,
-                    tint = EduRachaColors.Primary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(64.dp)
-                )
-            }
+            Icon(
+                Icons.Default.PersonOff,
+                contentDescription = null,
+                modifier = Modifier.size(60.dp),
+                tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f)
+            )
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
+        Spacer(Modifier.height(24.dp))
         Text(
-            text = "Sin solicitudes",
-            fontSize = 20.sp,
+            text = "No hay solicitudes pendientes",
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.TextPrimary,
             textAlign = TextAlign.Center
         )
-
+        Spacer(Modifier.height(8.dp))
         Text(
-            text = "No hay solicitudes pendientes para este curso en este momento",
-            fontSize = 15.sp,
+            text = "Cuando los estudiantes soliciten unirse a este curso, aparecerán aquí para que puedas revisar y aprobar sus solicitudes",
+            fontSize = 14.sp,
             color = EduRachaColors.TextSecondary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
     }
 }
-
-data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

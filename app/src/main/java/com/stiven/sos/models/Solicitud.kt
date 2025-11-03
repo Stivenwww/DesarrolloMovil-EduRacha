@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * Modelo para solicitud de curso
+ * NOTA: El backend solo usa "mensaje" para ambos tipos (estudiante y docente)
  */
 data class SolicitudCurso(
     val id: String? = null,
@@ -12,11 +13,18 @@ data class SolicitudCurso(
     val estudianteId: String = "",
     val estudianteNombre: String = "",
     val estudianteEmail: String = "",
+    val mensaje: String? = null,  //  Campo unificado (backend)
     val estado: EstadoSolicitud = EstadoSolicitud.PENDIENTE,
     val fechaSolicitud: String = "",
-    val fechaRespuesta: String? = null,
-    val mensaje: String? = null
-)
+    val fechaRespuesta: String? = null
+) {
+    // Propiedades computadas para compatibilidad con la UI
+    val mensajeEstudiante: String?
+        get() = if (estado == EstadoSolicitud.PENDIENTE) mensaje else null
+
+    val mensajeDocente: String?
+        get() = if (estado != EstadoSolicitud.PENDIENTE) mensaje else null
+}
 
 /**
  * Estados posibles de una solicitud
@@ -40,7 +48,7 @@ data class SolicitudRequest(
     val estudianteId: String,
     val estudianteNombre: String,
     val estudianteEmail: String,
-    val mensaje: String? = null
+    val mensaje: String? = null  // Este será el mensajeEstudiante
 )
 
 /**
@@ -48,7 +56,7 @@ data class SolicitudRequest(
  */
 data class RespuestaSolicitudRequest(
     val aceptar: Boolean,
-    val mensaje: String? = null
+    val mensaje: String? = null  // Este será el mensajeDocente
 )
 
 /**

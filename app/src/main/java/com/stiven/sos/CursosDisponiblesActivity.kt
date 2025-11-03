@@ -6,7 +6,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,13 +16,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.Curso
+import com.stiven.sos.models.EstadoSolicitud
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.CursoViewModel
@@ -37,7 +36,14 @@ class CursosDisponiblesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val prefs = getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
+        val userUid = prefs.getString("user_uid", "") ?: ""
+
+        // Cargar cursos y solicitudes
         cursoViewModel.obtenerCursos()
+        if (userUid.isNotEmpty()) {
+            solicitudViewModel.cargarSolicitudesEstudiante(userUid)
+        }
 
         setContent {
             EduRachaTheme {
@@ -64,6 +70,7 @@ fun CursosDisponiblesScreen(
 
     var showSolicitudDialog by remember { mutableStateOf(false) }
     var cursoSeleccionado by remember { mutableStateOf<Curso?>(null) }
+    var mensajeEstudiante by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
 
     // Obtener datos del usuario
@@ -71,6 +78,14 @@ fun CursosDisponiblesScreen(
     val userUid = prefs.getString("user_uid", "") ?: ""
     val userName = prefs.getString("user_name", "") ?: ""
     val userEmail = prefs.getString("user_email", "") ?: ""
+
+    // ✅ Crear un mapa de cursos con solicitudes existentes
+    val cursosConSolicitud = remember(solicitudUiState.solicitudes) {
+        solicitudUiState.solicitudes
+            .filter { it.estado == EstadoSolicitud.PENDIENTE }
+            .map { it.codigoCurso }
+            .toSet()
+    }
 
     // Mostrar mensajes
     LaunchedEffect(solicitudUiState.mensajeExito) {
@@ -159,11 +174,24 @@ fun CursosDisponiblesScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(cursosFiltrados) { curso ->
+                            // ✅ Verificar si ya tiene solicitud pendiente
+                            val tieneSolicitudPendiente = cursosConSolicitud.contains(curso.codigo)
+
                             CursoDisponibleCard(
                                 curso = curso,
+                                tieneSolicitudPendiente = tieneSolicitudPendiente,
                                 onSolicitarClick = {
-                                    cursoSeleccionado = curso
-                                    showSolicitudDialog = true
+                                    if (tieneSolicitudPendiente) {
+                                        Toast.makeText(
+                                            context,
+                                            "Ya tienes una solicitud pendiente para este curso",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        cursoSeleccionado = curso
+                                        mensajeEstudiante = ""
+                                        showSolicitudDialog = true
+                                    }
                                 }
                             )
                         }
@@ -173,10 +201,14 @@ fun CursosDisponiblesScreen(
         }
     }
 
-    // Diálogo de confirmación
+    // ✅ Diálogo con campo de mensaje
     if (showSolicitudDialog && cursoSeleccionado != null) {
         AlertDialog(
-            onDismissRequest = { showSolicitudDialog = false },
+            onDismissRequest = {
+                showSolicitudDialog = false
+                cursoSeleccionado = null
+                mensajeEstudiante = ""
+            },
             icon = {
                 Icon(
                     Icons.Default.School,
@@ -206,6 +238,19 @@ fun CursosDisponiblesScreen(
                         fontSize = 14.sp,
                         color = EduRachaColors.TextSecondary
                     )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ✅ Campo de mensaje
+                    OutlinedTextField(
+                        value = mensajeEstudiante,
+                        onValueChange = { mensajeEstudiante = it },
+                        label = { Text("Mensaje para el docente (opcional)") },
+                        placeholder = { Text("¿Por qué quieres unirte a este curso?") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
             },
             confirmButton = {
@@ -216,16 +261,20 @@ fun CursosDisponiblesScreen(
                                 codigoCurso = curso.codigo,
                                 estudianteId = userUid,
                                 estudianteNombre = userName,
-                                estudianteEmail = userEmail
+                                estudianteEmail = userEmail,
+                                mensaje = mensajeEstudiante.ifBlank { null }
                             )
                         }
                         showSolicitudDialog = false
                         cursoSeleccionado = null
+                        mensajeEstudiante = ""
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Primary
                     )
                 ) {
+                    Icon(Icons.Default.Send, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text("Enviar solicitud")
                 }
             },
@@ -233,6 +282,7 @@ fun CursosDisponiblesScreen(
                 TextButton(onClick = {
                     showSolicitudDialog = false
                     cursoSeleccionado = null
+                    mensajeEstudiante = ""
                 }) {
                     Text("Cancelar")
                 }
@@ -291,20 +341,24 @@ fun SearchBarCursos(
 @Composable
 fun CursoDisponibleCard(
     curso: Curso,
+    tieneSolicitudPendiente: Boolean,
     onSolicitarClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(
+            containerColor = if (tieneSolicitudPendiente)
+                EduRachaColors.Warning.copy(alpha = 0.05f)
+            else Color.White
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            // Encabezado con código
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -333,7 +387,6 @@ fun CursoDisponibleCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // Descripción
             Text(
                 text = curso.descripcion,
                 fontSize = 14.sp,
@@ -343,7 +396,6 @@ fun CursoDisponibleCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // Información adicional
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -354,28 +406,63 @@ fun CursoDisponibleCard(
                 )
                 InfoChip(
                     icon = Icons.Default.Person,
-                    text = "${curso.docenteId}"
+                    text = curso.docenteId
                 )
+            }
+
+            // ✅ Badge si ya tiene solicitud pendiente
+            if (tieneSolicitudPendiente) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = EduRachaColors.Warning.copy(alpha = 0.15f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.HourglassTop,
+                            contentDescription = null,
+                            tint = EduRachaColors.Warning,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Solicitud pendiente - Esperando respuesta del docente",
+                            fontSize = 12.sp,
+                            color = EduRachaColors.Warning,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Botón de solicitar
             Button(
                 onClick = onSolicitarClick,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = if (tieneSolicitudPendiente)
+                        EduRachaColors.TextSecondary
+                    else EduRachaColors.Primary
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !tieneSolicitudPendiente
             ) {
                 Icon(
-                    Icons.Default.Send,
+                    if (tieneSolicitudPendiente) Icons.Default.CheckCircle else Icons.Default.Send,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Solicitar unirse", fontWeight = FontWeight.Bold)
+                Text(
+                    if (tieneSolicitudPendiente) "Solicitud enviada" else "Solicitar unirse",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

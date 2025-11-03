@@ -21,31 +21,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.google.firebase.auth.FirebaseAuth
 import com.stiven.sos.api.ApiClient
 import com.stiven.sos.models.RegistroRequest
 import com.stiven.sos.models.UserPreferences
+import com.stiven.sos.utils.SessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class RegisterActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var sessionManager: SessionManager
     private var userType: String = "student"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         auth = FirebaseAuth.getInstance()
+        sessionManager = SessionManager.getInstance(this)
         userType = intent.getStringExtra("user_type") ?: "student"
 
         setContent {
@@ -54,6 +58,7 @@ class RegisterActivity : ComponentActivity() {
                     userType = userType,
                     auth = auth,
                     context = this@RegisterActivity,
+                    sessionManager = sessionManager,
                     onNavigateToLogin = {
                         val intent = Intent(this@RegisterActivity, LoginActivity::class.java)
                         intent.putExtra("user_type", userType)
@@ -73,7 +78,6 @@ class RegisterActivity : ComponentActivity() {
             Intent(this, MainActivity::class.java)
         }
         intent.putExtra("user_type", userType)
-        // ✅ Limpiar todas las actividades anteriores del stack
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
@@ -86,6 +90,7 @@ fun RegisterScreen(
     userType: String,
     auth: FirebaseAuth,
     context: android.content.Context,
+    sessionManager: SessionManager,
     onNavigateToLogin: () -> Unit,
     onNavigateToMain: () -> Unit
 ) {
@@ -99,59 +104,113 @@ fun RegisterScreen(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-
-    var fullNameError by remember { mutableStateOf("") }
-    var usernameError by remember { mutableStateOf("") }
-    var emailError by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf("") }
-    var confirmPasswordError by remember { mutableStateOf("") }
-
     var isLoading by remember { mutableStateOf(false) }
+
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorTitle by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     val primaryColor = Color(0xFF0D47A1)
     val secondaryColor = Color(0xFF0D47A1)
     val backgroundColor = Color(0xFFF5F5F5)
-    val errorColor = Color(0xFFD32F2F)
 
-    fun validateFullName(name: String): String {
-        return when {
-            name.trim().isEmpty() -> "El nombre completo es obligatorio"
-            name.trim().length < 3 -> "El nombre debe tener al menos 3 caracteres"
-            else -> ""
+    fun showError(title: String, message: String) {
+        errorTitle = title
+        errorMessage = message
+        showErrorDialog = true
+    }
+
+    fun validateInputs(): Boolean {
+        when {
+            fullName.trim().isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa tu nombre completo")
+                return false
+            }
+            fullName.trim().length < 3 -> {
+                showError("Nombre muy corto", "El nombre debe tener al menos 3 caracteres")
+                return false
+            }
+            username.trim().isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa un nombre de usuario")
+                return false
+            }
+            username.trim().length < 3 -> {
+                showError("Usuario muy corto", "El nombre de usuario debe tener al menos 3 caracteres")
+                return false
+            }
+            !username.matches(Regex("^[a-zA-Z0-9_]+$")) -> {
+                showError("Usuario inválido", "Solo se permiten letras, números y guiones bajos")
+                return false
+            }
+            email.trim().isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa tu correo electrónico")
+                return false
+            }
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                showError("Correo inválido", "Por favor ingresa un correo electrónico válido")
+                return false
+            }
+            password.isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa una contraseña")
+                return false
+            }
+            password.length < 6 -> {
+                showError("Contraseña muy corta", "La contraseña debe tener al menos 6 caracteres")
+                return false
+            }
+            confirmPassword.isEmpty() -> {
+                showError("Campo requerido", "Por favor confirma tu contraseña")
+                return false
+            }
+            password != confirmPassword -> {
+                showError("Contraseñas diferentes", "Las contraseñas no coinciden. Verifica e intenta nuevamente")
+                return false
+            }
+        }
+        return true
+    }
+
+    // 🔥 FUNCIÓN: Obtiene el rol desde Firebase Auth (igual que en Login)
+    suspend fun obtenerRolDeFirebaseAuth(userId: String): String? {
+        return try {
+            val user = auth.currentUser
+            if (user != null && user.uid == userId) {
+                val tokenResult = user.getIdToken(true).await()
+                val claims = tokenResult.claims
+                val rol = claims["rol"] as? String
+                Log.d("RegisterActivity", "📊 Rol obtenido de Firebase Auth: $rol")
+                rol
+            } else {
+                Log.e("RegisterActivity", "❌ Usuario no coincide o es null")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("RegisterActivity", "❌ Error al obtener rol: ${e.message}")
+            null
         }
     }
 
-    fun validateUsername(user: String): String {
-        return when {
-            user.trim().isEmpty() -> "El nombre de usuario es obligatorio"
-            user.trim().length < 3 -> "El nombre de usuario debe tener al menos 3 caracteres"
-            !user.matches(Regex("^[a-zA-Z0-9_]+$")) -> "Solo letras, números y guiones bajos"
-            else -> ""
+    // 🔥 FUNCIÓN: Guarda datos en SharedPreferences (igual que en Login)
+    fun guardarDatosEnPreferences(
+        userId: String,
+        rol: String,
+        nombre: String,
+        correo: String,
+        apodo: String
+    ) {
+        val prefs = context.getSharedPreferences("EduRachaPrefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("user_rol", rol)
+            putString("user_id", userId)
+            putString("user_name", nombre)
+            putString("user_email", correo)
+            putString("user_nickname", apodo)
+            apply()
         }
-    }
-
-    fun validateEmail(mail: String): String {
-        return when {
-            mail.trim().isEmpty() -> "El correo electrónico es obligatorio"
-            !Patterns.EMAIL_ADDRESS.matcher(mail).matches() -> "Ingresa un correo válido"
-            else -> ""
-        }
-    }
-
-    fun validatePassword(pass: String): String {
-        return when {
-            pass.isEmpty() -> "La contraseña es obligatoria"
-            pass.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
-            else -> ""
-        }
-    }
-
-    fun validateConfirmPassword(pass: String, confirm: String): String {
-        return when {
-            confirm.isEmpty() -> "Confirma tu contraseña"
-            pass != confirm -> "Las contraseñas no coinciden"
-            else -> ""
-        }
+        Log.d("RegisterActivity", "✅ Datos guardados en SharedPreferences")
+        Log.d("RegisterActivity", "   UID: $userId")
+        Log.d("RegisterActivity", "   Rol: $rol")
+        Log.d("RegisterActivity", "   Nombre: $nombre")
     }
 
     val title = if (userType == "teacher") "Crear Cuenta de Docente" else "Crear Cuenta de Estudiante"
@@ -251,21 +310,16 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = fullName,
-                        onValueChange = {
-                            fullName = it
-                            fullNameError = ""
-                        },
+                        onValueChange = { fullName = it },
                         label = { Text("Nombre completo") },
                         placeholder = { Text("Ingresa tu nombre y apellidos") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = fullNameError.isNotEmpty(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -273,45 +327,25 @@ fun RegisterScreen(
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
-                                tint = if (fullNameError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         }
                     )
-                    if (fullNameError.isNotEmpty()) {
-                        Text(
-                            text = fullNameError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = "Ingresa tu nombre y apellidos completos",
-                            color = Color(0xFF757575),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
                         value = username,
-                        onValueChange = {
-                            username = it
-                            usernameError = ""
-                        },
+                        onValueChange = { username = it },
                         label = { Text("Nombre de usuario") },
                         placeholder = { Text("usuario123") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = usernameError.isNotEmpty(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -319,45 +353,25 @@ fun RegisterScreen(
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = null,
-                                tint = if (usernameError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         }
                     )
-                    if (usernameError.isNotEmpty()) {
-                        Text(
-                            text = usernameError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = "Solo letras, números y guiones bajos",
-                            color = Color(0xFF757575),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = {
-                            email = it
-                            emailError = ""
-                        },
+                        onValueChange = { email = it },
                         label = { Text("Correo electrónico") },
                         placeholder = { Text("ejemplo@correo.com") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = emailError.isNotEmpty(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -365,46 +379,26 @@ fun RegisterScreen(
                             Icon(
                                 imageVector = Icons.Default.Email,
                                 contentDescription = null,
-                                tint = if (emailError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         }
                     )
-                    if (emailError.isNotEmpty()) {
-                        Text(
-                            text = emailError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = "Debe ser un correo válido (ej: usuario@dominio.com)",
-                            color = Color(0xFF757575),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = {
-                            password = it
-                            passwordError = ""
-                        },
+                        onValueChange = { password = it },
                         label = { Text("Contraseña") },
                         placeholder = { Text("Mínimo 6 caracteres") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = passwordError.isNotEmpty(),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -412,7 +406,7 @@ fun RegisterScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = if (passwordError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         },
                         trailingIcon = {
@@ -428,42 +422,22 @@ fun RegisterScreen(
                             }
                         }
                     )
-                    if (passwordError.isNotEmpty()) {
-                        Text(
-                            text = passwordError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = "Mínimo 6 caracteres, incluye números y letras",
-                            color = Color(0xFF757575),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
                         value = confirmPassword,
-                        onValueChange = {
-                            confirmPassword = it
-                            confirmPasswordError = ""
-                        },
+                        onValueChange = { confirmPassword = it },
                         label = { Text("Confirmar contraseña") },
                         placeholder = { Text("Repite tu contraseña") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = confirmPasswordError.isNotEmpty(),
                         visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -471,7 +445,7 @@ fun RegisterScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = if (confirmPasswordError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         },
                         trailingIcon = {
@@ -487,40 +461,22 @@ fun RegisterScreen(
                             }
                         }
                     )
-                    if (confirmPasswordError.isNotEmpty()) {
-                        Text(
-                            text = confirmPasswordError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    } else {
-                        Text(
-                            text = "Debe coincidir con la contraseña anterior",
-                            color = Color(0xFF757575),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
                     Button(
                         onClick = {
-                            fullNameError = validateFullName(fullName)
-                            usernameError = validateUsername(username)
-                            emailError = validateEmail(email)
-                            passwordError = validatePassword(password)
-                            confirmPasswordError = validateConfirmPassword(password, confirmPassword)
-
-                            if (fullNameError.isEmpty() && usernameError.isEmpty() &&
-                                emailError.isEmpty() && passwordError.isEmpty() &&
-                                confirmPasswordError.isEmpty()) {
-
+                            if (validateInputs()) {
                                 isLoading = true
 
                                 val rol = if (userType == "teacher") "docente" else "estudiante"
 
+                                Log.d("RegisterActivity", "=== INICIANDO REGISTRO ===")
+                                Log.d("RegisterActivity", "Nombre: ${fullName.trim()}")
+                                Log.d("RegisterActivity", "Correo: ${email.trim()}")
+                                Log.d("RegisterActivity", "Rol esperado: $rol")
+
+                                // 🔥 PASO 1: Registrar en tu backend
                                 val registroRequest = RegistroRequest(
                                     nombreCompleto = fullName.trim(),
                                     apodo = username.trim(),
@@ -529,89 +485,152 @@ fun RegisterScreen(
                                     rol = rol
                                 )
 
-                                Log.d("RegisterActivity", "=== INICIANDO REGISTRO ===")
-                                Log.d("RegisterActivity", "Nombre completo a enviar: ${registroRequest.nombreCompleto}")
-                                Log.d("RegisterActivity", "Correo a enviar: ${registroRequest.correo}")
-                                Log.d("RegisterActivity", "Rol a enviar: ${registroRequest.rol}")
-
-                                CoroutineScope(Dispatchers.IO).launch {
+                                CoroutineScope(Dispatchers.Main).launch {
                                     try {
-                                        Log.d("RegisterActivity", "Enviando petición al servidor...")
-                                        val response = ApiClient.apiService.registrarUsuario(registroRequest)
+                                        // Llamada al backend
+                                        val response = withContext(Dispatchers.IO) {
+                                            ApiClient.apiService.registrarUsuario(registroRequest)
+                                        }
 
-                                        Log.d("RegisterActivity", "=== RESPUESTA RECIBIDA ===")
-                                        Log.d("RegisterActivity", "Código de respuesta: ${response.code()}")
+                                        if (response.isSuccessful && response.body() != null) {
+                                            Log.d("RegisterActivity", "✓ Backend: Registro exitoso")
 
-                                        withContext(Dispatchers.Main) {
-                                            if (response.isSuccessful) {
-                                                Log.d("RegisterActivity", "Respuesta exitosa")
+                                            val responseBody = response.body()!!
+                                            val uid = responseBody["uid"] as? String ?: ""
 
-                                                if (response.body() != null) {
-                                                    val responseBody = response.body()!!
+                                            // 🔥 PASO 2: Iniciar sesión en Firebase Auth para obtener el token con customClaims
+                                            Log.d("RegisterActivity", "🔐 Autenticando en Firebase...")
 
-                                                    val uid = try { responseBody["uid"] as? String ?: "" } catch (e: Exception) { "" }
-                                                    val nombre = try { responseBody["nombreCompleto"] as? String ?: fullName.trim() } catch (e: Exception) { fullName.trim() }
-                                                    val apodo = try { responseBody["apodo"] as? String ?: username.trim() } catch (e: Exception) { username.trim() }
-                                                    val correo = try { responseBody["correo"] as? String ?: email.trim() } catch (e: Exception) { email.trim() }
-                                                    val rolRespuesta = try { responseBody["rol"] as? String ?: rol } catch (e: Exception) { rol }
+                                            auth.signInWithEmailAndPassword(email.trim(), password)
+                                                .addOnSuccessListener { authResult ->
+                                                    val user = authResult.user
+                                                    if (user != null) {
+                                                        CoroutineScope(Dispatchers.Main).launch {
+                                                            try {
+                                                                // Esperar un poco para que Firebase actualice los claims
+                                                                kotlinx.coroutines.delay(1000)
 
-                                                    Log.d("RegisterActivity", "UID recibido: $uid")
-                                                    Log.d("RegisterActivity", "Nombre recibido: $nombre")
-                                                    Log.d("RegisterActivity", "Correo recibido: $correo")
+                                                                // Obtener el rol desde Firebase Auth
+                                                                val rolReal = obtenerRolDeFirebaseAuth(user.uid) ?: rol
 
-                                                    // 🔑 PRIMERO: Limpiar datos anteriores
-                                                    Log.d("RegisterActivity", "=== LIMPIANDO DATOS ANTERIORES ===")
-                                                    UserPreferences.clearUserData(context)
+                                                                Log.d("RegisterActivity", "✓ Rol obtenido: $rolReal")
 
-                                                    // 🔑 SEGUNDO: GUARDAR EN SHAREDPREFERENCES CON commit() (SÍNCRONO)
-                                                    Log.d("RegisterActivity", "=== GUARDANDO NUEVOS DATOS EN SHAREDPREFERENCES ===")
-                                                    UserPreferences.saveUserData(
-                                                        context = context,
-                                                        uid = uid,
-                                                        nombreCompleto = nombre,
-                                                        apodo = apodo,
-                                                        correo = correo,
-                                                        rol = rolRespuesta
+                                                                // Guardar en todas las ubicaciones
+                                                                guardarDatosEnPreferences(
+                                                                    user.uid,
+                                                                    rolReal,
+                                                                    fullName.trim(),
+                                                                    email.trim(),
+                                                                    username.trim()
+                                                                )
+
+                                                                sessionManager.saveUserSession(
+                                                                    userId = user.uid,
+                                                                    userName = fullName.trim(),
+                                                                    userEmail = email.trim(),
+                                                                    userRol = rolReal
+                                                                )
+
+                                                                UserPreferences.saveUserData(
+                                                                    context = context,
+                                                                    uid = user.uid,
+                                                                    nombreCompleto = fullName.trim(),
+                                                                    apodo = username.trim(),
+                                                                    correo = email.trim(),
+                                                                    rol = rolReal
+                                                                )
+
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "¡Registro exitoso! Bienvenido ${fullName.trim()}",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+
+                                                                isLoading = false
+                                                                onNavigateToMain()
+
+                                                            } catch (e: Exception) {
+                                                                Log.e("RegisterActivity", "❌ Error al obtener rol: ${e.message}")
+                                                                isLoading = false
+                                                                auth.signOut()
+                                                                showError("Error", "No se pudo completar el registro: ${e.message}")
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                .addOnFailureListener { exception ->
+                                                    isLoading = false
+                                                    Log.e("RegisterActivity", "❌ Error en Firebase Auth: ${exception.message}")
+                                                    showError(
+                                                        "Error de autenticación",
+                                                        "No se pudo iniciar sesión después del registro. Por favor intenta iniciar sesión manualmente."
                                                     )
-
-                                                    Log.d("RegisterActivity", "✓ Datos guardados en SharedPreferences")
-
-                                                    // Verificar que se guardó correctamente
-                                                    Log.d("RegisterActivity", "Verificación post-guardado: ${UserPreferences.getUserName(context)}")
-
-                                                    Toast.makeText(
-                                                        context,
-                                                        "¡Registro exitoso! Bienvenido $nombre",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-
-                                                    isLoading = false
-                                                    // ✅ Navegar inmediatamente (sin delay)
-                                                    onNavigateToMain()
-                                                } else {
-                                                    Log.e("RegisterActivity", "Body es nulo")
-                                                    isLoading = false
-                                                    Toast.makeText(context, "Error: respuesta vacía del servidor", Toast.LENGTH_LONG).show()
                                                 }
-                                            } else {
-                                                Log.e("RegisterActivity", "Respuesta no exitosa: ${response.code()}")
-                                                isLoading = false
 
-                                                val errorMsg = when (response.code()) {
-                                                    400 -> "Datos inválidos. Verifica la información"
-                                                    409 -> "Este correo ya está registrado"
-                                                    500 -> "Error en el servidor. Intenta más tarde"
-                                                    else -> "Error ${response.code()}: ${response.message()}"
-                                                }
-                                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("RegisterActivity", "Error: ${e.message}", e)
-                                        withContext(Dispatchers.Main) {
+                                        } else {
+                                            // Manejo de errores del backend
                                             isLoading = false
-                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                            Log.e("RegisterActivity", "❌ Error del backend: ${response.code()}")
+
+                                            val errorTitle: String
+                                            val errorMsg: String
+
+                                            when (response.code()) {
+                                                400 -> {
+                                                    val errorBody = response.errorBody()?.string()
+                                                    when {
+                                                        errorBody?.contains("EMAIL_EXISTS", ignoreCase = true) == true -> {
+                                                            errorTitle = "Correo ya registrado"
+                                                            errorMsg = "Este correo electrónico ya está en uso.\n\nPor favor usa otro correo o inicia sesión si ya tienes una cuenta."
+                                                        }
+                                                        errorBody?.contains("INVALID_EMAIL", ignoreCase = true) == true -> {
+                                                            errorTitle = "Correo inválido"
+                                                            errorMsg = "El formato del correo electrónico no es válido."
+                                                        }
+                                                        errorBody?.contains("WEAK_PASSWORD", ignoreCase = true) == true -> {
+                                                            errorTitle = "Contraseña débil"
+                                                            errorMsg = "La contraseña debe tener al menos 6 caracteres."
+                                                        }
+                                                        else -> {
+                                                            errorTitle = "Datos inválidos"
+                                                            errorMsg = "Por favor verifica que todos los campos estén correctos."
+                                                        }
+                                                    }
+                                                }
+                                                409 -> {
+                                                    errorTitle = "Usuario existente"
+                                                    errorMsg = "Ya existe una cuenta con este correo o nombre de usuario.\n\nIntenta con datos diferentes o inicia sesión."
+                                                }
+                                                500 -> {
+                                                    errorTitle = "Error del servidor"
+                                                    errorMsg = "Ocurrió un error en el servidor.\n\nPor favor intenta nuevamente más tarde."
+                                                }
+                                                503 -> {
+                                                    errorTitle = "Servicio no disponible"
+                                                    errorMsg = "El servidor no está disponible en este momento.\n\nIntenta más tarde."
+                                                }
+                                                else -> {
+                                                    errorTitle = "Error de registro"
+                                                    errorMsg = "Error ${response.code()}: ${response.message()}"
+                                                }
+                                            }
+
+                                            showError(errorTitle, errorMsg)
                                         }
+
+                                    } catch (e: Exception) {
+                                        Log.e("RegisterActivity", "❌ Excepción: ${e.message}", e)
+                                        isLoading = false
+
+                                        val errorMsg = when {
+                                            e.message?.contains("timeout", ignoreCase = true) == true ->
+                                                "Tiempo de espera agotado.\n\nVerifica tu conexión a internet e intenta nuevamente."
+                                            e.message?.contains("unable to resolve host", ignoreCase = true) == true ->
+                                                "No se pudo conectar al servidor.\n\nVerifica tu conexión a internet."
+                                            else ->
+                                                "No se pudo conectar con el servidor.\n\nVerifica tu conexión a internet e intenta más tarde."
+                                        }
+                                        showError("Error de conexión", errorMsg)
                                     }
                                 }
                             }
@@ -624,11 +643,7 @@ fun RegisterScreen(
                             containerColor = Color(0xFF0D47A1),
                             disabledContainerColor = Color(0xFF1565C0).copy(alpha = 0.6f)
                         ),
-                        shape = RoundedCornerShape(28.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 0.dp,
-                            pressedElevation = 2.dp
-                        )
+                        shape = RoundedCornerShape(28.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -705,5 +720,13 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showErrorDialog) {
+        ErrorDialog(
+            title = errorTitle,
+            message = errorMessage,
+            onDismiss = { showErrorDialog = false }
+        )
     }
 }

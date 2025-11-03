@@ -23,13 +23,14 @@ class SolicitudViewModel : ViewModel() {
     val uiState: StateFlow<SolicitudUiState> = _uiState.asStateFlow()
 
     /**
-     * Crear una solicitud para unirse a un curso
+     *  Crear una solicitud para unirse a un curso CON MENSAJE
      */
     fun crearSolicitud(
         codigoCurso: String,
         estudianteId: String,
         estudianteNombre: String,
-        estudianteEmail: String
+        estudianteEmail: String,
+        mensaje: String? = null
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, mensajeExito = null) }
@@ -39,7 +40,8 @@ class SolicitudViewModel : ViewModel() {
                     codigoCurso = codigoCurso,
                     estudianteId = estudianteId,
                     estudianteNombre = estudianteNombre,
-                    estudianteEmail = estudianteEmail
+                    estudianteEmail = estudianteEmail,
+                    mensaje = mensaje
                 )
 
                 val response = ApiClient.apiService.crearSolicitudCurso(request)
@@ -54,10 +56,16 @@ class SolicitudViewModel : ViewModel() {
                     // Recargar solicitudes
                     cargarSolicitudesEstudiante(estudianteId)
                 } else {
+                    // ✅ Manejo específico de error 409 (Conflict)
+                    val errorMsg = when (response.code()) {
+                        409 -> "Ya has enviado una solicitud para este curso. Espera la respuesta del docente."
+                        404 -> "Curso no encontrado. Verifica el código."
+                        else -> "Error al enviar solicitud: ${response.code()}"
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "Error al enviar solicitud: ${response.code()}"
+                            error = errorMsg
                         )
                     }
                 }
@@ -147,7 +155,7 @@ class SolicitudViewModel : ViewModel() {
     }
 
     /**
-     * Responder a una solicitud (aceptar o rechazar)
+     * ✅ Responder a una solicitud (aceptar o rechazar) CON MENSAJE
      */
     fun responderSolicitud(
         solicitudId: String,
@@ -180,11 +188,12 @@ class SolicitudViewModel : ViewModel() {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "Error al responder solicitud: ${response.code()}"
+                            error = "Error al responder solicitud: ${response.code()} - ${response.message()}"
                         )
                     }
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 _uiState.update {
                     it.copy(
                         isLoading = false,

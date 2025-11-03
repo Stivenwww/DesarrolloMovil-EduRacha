@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -219,9 +218,39 @@ fun SolicitudCard(solicitud: SolicitudCurso) {
                 )
             }
 
+            // ✅ Mostrar MI mensaje (del estudiante) si existe - usando propiedad computada
+            val mensajeEst = solicitud.mensajeEstudiante
+            if (!mensajeEst.isNullOrBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Tu mensaje:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.Primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = mensajeEst,
+                            fontSize = 14.sp,
+                            color = EduRachaColors.TextPrimary,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            }
+
             // Fecha de respuesta (si existe)
             if (solicitud.fechaRespuesta != null) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -240,27 +269,39 @@ fun SolicitudCard(solicitud: SolicitudCurso) {
                 }
             }
 
-            // Mensaje del docente (si existe)
-            if (!solicitud.mensaje.isNullOrBlank()) {
+            // ✅ Mensaje del DOCENTE (si existe) - usando propiedad computada
+            val mensajeDoc = solicitud.mensajeDocente
+            if (!mensajeDoc.isNullOrBlank()) {
                 Spacer(Modifier.height(12.dp))
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = EduRachaColors.SurfaceVariant
+                    color = estadoColor.copy(alpha = 0.1f)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp)
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Person,
+                                null,
+                                tint = estadoColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Mensaje del docente:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = estadoColor
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "Mensaje del docente:",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.TextSecondary
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = solicitud.mensaje,
+                            text = mensajeDoc,
                             fontSize = 14.sp,
                             color = EduRachaColors.TextPrimary,
                             lineHeight = 20.sp

@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.util.Patterns
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -24,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -32,14 +30,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.auth.UserProfileChangeRequest
 import com.stiven.sos.models.UserPreferences
 import com.stiven.sos.utils.SessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 class LoginActivity : ComponentActivity() {
 
@@ -114,29 +117,129 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var emailError by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorTitle by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     val primaryColor = Color(0xFF0D47A1)
     val secondaryColor = Color(0xFF0D47A1)
     val backgroundColor = Color(0xFFF5F5F5)
-    val errorColor = Color(0xFFD32F2F)
 
-    fun validateEmail(email: String): String {
-        return when {
-            email.trim().isEmpty() -> "El correo electrónico es obligatorio"
-            !Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
-                "Ingresa un correo electrónico válido"
-            else -> ""
+    fun showError(title: String, message: String) {
+        errorTitle = title
+        errorMessage = message
+        showErrorDialog = true
+    }
+
+    fun validateInputs(): Boolean {
+        when {
+            email.trim().isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa tu correo electrónico")
+                return false
+            }
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                showError("Correo inválido", "Por favor ingresa un correo electrónico válido")
+                return false
+            }
+            password.isEmpty() -> {
+                showError("Campo requerido", "Por favor ingresa tu contraseña")
+                return false
+            }
+            password.length < 6 -> {
+                showError("Contraseña muy corta", "La contraseña debe tener al menos 6 caracteres")
+                return false
+            }
+        }
+        return true
+    }
+
+    // 🔥 FUNCIÓN: Obtiene el rol desde customClaims de Firebase Auth
+    suspend fun obtenerRolDeFirebaseAuth(userId: String): String? {
+        return try {
+            val user = auth.currentUser
+            if (user != null && user.uid == userId) {
+                val tokenResult = user.getIdToken(true).await()
+                val claims = tokenResult.claims
+                val rol = claims["rol"] as? String
+
+                Log.d("LoginActivity", "📊 Rol obtenido de Firebase Auth claims: $rol")
+                rol
+            } else {
+                Log.e("LoginActivity", "❌ Usuario no coincide o es null")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("LoginActivity", "❌ Error al obtener rol de Firebase Auth: ${e.message}")
+            null
         }
     }
 
-    fun validatePassword(password: String): String {
-        return when {
-            password.isEmpty() -> "La contraseña es obligatoria"
-            password.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
-            else -> ""
+    // 🔥 FUNCIÓN: Guarda el rol en SharedPreferences
+    fun guardarDatosEnPreferences(
+        userId: String,
+        rol: String,
+        nombre: String,
+        correo: String,
+        apodo: String
+    ) {
+        val prefs = context.getSharedPreferences("EduRachaPrefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("user_rol", rol)
+            putString("user_id", userId)
+            putString("user_name", nombre)
+            putString("user_email", correo)
+            putString("user_nickname", apodo)
+            apply()
+        }
+        Log.d("LoginActivity", "✅ Datos guardados en SharedPreferences")
+        Log.d("LoginActivity", "   UID: $userId")
+        Log.d("LoginActivity", "   Rol: $rol")
+        Log.d("LoginActivity", "   Nombre: $nombre")
+    }
+
+    // 🔥 FUNCIÓN: Verifica si el rol coincide con el portal seleccionado
+    suspend fun verificarRolUsuario(
+        userId: String,
+        userName: String,
+        userEmail: String,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val rolEsperado = if (userType == "teacher") "docente" else "estudiante"
+
+        Log.d("LoginActivity", "=== VERIFICACIÓN DE ROL ===")
+        Log.d("LoginActivity", "UID: $userId")
+        Log.d("LoginActivity", "Portal seleccionado: $userType (esperando: $rolEsperado)")
+
+        val rolGuardado = obtenerRolDeFirebaseAuth(userId)
+
+        if (rolGuardado == null) {
+            Log.e("LoginActivity", "✗ No se encontró rol en Firebase Auth")
+            onError("Tu cuenta no tiene un rol asignado.\n\n" +
+                    "Esto ocurre con cuentas antiguas. Por favor:\n\n" +
+                    "1. Cierra esta ventana\n" +
+                    "2. Ve a 'Registrarse'\n" +
+                    "3. Usa el mismo correo y contraseña\n" +
+                    "4. Completa el proceso de registro\n\n" +
+                    "Esto actualizará tu cuenta correctamente.")
+            return
+        }
+
+        Log.d("LoginActivity", "Rol del usuario: $rolGuardado")
+
+        if (rolGuardado == rolEsperado) {
+            Log.d("LoginActivity", "✓ Rol correcto, permitiendo acceso")
+            onSuccess(rolGuardado)
+        } else {
+            Log.d("LoginActivity", "✗ Rol incorrecto, bloqueando acceso")
+            val mensajeError = if (userType == "teacher") {
+                "Esta cuenta está registrada como estudiante.\n\nPor favor usa el portal de estudiantes para iniciar sesión."
+            } else {
+                "Esta cuenta está registrada como docente.\n\nPor favor usa el portal de docentes para iniciar sesión."
+            }
+            onError(mensajeError)
         }
     }
 
@@ -147,51 +250,67 @@ fun LoginScreen(
     ) { result ->
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
+            isLoading = true
             val account = task.result
             val credential = GoogleAuthProvider.getCredential(account.idToken, null)
             auth.signInWithCredential(credential).addOnCompleteListener { authTask ->
                 if (authTask.isSuccessful) {
                     val user = auth.currentUser
-                    val currentDisplayName = user?.displayName ?: account.displayName ?: "Usuario"
+                    if (user != null) {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            try {
+                                val nombre = user.displayName ?: account.displayName ?: "Usuario"
+                                val correo = user.email ?: ""
 
-                    // ✅ GUARDAR EN SessionManager
-                    val rol = if (userType == "teacher") "docente" else "estudiante"
-                    sessionManager.saveUserSession(
-                        userId = user?.uid ?: "",
-                        userName = currentDisplayName,
-                        userEmail = user?.email ?: "",
-                        userRol = rol
-                    )
+                                verificarRolUsuario(
+                                    userId = user.uid,
+                                    userName = nombre,
+                                    userEmail = correo,
+                                    onSuccess = { rolReal ->
+                                        guardarDatosEnPreferences(user.uid, rolReal, nombre, correo, "")
 
-                    Log.d("LoginActivity", "✓ SessionManager guardado - UserID: ${user?.uid}, Rol: $rol")
+                                        sessionManager.saveUserSession(
+                                            userId = user.uid,
+                                            userName = nombre,
+                                            userEmail = correo,
+                                            userRol = rolReal
+                                        )
 
-                    // También guardar en UserPreferences para compatibilidad
-                    UserPreferences.saveUserData(
-                        context = context,
-                        uid = user?.uid ?: "",
-                        nombreCompleto = currentDisplayName,
-                        apodo = "",
-                        correo = user?.email ?: "",
-                        rol = rol
-                    )
+                                        UserPreferences.saveUserData(
+                                            context = context,
+                                            uid = user.uid,
+                                            nombreCompleto = nombre,
+                                            apodo = "",
+                                            correo = correo,
+                                            rol = rolReal
+                                        )
 
-                    if (!currentDisplayName.contains("Docente") && !currentDisplayName.contains("Estudiante")) {
-                        val newDisplayName = "$currentDisplayName - ${if (userType == "teacher") "Docente" else "Estudiante"}"
-                        val profileUpdates = UserProfileChangeRequest.Builder()
-                            .setDisplayName(newDisplayName)
-                            .build()
-                        user?.updateProfile(profileUpdates)?.addOnCompleteListener {
-                            onNavigateToMain()
+                                        isLoading = false
+                                        onNavigateToMain()
+                                    },
+                                    onError = { mensaje ->
+                                        isLoading = false
+                                        auth.signOut()
+                                        googleClient.signOut()
+                                        showError("Acceso denegado", mensaje)
+                                    }
+                                )
+                            } catch (e: Exception) {
+                                isLoading = false
+                                auth.signOut()
+                                googleClient.signOut()
+                                showError("Error", "Error al verificar el rol: ${e.message}")
+                            }
                         }
-                    } else {
-                        onNavigateToMain()
                     }
                 } else {
-                    Toast.makeText(context, "Error con Google: ${authTask.exception?.message}", Toast.LENGTH_SHORT).show()
+                    isLoading = false
+                    showError("Error de autenticación", authTask.exception?.localizedMessage ?: "No se pudo iniciar sesión con Google")
                 }
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Error al iniciar sesión con Google", Toast.LENGTH_SHORT).show()
+            isLoading = false
+            showError("Error de conexión", "No se pudo iniciar sesión con Google. Verifica tu conexión a internet.")
         }
     }
 
@@ -279,21 +398,16 @@ fun LoginScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = {
-                            email = it
-                            emailError = ""
-                        },
+                        onValueChange = { email = it },
                         label = { Text("Correo electrónico") },
                         placeholder = { Text("ejemplo@correo.com") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = emailError.isNotEmpty(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -301,39 +415,26 @@ fun LoginScreen(
                             Icon(
                                 imageVector = Icons.Default.Email,
                                 contentDescription = null,
-                                tint = if (emailError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         }
                     )
-                    if (emailError.isNotEmpty()) {
-                        Text(
-                            text = emailError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = {
-                            password = it
-                            passwordError = ""
-                        },
+                        onValueChange = { password = it },
                         label = { Text("Contraseña") },
                         placeholder = { Text("Mínimo 6 caracteres") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = !isLoading,
-                        isError = passwordError.isNotEmpty(),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             unfocusedBorderColor = Color(0xFFBDBDBD),
                             focusedLabelColor = primaryColor,
-                            errorBorderColor = errorColor,
                             disabledBorderColor = Color(0xFFE0E0E0)
                         ),
                         shape = RoundedCornerShape(8.dp),
@@ -341,7 +442,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = if (passwordError.isNotEmpty()) errorColor else primaryColor
+                                tint = primaryColor
                             )
                         },
                         trailingIcon = {
@@ -357,93 +458,81 @@ fun LoginScreen(
                             }
                         }
                     )
-                    if (passwordError.isNotEmpty()) {
-                        Text(
-                            text = passwordError,
-                            color = errorColor,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
-                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
                     Button(
                         onClick = {
-                            emailError = validateEmail(email)
-                            passwordError = validatePassword(password)
-
-                            if (emailError.isEmpty() && passwordError.isEmpty()) {
+                            if (validateInputs()) {
                                 isLoading = true
                                 Log.d("LoginActivity", "=== INICIANDO SESIÓN ===")
-                                Log.d("LoginActivity", "Email: $email")
+                                Log.d("LoginActivity", "Email: $email, Portal: $userType")
 
                                 auth.signInWithEmailAndPassword(email.trim(), password)
                                     .addOnSuccessListener { authResult ->
-                                        Log.d("LoginActivity", "✓ Autenticación exitosa")
-
                                         val user = authResult.user
                                         if (user != null) {
-                                            // ✅ CAMBIO PRINCIPAL: Guardar en SessionManager
-                                            val rol = if (userType == "teacher") "docente" else "estudiante"
+                                            CoroutineScope(Dispatchers.Main).launch {
+                                                try {
+                                                    val nombre = user.displayName ?: "Usuario"
+                                                    val correo = user.email ?: ""
 
-                                            sessionManager.saveUserSession(
-                                                userId = user.uid,
-                                                userName = user.displayName ?: "Usuario",
-                                                userEmail = user.email ?: "",
-                                                userRol = rol
-                                            )
+                                                    verificarRolUsuario(
+                                                        userId = user.uid,
+                                                        userName = nombre,
+                                                        userEmail = correo,
+                                                        onSuccess = { rolReal ->
+                                                            guardarDatosEnPreferences(user.uid, rolReal, nombre, correo, "")
 
-                                            Log.d("LoginActivity", "✓ SessionManager guardado:")
-                                            Log.d("LoginActivity", "  - UserID: ${user.uid}")
-                                            Log.d("LoginActivity", "  - Email: ${user.email}")
-                                            Log.d("LoginActivity", "  - Rol: $rol")
+                                                            sessionManager.saveUserSession(
+                                                                userId = user.uid,
+                                                                userName = nombre,
+                                                                userEmail = correo,
+                                                                userRol = rolReal
+                                                            )
 
-                                            // También guardar en UserPreferences para compatibilidad
-                                            val emailGuardado = UserPreferences.getUserEmail(context)
-                                            if (emailGuardado != user.email) {
-                                                Log.d("LoginActivity", "Usuario diferente, limpiando datos")
-                                                UserPreferences.clearUserData(context)
+                                                            UserPreferences.saveUserData(
+                                                                context = context,
+                                                                uid = user.uid,
+                                                                nombreCompleto = nombre,
+                                                                apodo = "",
+                                                                correo = correo,
+                                                                rol = rolReal
+                                                            )
+
+                                                            Log.d("LoginActivity", "✓ Login exitoso con rol: $rolReal")
+                                                            isLoading = false
+                                                            onNavigateToMain()
+                                                        },
+                                                        onError = { mensaje ->
+                                                            isLoading = false
+                                                            auth.signOut()
+                                                            showError("Acceso denegado", mensaje)
+                                                        }
+                                                    )
+                                                } catch (e: Exception) {
+                                                    isLoading = false
+                                                    auth.signOut()
+                                                    showError("Error", "Error al verificar el rol: ${e.message}")
+                                                }
                                             }
-
-                                            UserPreferences.saveUserData(
-                                                context = context,
-                                                uid = user.uid,
-                                                nombreCompleto = user.displayName ?: "Usuario",
-                                                apodo = "",
-                                                correo = user.email ?: "",
-                                                rol = rol
-                                            )
-
-                                            Log.d("LoginActivity", "✓ Navegando a pantalla principal")
-                                            isLoading = false
-
-                                            val intent = if (userType == "teacher") {
-                                                Intent(context, PanelDocenteActivity::class.java)
-                                            } else {
-                                                Intent(context, MainActivity::class.java)
-                                            }
-                                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                            intent.putExtra("user_type", userType)
-                                            context.startActivity(intent)
-                                            (context as? ComponentActivity)?.finish()
                                         }
                                     }
                                     .addOnFailureListener { exception ->
                                         isLoading = false
-                                        val errorMessage = when {
+                                        val errorMsg = when {
                                             exception.message?.contains("password", ignoreCase = true) == true ->
                                                 "Contraseña incorrecta"
-                                            exception.message?.contains("user", ignoreCase = true) == true ->
-                                                "No existe una cuenta con este correo"
+                                            exception.message?.contains("user", ignoreCase = true) == true ||
+                                                    exception.message?.contains("email", ignoreCase = true) == true ->
+                                                "No existe una cuenta con este correo electrónico"
                                             exception.message?.contains("network", ignoreCase = true) == true ->
-                                                "Error de conexión. Verifica tu internet"
-                                            exception.message?.contains("timeout", ignoreCase = true) == true ->
-                                                "Tiempo de espera agotado. Intenta nuevamente"
-                                            else -> "Error: ${exception.message}"
+                                                "Error de conexión a internet"
+                                            exception.message?.contains("too-many-requests", ignoreCase = true) == true ->
+                                                "Demasiados intentos. Intenta más tarde"
+                                            else -> exception.message ?: "Error desconocido"
                                         }
-                                        Log.e("LoginActivity", "✗ Error de autenticación: $errorMessage", exception)
-                                        Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                        showError("Error de inicio de sesión", errorMsg)
                                     }
                             }
                         },
@@ -455,11 +544,7 @@ fun LoginScreen(
                             containerColor = Color(0xFF0D47A1),
                             disabledContainerColor = Color(0xFF1565C0).copy(alpha = 0.6f)
                         ),
-                        shape = RoundedCornerShape(28.dp),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 0.dp,
-                            pressedElevation = 2.dp
-                        )
+                        shape = RoundedCornerShape(28.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -488,6 +573,7 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
+                        enabled = !isLoading,
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = Color.White,
                             contentColor = Color(0xFF424242)
@@ -565,6 +651,87 @@ fun LoginScreen(
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+
+    if (showErrorDialog) {
+        ErrorDialog(
+            title = errorTitle,
+            message = errorMessage,
+            onDismiss = { showErrorDialog = false }
+        )
+    }
+}
+
+@Composable
+fun ErrorDialog(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFFEBEE),
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        tint = Color(0xFFD32F2F),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF212121),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = message,
+                    fontSize = 14.sp,
+                    color = Color(0xFF757575),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0D47A1)
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Text(
+                        text = "Entendido",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }
