@@ -220,4 +220,9 @@ interface ApiService {
         @Path("cursoId") cursoId: String,
         @Path("temaId") temaId: String
     ): Response<TemaInfoResponse>
+
+    @GET("quiz/{quizId}/retroalimentacion")
+    suspend fun obtenerRetroalimentacion(
+        @Path("quizId") quizId: String
+    ): Response<RetroalimentacionFallosResponse>
 }

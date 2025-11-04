@@ -115,6 +115,9 @@
         <activity
             android:name=".ResultadoQuizActivity"
             android:exported="false" />
+        <activity
+            android:name=".RetroalimentacionActivity"
+            android:exported="false" />
 
     </application>
 

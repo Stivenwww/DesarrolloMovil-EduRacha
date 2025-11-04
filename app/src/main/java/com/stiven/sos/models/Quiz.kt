@@ -129,6 +129,24 @@ data class HistorialQuizzesResponse(
 )
 
 // ============================================
+// RETROALIMENTACIÓN DE FALLOS - NUEVO
+// ============================================
+
+data class RetroalimentacionFallosResponse(
+    val quizId: String,
+    val totalFallos: Int,
+    val preguntasFalladas: List<RetroalimentacionPregunta>
+)
+
+data class RetroalimentacionPregunta(
+    val preguntaId: String,
+    val texto: String,
+    val respuestaUsuarioTexto: String,
+    val respuestaCorrectaTexto: String,
+    val explicacion: String
+)
+
+// ============================================
 // MODELO DE INSCRIPCIÓN
 // ============================================
 
@@ -139,5 +157,9 @@ data class Inscripcion(
     val vidasActuales: Int = 5,
     val vidasMax: Int = 5,
     val ultimaRegen: Long = 0,
-    val intentosHechos: Int = 0
+    val intentosHechos: Int = 0,
+    val experiencia: Int = 0,
+    val diasConsecutivos: Int = 0,
+    val ultimaFecha: Long = 0,
+    val vidas: Int = 5
 )
