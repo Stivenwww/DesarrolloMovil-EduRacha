@@ -81,6 +81,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".PreguntasRevisadasActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ListaCursosActivity"
             android:exported="false" />
 

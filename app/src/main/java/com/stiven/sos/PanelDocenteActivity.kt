@@ -62,7 +62,8 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToReports = { navigateTo(ListaEstudiantesActivity::class.java) },
                     onNavigateToGroups = { navigateTo(GestionGruposActivity::class.java) },
                     onNavigateToStudents = { navigateTo(ListaEstudiantesActivity::class.java) },
-                    onNavigateToCourses = { handleCoursesClick() }
+                    onNavigateToCourses = { handleCoursesClick() },
+                    onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) } // ✅ NUEVO
                 )
             }
         }
@@ -104,7 +105,8 @@ fun PanelDocenteScreen(
     onNavigateToReports: () -> Unit,
     onNavigateToGroups: () -> Unit,
     onNavigateToStudents: () -> Unit,
-    onNavigateToCourses: () -> Unit
+    onNavigateToCourses: () -> Unit,
+    onNavigateToReviewedQuestions: () -> Unit // ✅ NUEVO PARÁMETRO
 ) {
     val context = LocalContext.current
     val greeting = remember { getGreeting() }
@@ -141,6 +143,15 @@ fun PanelDocenteScreen(
         preguntasUiState.preguntas.count {
             it.estado == EstadoPregunta.PENDIENTE_REVISION
         }
+    }
+
+    // ✅ NUEVO: Contar preguntas aprobadas y rechazadas
+    val preguntasAprobadas = remember(preguntasUiState.preguntas) {
+        preguntasUiState.preguntas.count { it.estado == EstadoPregunta.APROBADA }
+    }
+
+    val preguntasRechazadas = remember(preguntasUiState.preguntas) {
+        preguntasUiState.preguntas.count { it.estado == EstadoPregunta.RECHAZADA }
     }
 
     LaunchedEffect(preguntasUiState.preguntas) {
@@ -223,6 +234,14 @@ fun PanelDocenteScreen(
                 icon = Icons.Outlined.CheckCircle,
                 backgroundColor = EduRachaColors.Accent,
                 onClick = onNavigateToValidation
+            )
+            // ✅ NUEVA CARD: Preguntas Revisadas
+            MainToolCard(
+                title = "Preguntas Revisadas",
+                description = "Ver historial de preguntas aprobadas y rechazadas ($preguntasAprobadas aprobadas, $preguntasRechazadas rechazadas)",
+                icon = Icons.Outlined.History,
+                backgroundColor = Color(0xFF6366F1), // Color índigo
+                onClick = onNavigateToReviewedQuestions
             )
             MainToolCard(
                 title = "Reportes",
