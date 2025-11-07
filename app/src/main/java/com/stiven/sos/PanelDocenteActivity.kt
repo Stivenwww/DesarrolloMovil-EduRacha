@@ -63,7 +63,8 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToGroups = { navigateTo(GestionGruposActivity::class.java) },
                     onNavigateToStudents = { navigateTo(ListaEstudiantesActivity::class.java) },
                     onNavigateToCourses = { handleCoursesClick() },
-                    onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) } // ✅ NUEVO
+                    onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) },
+                    onNavigateToCreateQuestion = { navigateTo(CrearPreguntaActivity::class.java) }// ✅ NUEVO
                 )
             }
         }
@@ -106,7 +107,8 @@ fun PanelDocenteScreen(
     onNavigateToGroups: () -> Unit,
     onNavigateToStudents: () -> Unit,
     onNavigateToCourses: () -> Unit,
-    onNavigateToReviewedQuestions: () -> Unit // ✅ NUEVO PARÁMETRO
+    onNavigateToReviewedQuestions: () -> Unit,
+    onNavigateToCreateQuestion: () -> Unit// ✅ NUEVO PARÁMETRO
 ) {
     val context = LocalContext.current
     val greeting = remember { getGreeting() }
@@ -229,11 +231,19 @@ fun PanelDocenteScreen(
                 onClick = onNavigateToCreateCourse
             )
             MainToolCard(
-                title = "Validación IA",
+                title = "Validación de preguntas",
                 description = "Revisa y aprueba preguntas generadas",
                 icon = Icons.Outlined.CheckCircle,
                 backgroundColor = EduRachaColors.Accent,
                 onClick = onNavigateToValidation
+            )
+            // ✅ NUEVA CARD: Crear Pregunta
+            MainToolCard(
+                title = "Crear Pregunta",
+                description = "Crea preguntas manualmente o genera con IA",
+                icon = Icons.Outlined.QuestionAnswer,
+                backgroundColor = Color(0xFF8B5CF6), // Color morado
+                onClick = onNavigateToCreateQuestion
             )
             // ✅ NUEVA CARD: Preguntas Revisadas
             MainToolCard(

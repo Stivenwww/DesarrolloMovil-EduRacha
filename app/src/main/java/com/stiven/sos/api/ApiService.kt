@@ -225,4 +225,21 @@ interface ApiService {
     suspend fun obtenerRetroalimentacion(
         @Path("quizId") quizId: String
     ): Response<RetroalimentacionFallosResponse>
+
+
+    // ============================================
+// ENDPOINTS DE TEMAS
+// ============================================
+
+    @GET("api/cursos/{id}/temas")
+    suspend fun obtenerTemasPorCurso(
+        @Path("id") cursoId: String,
+        @Query("estado") estado: String? = null
+    ): Response<List<Tema>>
+
+    @GET("api/cursos/{id}/temas/{temaId}")
+    suspend fun obtenerTemaPorId(
+        @Path("id") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<Tema>
 }

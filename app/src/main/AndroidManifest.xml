@@ -81,6 +81,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".CrearPreguntaActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".PreguntasRevisadasActivity"
             android:exported="false" />
 

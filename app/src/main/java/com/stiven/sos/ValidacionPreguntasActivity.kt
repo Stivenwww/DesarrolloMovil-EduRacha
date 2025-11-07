@@ -10,10 +10,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -67,10 +70,8 @@ fun ValidacionPreguntasScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Cargar preguntas pendientes cuando se inicia la pantalla
     LaunchedEffect(cursoId, temaId) {
         if (cursoId.isNotEmpty() && temaId.isNotEmpty()) {
-            // Cargar preguntas con estado "pendiente_revision"
             viewModel.cargarPreguntas(
                 cursoId = cursoId,
                 estado = EstadoPregunta.PENDIENTE_REVISION
@@ -78,7 +79,6 @@ fun ValidacionPreguntasScreen(
         }
     }
 
-    // Mostrar mensajes de error o éxito
     LaunchedEffect(uiState.error, uiState.successMessage) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -90,7 +90,6 @@ fun ValidacionPreguntasScreen(
         }
     }
 
-    // Filtrar preguntas por temaId
     val preguntasFiltradas = remember(uiState.preguntas, temaId) {
         uiState.preguntas.filter { it.temaId == temaId }
     }
@@ -167,7 +166,6 @@ fun ValidacionPreguntasScreen(
                                         estado = EstadoPregunta.APROBADA,
                                         notas = "Aprobada por el docente",
                                         onSuccess = {
-                                            // Recargar preguntas después de aprobar
                                             viewModel.cargarPreguntas(
                                                 cursoId = cursoId,
                                                 estado = EstadoPregunta.PENDIENTE_REVISION
@@ -181,7 +179,6 @@ fun ValidacionPreguntasScreen(
                                         estado = EstadoPregunta.RECHAZADA,
                                         notas = motivo,
                                         onSuccess = {
-                                            // Recargar preguntas después de rechazar
                                             viewModel.cargarPreguntas(
                                                 cursoId = cursoId,
                                                 estado = EstadoPregunta.PENDIENTE_REVISION
@@ -194,7 +191,6 @@ fun ValidacionPreguntasScreen(
                                         id = preguntaEditada.id ?: "",
                                         pregunta = preguntaEditada,
                                         onSuccess = {
-                                            // Recargar preguntas después de editar
                                             viewModel.cargarPreguntas(
                                                 cursoId = cursoId,
                                                 estado = EstadoPregunta.PENDIENTE_REVISION
@@ -315,6 +311,8 @@ fun PreguntaCard(
             }
 
             Spacer(Modifier.height(16.dp))
+
+            // Texto de la pregunta
             Text(
                 pregunta.texto,
                 style = MaterialTheme.typography.titleMedium,
@@ -328,11 +326,98 @@ fun PreguntaCard(
                 if (index < pregunta.opciones.size - 1) Spacer(Modifier.height(8.dp))
             }
 
-            // Sección Expandible
+            // ✅ MOSTRAR EXPLICACIÓN (OBLIGATORIA)
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Spacer(Modifier.height(12.dp))
+
+            if (!pregunta.explicacionCorrecta.isNullOrBlank()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = EduRachaColors.Primary.copy(alpha = 0.08f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.Lightbulb,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = EduRachaColors.Primary
+                            )
+                            Text(
+                                "Explicación de la respuesta *",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.Primary
+                            )
+                        }
+                        Text(
+                            text = pregunta.explicacionCorrecta,
+                            fontSize = 14.sp,
+                            color = EduRachaColors.TextPrimary,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = EduRachaColors.Error.copy(alpha = 0.1f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        2.dp,
+                        EduRachaColors.Error
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Error,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = EduRachaColors.Error
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "⚠️ Explicación obligatoria faltante",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.Error
+                            )
+                            Text(
+                                "Debes agregar una explicación antes de aprobar",
+                                fontSize = 12.sp,
+                                color = EduRachaColors.TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Sección Expandible (Metadatos)
             if (expanded) {
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 Spacer(Modifier.height(16.dp))
+
+                Text(
+                    "Información adicional",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaColors.TextPrimary
+                )
+                Spacer(Modifier.height(8.dp))
+
                 InfoRow(
                     Icons.Default.AutoAwesome,
                     "Generado por",
@@ -340,9 +425,13 @@ fun PreguntaCard(
                 )
                 Spacer(Modifier.height(8.dp))
                 val fuente = pregunta.fuente
-                if(fuente.isNotBlank()) InfoRow(Icons.Default.Bookmark, "Fuente", fuente)
-                Spacer(Modifier.height(8.dp))
+                if(fuente.isNotBlank()) {
+                    InfoRow(Icons.Default.Bookmark, "Fuente", fuente)
+                    Spacer(Modifier.height(8.dp))
+                }
                 InfoRow(Icons.Default.Person, "Creado por", pregunta.creadoPor)
+                Spacer(Modifier.height(8.dp))
+                InfoRow(Icons.Default.CalendarMonth, "Fecha", pregunta.fechaCreacion)
             }
 
             // Botones de Acción
@@ -373,6 +462,7 @@ fun PreguntaCard(
                 Button(
                     onClick = onAprobar,
                     modifier = Modifier.weight(1f),
+                    enabled = !pregunta.explicacionCorrecta.isNullOrBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Success
                     )
@@ -385,9 +475,10 @@ fun PreguntaCard(
         }
     }
 
-    // Diálogo de Edición
+    // ✅ DIÁLOGO DE EDICIÓN ACTUALIZADO CON EXPLICACIÓN
     if (showEditDialog) {
         var textoEditado by remember { mutableStateOf(pregunta.texto) }
+        var explicacionEditada by remember { mutableStateOf(pregunta.explicacionCorrecta ?: "") }
         val opcionesOriginales = pregunta.opciones
         var opcionesEditadas by remember {
             mutableStateOf(opcionesOriginales.map { it.texto })
@@ -398,57 +489,154 @@ fun PreguntaCard(
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("Editar pregunta") },
+            title = {
+                Text(
+                    "Editar pregunta",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
             text = {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item {
-                        OutlinedTextField(
-                            value = textoEditado,
-                            onValueChange = { textoEditado = it },
-                            label = { Text("Texto de la pregunta") },
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Texto de la pregunta
+                    Text(
+                        "Pregunta",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.Primary
+                    )
+                    OutlinedTextField(
+                        value = textoEditado,
+                        onValueChange = { textoEditado = it },
+                        label = { Text("Texto de la pregunta") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    HorizontalDivider()
+
+                    // Opciones
+                    Text(
+                        "Opciones de respuesta",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.Primary
+                    )
+                    opcionesEditadas.forEachIndexed { index, textoOpcion ->
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            minLines = 3
-                        )
-                    }
-                    items(opcionesEditadas.size) { index ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = respuestaCorrectaIndex == index,
-                                onClick = { respuestaCorrectaIndex = index }
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (respuestaCorrectaIndex == index)
+                                    EduRachaColors.Success.copy(alpha = 0.1f)
+                                else
+                                    MaterialTheme.colorScheme.surface
                             )
-                            TextField(
-                                value = opcionesEditadas[index],
-                                onValueChange = {
-                                    opcionesEditadas = opcionesEditadas.toMutableList()
-                                        .also { list -> list[index] = it }
-                                },
-                                label = { Text("Opción ${'A' + index}") },
-                                modifier = Modifier.weight(1f)
-                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = respuestaCorrectaIndex == index,
+                                    onClick = { respuestaCorrectaIndex = index },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = EduRachaColors.Success
+                                    )
+                                )
+                                OutlinedTextField(
+                                    value = textoOpcion,
+                                    onValueChange = {
+                                        opcionesEditadas = opcionesEditadas.toMutableList()
+                                            .also { list -> list[index] = it }
+                                    },
+                                    label = { Text("Opción ${'A' + index}") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
                         }
                     }
+
+                    HorizontalDivider()
+
+                    // ✅ CAMPO PARA EDITAR EXPLICACIÓN
+                    Text(
+                        "Explicación (Obligatoria) *",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.Primary
+                    )
+                    OutlinedTextField(
+                        value = explicacionEditada,
+                        onValueChange = { explicacionEditada = it },
+                        label = { Text("¿Por qué esta es la respuesta correcta?") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        shape = RoundedCornerShape(12.dp),
+                        isError = explicacionEditada.isBlank(),
+                        supportingText = {
+                            if (explicacionEditada.isBlank()) {
+                                Text(
+                                    "La explicación es obligatoria",
+                                    color = EduRachaColors.Error
+                                )
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Lightbulb,
+                                contentDescription = null,
+                                tint = if (explicacionEditada.isBlank())
+                                    EduRachaColors.Error
+                                else
+                                    EduRachaColors.Primary
+                            )
+                        }
+                    )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val preguntaEditada = pregunta.copy(
-                        texto = textoEditado,
-                        opciones = opcionesEditadas.mapIndexed { index, textoOpcion ->
-                            Opcion(
-                                id = opcionesOriginales.getOrNull(index)?.id ?: index,
-                                texto = textoOpcion,
-                                esCorrecta = index == respuestaCorrectaIndex
-                            )
-                        },
-                        modificada = true
+                Button(
+                    onClick = {
+                        val preguntaEditada = pregunta.copy(
+                            texto = textoEditado,
+                            opciones = opcionesEditadas.mapIndexed { index, textoOpcion ->
+                                Opcion(
+                                    id = opcionesOriginales.getOrNull(index)?.id ?: index,
+                                    texto = textoOpcion,
+                                    esCorrecta = index == respuestaCorrectaIndex
+                                )
+                            },
+                            explicacionCorrecta = explicacionEditada.takeIf { it.isNotBlank() },
+                            modificada = true
+                        )
+                        onEditar(preguntaEditada)
+                        showEditDialog = false
+                    },
+                    enabled = explicacionEditada.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EduRachaColors.Primary
                     )
-                    onEditar(preguntaEditada)
-                    showEditDialog = false
-                }) { Text("Guardar Cambios") }
+                ) {
+                    Icon(Icons.Default.Save, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Guardar Cambios")
+                }
             },
             dismissButton = {
-                TextButton({ showEditDialog = false }) { Text("Cancelar") }
-            }
+                OutlinedButton(onClick = { showEditDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
         )
     }
 
@@ -457,15 +645,35 @@ fun PreguntaCard(
         var motivo by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showRejectDialog = false },
-            title = { Text("Rechazar pregunta") },
-            text = {
-                OutlinedTextField(
-                    value = motivo,
-                    onValueChange = { motivo = it },
-                    label = { Text("Motivo del rechazo") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
+            title = {
+                Text(
+                    "Rechazar pregunta",
+                    fontWeight = FontWeight.Bold
                 )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Indica el motivo por el cual rechazas esta pregunta:",
+                        fontSize = 14.sp,
+                        color = EduRachaColors.TextSecondary
+                    )
+                    OutlinedTextField(
+                        value = motivo,
+                        onValueChange = { motivo = it },
+                        label = { Text("Motivo del rechazo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        shape = RoundedCornerShape(12.dp),
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Comment,
+                                contentDescription = null,
+                                tint = EduRachaColors.Error
+                            )
+                        }
+                    )
+                }
             },
             confirmButton = {
                 Button(
@@ -475,14 +683,22 @@ fun PreguntaCard(
                             showRejectDialog = false
                         }
                     },
+                    enabled = motivo.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Error
                     )
-                ) { Text("Confirmar Rechazo") }
+                ) {
+                    Icon(Icons.Default.ThumbDown, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Confirmar Rechazo")
+                }
             },
             dismissButton = {
-                TextButton({ showRejectDialog = false }) { Text("Cancelar") }
-            }
+                OutlinedButton(onClick = { showRejectDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
         )
     }
 }
@@ -519,25 +735,35 @@ fun OpcionItem(letra: String, texto: String, esCorrecta: Boolean) {
         }
         Spacer(Modifier.width(12.dp))
         Text(texto, style = MaterialTheme.typography.bodyLarge)
+        if (esCorrecta) {
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.Default.CheckCircle,
+                "Correcta",
+                modifier = Modifier.size(20.dp),
+                tint = EduRachaColors.Success
+            )
+        }
     }
 }
 
 @Composable
 fun InfoRow(icon: ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Icon(
             icon,
             null,
             Modifier.size(16.dp),
             MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.width(8.dp))
         Text(
             "$label:",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold
         )
-        Spacer(Modifier.width(4.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
