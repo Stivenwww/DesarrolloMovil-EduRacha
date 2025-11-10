@@ -69,9 +69,6 @@ class VisualizarGruposActivity : ComponentActivity() {
     }
 }
 
-// =========================================================================================
-// PANTALLA Y COMPOSABLES
-// =========================================================================================
 
 @Composable
 fun VisualizarGruposScreen(
@@ -79,7 +76,7 @@ fun VisualizarGruposScreen(
     cursoViewModel: CursoViewModel,
     onNavigateBack: () -> Unit
 ) {
-    // --- CORRECCIÓN 1: Observar el uiState unificado ---
+    //  Observar el uiState unificado ---
     val uiState by cursoViewModel.uiState.collectAsState()
     val cursos = uiState.cursos
     val isLoading = uiState.isLoading
@@ -217,7 +214,7 @@ fun VisualizarGruposHeader(
     }
 }
 
-// --- CORRECCIÓN 2: La tarjeta ahora recibe un objeto Curso completo ---
+//  La tarjeta ahora recibe un objeto Curso completo ---
 @Composable
 fun GrupoExpandibleCard(
     curso: Curso,

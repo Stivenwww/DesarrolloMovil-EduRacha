@@ -30,14 +30,11 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(CursoUiState())
     val uiState = _uiState.asStateFlow()
 
-    // ✅ Flag para evitar múltiples llamadas simultáneas
+    //  Flag para evitar múltiples llamadas simultáneas
     private var isLoadingCursos = false
     private var isLoadingSolicitudes = false
 
-    // ✅ ELIMINAR EL init{} - La UI debe llamar manualmente
-    // init {
-    //     obtenerCursos()
-    // }
+
 
     fun obtenerCursos() {
         // ✅ Prevenir llamadas duplicadas
@@ -201,7 +198,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.eliminarCurso(id)
                 .onSuccess {
-                    Log.d("CursoViewModel", "✅ Curso eliminado")
+                    Log.d("CursoViewModel", " Curso eliminado")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -211,7 +208,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "❌ Error eliminando curso", exception)
+                    Log.e("CursoViewModel", " Error eliminando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,

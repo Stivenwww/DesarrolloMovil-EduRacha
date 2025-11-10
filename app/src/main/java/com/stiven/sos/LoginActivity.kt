@@ -155,7 +155,7 @@ fun LoginScreen(
         return true
     }
 
-    // 🔥 FUNCIÓN: Obtiene el rol desde customClaims de Firebase Auth
+    //  Obtiene el rol desde customClaims de Firebase Auth
     suspend fun obtenerRolDeFirebaseAuth(userId: String): String? {
         return try {
             val user = auth.currentUser
@@ -164,19 +164,19 @@ fun LoginScreen(
                 val claims = tokenResult.claims
                 val rol = claims["rol"] as? String
 
-                Log.d("LoginActivity", "📊 Rol obtenido de Firebase Auth claims: $rol")
+                Log.d("LoginActivity", "Rol obtenido de Firebase Auth claims: $rol")
                 rol
             } else {
-                Log.e("LoginActivity", "❌ Usuario no coincide o es null")
+                Log.e("LoginActivity", " Usuario no coincide o es null")
                 null
             }
         } catch (e: Exception) {
-            Log.e("LoginActivity", "❌ Error al obtener rol de Firebase Auth: ${e.message}")
+            Log.e("LoginActivity", " Error al obtener rol de Firebase Auth: ${e.message}")
             null
         }
     }
 
-    // 🔥 FUNCIÓN: Guarda el rol en SharedPreferences
+    //  Guarda el rol en SharedPreferences
     fun guardarDatosEnPreferences(
         userId: String,
         rol: String,
@@ -193,13 +193,13 @@ fun LoginScreen(
             putString("user_nickname", apodo)
             apply()
         }
-        Log.d("LoginActivity", "✅ Datos guardados en SharedPreferences")
+        Log.d("LoginActivity", "   Datos guardados en SharedPreferences")
         Log.d("LoginActivity", "   UID: $userId")
         Log.d("LoginActivity", "   Rol: $rol")
         Log.d("LoginActivity", "   Nombre: $nombre")
     }
 
-    // 🔥 FUNCIÓN: Verifica si el rol coincide con el portal seleccionado
+    //  Verifica si el rol coincide con el portal seleccionado
     suspend fun verificarRolUsuario(
         userId: String,
         userName: String,

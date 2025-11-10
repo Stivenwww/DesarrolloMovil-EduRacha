@@ -35,7 +35,7 @@ class QuizActivity : ComponentActivity() {
         temaId = intent.getStringExtra("tema_id") ?: ""
         temaTitulo = intent.getStringExtra("tema_titulo") ?: "Quiz"
 
-        // ❌ NO iniciar aquí - dejar que lo haga LaunchedEffect en el Composable
+
 
         setContent {
             EduRachaTheme {

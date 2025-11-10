@@ -123,7 +123,7 @@ fun RegisterScreen(
     }
 
     fun validateInputs(): Boolean {
-        // 🔥 CORRECCIÓN: Se usa una expresión regular más flexible para la validación del correo.
+        // : Se usa una expresión regular más flexible para la validación del correo.
         val emailRegex = Regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\$")
 
         when {
@@ -151,7 +151,7 @@ fun RegisterScreen(
                 showError("Campo requerido", "Por favor ingresa tu correo electrónico")
                 return false
             }
-            // 🔥 CORRECCIÓN: Se reemplaza la validación de Patterns.EMAIL_ADDRESS
+            // : Se reemplaza la validación de Patterns.EMAIL_ADDRESS
             !emailRegex.matches(email.trim()) -> {
                 showError("Correo inválido", "Por favor ingresa un correo electrónico válido")
                 return false
@@ -483,7 +483,7 @@ fun RegisterScreen(
                                 Log.d("RegisterActivity", "Correo: ${email.trim()}")
                                 Log.d("RegisterActivity", "Rol esperado: $rol")
 
-                                // 🔥 PASO 1: Registrar en tu backend
+                                //  PASO 1: Registrar en tu backend
                                 val registroRequest = RegistroRequest(
                                     nombreCompleto = fullName.trim(),
                                     apodo = username.trim(),
@@ -505,8 +505,8 @@ fun RegisterScreen(
                                             val responseBody = response.body()!!
                                             val uid = responseBody["uid"] as? String ?: ""
 
-                                            // 🔥 PASO 2: Iniciar sesión en Firebase Auth para obtener el token con customClaims
-                                            Log.d("RegisterActivity", "🔐 Autenticando en Firebase...")
+                                            //  PASO 2: Iniciar sesión en Firebase Auth para obtener el token con customClaims
+                                            Log.d("RegisterActivity", " Autenticando en Firebase...")
 
                                             auth.signInWithEmailAndPassword(email.trim(), password)
                                                 .addOnSuccessListener { authResult ->
@@ -557,7 +557,7 @@ fun RegisterScreen(
                                                                 onNavigateToMain()
 
                                                             } catch (e: Exception) {
-                                                                Log.e("RegisterActivity", "❌ Error al obtener rol: ${e.message}")
+                                                                Log.e("RegisterActivity", " Error al obtener rol: ${e.message}")
                                                                 isLoading = false
                                                                 auth.signOut()
                                                                 showError("Error", "No se pudo completar el registro: ${e.message}")
@@ -567,7 +567,7 @@ fun RegisterScreen(
                                                 }
                                                 .addOnFailureListener { exception ->
                                                     isLoading = false
-                                                    Log.e("RegisterActivity", "❌ Error en Firebase Auth: ${exception.message}")
+                                                    Log.e("RegisterActivity", " Error en Firebase Auth: ${exception.message}")
                                                     showError(
                                                         "Error de autenticación",
                                                         "No se pudo iniciar sesión después del registro. Por favor intenta iniciar sesión manualmente."
@@ -577,7 +577,7 @@ fun RegisterScreen(
                                         } else {
                                             // Manejo de errores del backend
                                             isLoading = false
-                                            Log.e("RegisterActivity", "❌ Error del backend: ${response.code()}")
+                                            Log.e("RegisterActivity", " Error del backend: ${response.code()}")
 
                                             val errorTitle: String
                                             val errorMsg: String
@@ -626,7 +626,7 @@ fun RegisterScreen(
                                         }
 
                                     } catch (e: Exception) {
-                                        Log.e("RegisterActivity", "❌ Excepción: ${e.message}", e)
+                                        Log.e("RegisterActivity", " Excepción: ${e.message}", e)
                                         isLoading = false
 
                                         val errorMsg = when {

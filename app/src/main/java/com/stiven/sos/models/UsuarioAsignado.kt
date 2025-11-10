@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 
 data class UsuarioAsignado(
+
     @SerializedName("id")
     val uid: String = "",
 

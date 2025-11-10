@@ -19,7 +19,6 @@
         <activity android:name=".CursosDisponiblesActivity" />
         <activity android:name=".MisSolicitudesActivity" />
         <activity android:name=".CursosInscritosActivity" />
-        <activity android:name=".RankingActivity" />
 
         <!-- Activity principal (pantalla de inicio) -->
         <activity
@@ -127,6 +126,18 @@
         <activity
             android:name=".RetroalimentacionActivity"
             android:exported="false" />
+
+
+
+        <activity
+            android:name=".SeleccionarCursoRankingActivity"
+            android:exported="false"
+           />
+
+        <activity
+            android:name=".RankingDetalleActivity"
+            android:exported="false"
+           />
 
     </application>
 

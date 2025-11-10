@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import android.widget.Toast
+import com.stiven.sos.models.CursoRequest
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -40,7 +41,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stiven.sos.models.Tema
+import androidx.compose.ui.window.DialogProperties
+import com.stiven.sos.models.TemaRequest
+import com.stiven.sos.models.GenerarExplicacionRequest
 import com.stiven.sos.models.UserPreferences
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
@@ -60,7 +63,7 @@ class CrearCursoActivity : ComponentActivity() {
                 CrearCursoConTemasScreen(
                     onNavigateBack = { finish() },
                     onCursoCreado = {
-                        Toast.makeText(this, "✅ Curso creado exitosamente", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Curso creado exitosamente", Toast.LENGTH_LONG).show()
                         finish()
                     }
                 )
@@ -69,27 +72,28 @@ class CrearCursoActivity : ComponentActivity() {
     }
 }
 
-// Clase TemaTemp para el UI
 data class TemaTemp(
-    val id: String,
+    val id: String = "tema_${System.currentTimeMillis()}",
     val titulo: String,
     val contenido: String,
     val archivoUrl: String,
     val archivoNombre: String,
-    val tipo: String = "pdf"
+    val tipo: String = "texto",
+    val explicacion: String = "",
+    val explicacionFuente: String = "",
+    val explicacionEstado: String = "pendiente",
+    val fechaCreacion: String = obtenerFechaActual(),
+    val explicacionUltimaActualizacion: String = obtenerFechaActual()
 )
 
-// Función para obtener fecha en formato ISO 8601 (YYYY-MM-DD)
 fun obtenerFechaActual(): String {
     val formato = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return formato.format(Date())
 }
 
-// Simulación de subida de PDF (reemplaza con tu lógica real)
 private suspend fun simularSubidaPdf(context: Context, uri: Uri): Result<String> {
     return withContext(Dispatchers.IO) {
         delay(1500)
-        // AQUÍ debes implementar la subida real a tu servidor/storage
         Result.success("https://example.com/${obtenerNombreArchivo(context, uri)}")
     }
 }
@@ -102,41 +106,32 @@ fun CrearCursoConTemasScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-
-    // 🔑 OBTENER EL UID DEL USUARIO LOGUEADO AUTOMÁTICAMENTE
     val docenteId = remember { UserPreferences.getUserUid(context) }
 
-    // Estados del curso
     var titulo by remember { mutableStateOf("") }
     var codigo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
     var duracionDias by remember { mutableStateOf("") }
     var estado by remember { mutableStateOf("activo") }
 
-    // Estados de validación
     var tituloError by remember { mutableStateOf(false) }
     var codigoError by remember { mutableStateOf(false) }
     var descripcionError by remember { mutableStateOf(false) }
     var duracionError by remember { mutableStateOf(false) }
 
-    // Lista de temas
     var temas by remember { mutableStateOf<List<TemaTemp>>(emptyList()) }
     var showAgregarTemaDialog by remember { mutableStateOf(false) }
     var temaParaEditar by remember { mutableStateOf<TemaTemp?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Fecha actual en tiempo real
     var fechaActual by remember { mutableStateOf(obtenerFechaActual()) }
-
-    // Actualizar fecha cada minuto
     LaunchedEffect(Unit) {
         while (true) {
-            delay(60000) // 60 segundos
+            delay(60000)
             fechaActual = obtenerFechaActual()
         }
     }
 
-    // Animación del libro
     val infiniteTransition = rememberInfiniteTransition(label = "bookAnimation")
     val bookRotation by infiniteTransition.animateFloat(
         initialValue = -5f,
@@ -156,7 +151,6 @@ fun CrearCursoConTemasScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // HEADER
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -188,7 +182,6 @@ fun CrearCursoConTemasScreen(
                             Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
                         }
 
-                        // Badge con cantidad de temas
                         if (temas.isNotEmpty()) {
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
@@ -218,7 +211,6 @@ fun CrearCursoConTemasScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Vista previa del curso
                     AnimatedVisibility(
                         visible = titulo.isNotEmpty(),
                         enter = fadeIn() + slideInVertically(),
@@ -255,7 +247,7 @@ fun CrearCursoConTemasScreen(
                                 )
                                 if (codigo.isNotEmpty()) {
                                     Text(
-                                        "Código: $codigo",
+                                        "Codigo: $codigo",
                                         color = EduRachaColors.Secondary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium
@@ -305,8 +297,7 @@ fun CrearCursoConTemasScreen(
                     .padding(horizontal = 20.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // SECCIÓN 1: INFORMACIÓN DEL CURSO
-                SectionHeader("INFORMACIÓN DEL CURSO", Icons.Default.Info, EduRachaColors.Primary)
+                SectionHeader("INFORMACION DEL CURSO", Icons.Default.Info, EduRachaColors.Primary)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -323,31 +314,29 @@ fun CrearCursoConTemasScreen(
                         CustomTextField(
                             value = titulo,
                             onValueChange = { titulo = it; tituloError = false },
-                            label = "Título del curso *",
+                            label = "Titulo del curso (Requerido)",
                             icon = Icons.Default.Edit,
                             isError = tituloError,
-                            errorMessage = "El título es requerido"
+                            errorMessage = "El titulo es requerido"
                         )
 
                         CustomTextField(
                             value = codigo,
                             onValueChange = { codigo = it.uppercase(); codigoError = false },
-                            label = "Código del curso *",
+                            label = "Codigo del curso (Requerido)",
                             icon = Icons.Default.Badge,
                             isError = codigoError,
-                            errorMessage = "El código es requerido"
+                            errorMessage = "El codigo es requerido"
                         )
 
                         CustomTextField(
                             value = descripcion,
                             onValueChange = { descripcion = it; descripcionError = false },
-                            label = "Descripción del curso *",
+                            label = "Descripcion del curso (Requerido)",
                             icon = Icons.Default.Description,
                             isError = descripcionError,
-                            errorMessage = "La descripción es requerida"
+                            errorMessage = "La descripcion es requerida"
                         )
-
-                        // ✅ YA NO HAY CAMPO PARA ID DEL DOCENTE - SE OBTIENE AUTOMÁTICAMENTE
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -361,7 +350,7 @@ fun CrearCursoConTemasScreen(
                                         duracionError = false
                                     }
                                 },
-                                label = "Duración (días) *",
+                                label = "Duracion (dias) (Requerido)",
                                 icon = Icons.Default.CalendarToday,
                                 isError = duracionError,
                                 errorMessage = "Requerido",
@@ -376,7 +365,6 @@ fun CrearCursoConTemasScreen(
                             )
                         }
 
-                        // 💡 INDICADOR VISUAL DEL DOCENTE (OPCIONAL - INFORMATIVO)
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -395,7 +383,7 @@ fun CrearCursoConTemasScreen(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "Docente asignado automáticamente",
+                                        "Docente asignado automaticamente",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = EduRachaColors.TextPrimary
@@ -417,7 +405,6 @@ fun CrearCursoConTemasScreen(
                     }
                 }
 
-                // SECCIÓN 2: TEMAS DEL CURSO
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -464,7 +451,7 @@ fun CrearCursoConTemasScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Agrega al menos un tema con contenido para crear el curso",
+                                "Agrega al menos un tema con explicacion para crear el curso",
                                 fontSize = 14.sp,
                                 color = EduRachaColors.TextSecondary,
                                 textAlign = TextAlign.Center
@@ -481,60 +468,90 @@ fun CrearCursoConTemasScreen(
                                 onEditar = { temaParaEditar = tema },
                                 onEliminar = {
                                     temas = temas.filter { it.id != tema.id }
-                                    Toast.makeText(context, "✓ Tema eliminado", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Tema eliminado", Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
                     }
                 }
 
-                // BOTÓN CREAR CURSO
+                // ✅✅✅ BOTÓN CREAR CURSO - COMPLETAMENTE CORREGIDO ✅✅✅
                 Button(
                     onClick = {
-                        // Validaciones
+                        // ============================================
+                        // 1. VALIDACIONES
+                        // ============================================
                         tituloError = titulo.isBlank()
                         codigoError = codigo.isBlank()
                         descripcionError = descripcion.isBlank()
                         duracionError = duracionDias.isBlank() || duracionDias.toIntOrNull() == null
 
-                        // ✅ VALIDACIÓN DEL DOCENTE ID
                         if (docenteId.isNullOrBlank()) {
+                            Toast.makeText(context, "Error: No se pudo obtener tu ID", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        if (tituloError || codigoError || descripcionError || duracionError) {
+                            Toast.makeText(context, "Completa todos los campos obligatorios", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        if (temas.isEmpty()) {
+                            Toast.makeText(context, "Agrega al menos un tema", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        val temasManualesSinExplicacion = temas.filter {
+                            it.explicacionFuente == "manual" && it.explicacion.isBlank()
+                        }
+
+                        if (temasManualesSinExplicacion.isNotEmpty()) {
                             Toast.makeText(
                                 context,
-                                "❌ Error: No se pudo obtener tu ID de usuario. Vuelve a iniciar sesión.",
+                                "Los temas manuales necesitan explicación",
                                 Toast.LENGTH_LONG
                             ).show()
                             return@Button
                         }
 
-                        if (tituloError || codigoError || descripcionError || duracionError) {
-                            Toast.makeText(context, "⚠️ Completa todos los campos obligatorios", Toast.LENGTH_LONG).show()
-                            return@Button
-                        }
-
-                        if (temas.isEmpty()) {
-                            Toast.makeText(context, "⚠️ Agrega al menos un tema", Toast.LENGTH_LONG).show()
-                            return@Button
-                        }
-
-                        // Crear el Mapa de temas
-                        val temasMap = temas.associate { temaTemp ->
-                            temaTemp.id to Tema(
-                                id = temaTemp.id,
+                        // ============================================
+                        // 2. CONSTRUIR EL MAPA DE TEMAS
+                        // ============================================
+                        val temasMap = temas.mapIndexed { index, temaTemp ->
+                            "tema_$index" to TemaRequest(
                                 titulo = temaTemp.titulo,
                                 contenido = temaTemp.contenido,
-                                archivoUrl = temaTemp.archivoUrl.ifEmpty { "" },
+                                archivoUrl = temaTemp.archivoUrl.ifEmpty { null },
                                 tipo = if (temaTemp.archivoUrl.isNotEmpty()) "pdf" else "texto",
-                                fechaCreacion = fechaActual
+                                fechaCreacion = fechaActual,
+                                explicacion = when {
+                                    temaTemp.explicacionFuente == "manual" -> temaTemp.explicacion
+                                    temaTemp.explicacionFuente == "ia" -> "[GENERAR_CON_IA]"
+                                    else -> null
+                                },
+                                explicacionFuente = when {
+                                    temaTemp.explicacionFuente == "manual" -> "docente"
+                                    temaTemp.explicacionFuente == "ia" -> "ia"
+                                    else -> null
+                                },
+                                explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") {
+                                    fechaActual
+                                } else {
+                                    null
+                                },
+                                explicacionEstado = when {
+                                    temaTemp.explicacionFuente == "manual" -> "aprobada"
+                                    temaTemp.explicacionFuente == "ia" -> "pendiente"
+                                    else -> null
+                                }
                             )
-                        }
+                        }.toMap()
 
-                        // ✅ USAR EL DOCENTE ID AUTOMÁTICO
-                        val cursoParaEnviar = com.stiven.sos.models.CursoRequest(
+                        val cursoParaEnviar = CursoRequest(
                             titulo = titulo.trim(),
                             codigo = codigo.trim().uppercase(),
                             descripcion = descripcion.trim(),
-                            docenteId = docenteId, // 🔑 SE USA EL ID DEL USUARIO LOGUEADO
+                            docenteId = docenteId,
                             duracionDias = duracionDias.toInt(),
                             temas = temasMap,
                             estado = estado,
@@ -542,35 +559,100 @@ fun CrearCursoConTemasScreen(
                         )
 
                         isLoading = true
-                        Log.d("CREAR_CURSO", "Enviando curso con docenteId: $docenteId")
-                        Log.d("CREAR_CURSO", "Curso completo: ${com.google.gson.Gson().toJson(cursoParaEnviar)}")
+                        Log.d("CREAR_CURSO", "✅ Enviando curso con ${temas.size} temas")
+                        Log.d("CREAR_CURSO", "   - Temas con IA: ${temas.count { it.explicacionFuente == "ia" }}")
+                        Log.d("CREAR_CURSO", "   - Temas manuales: ${temas.count { it.explicacionFuente == "manual" }}")
 
+                        // ============================================
+                        // 3. CREAR CURSO Y GENERAR EXPLICACIONES
+                        // ============================================
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
+                                // 3.1 Crear el curso
                                 val response = com.stiven.sos.api.ApiClient.apiService.crearCurso(cursoParaEnviar)
 
-                                withContext(Dispatchers.Main) {
-                                    isLoading = false
-                                    if (response.isSuccessful) {
-                                        Log.d("CREAR_CURSO", "Curso creado exitosamente")
+                                if (response.isSuccessful && response.body() != null) {
+                                    val responseBody = response.body()!!
+                                    val cursoId = responseBody.id
+
+                                    Log.d("CREAR_CURSO", "✅ Curso creado exitosamente con ID: $cursoId")
+
+                                    // 3.2 Identificar temas con IA
+                                    val temasConIA = temas.filter { it.explicacionFuente == "ia" }
+                                    val temasConIAIndices = temas.mapIndexedNotNull { index, tema ->
+                                        if (tema.explicacionFuente == "ia") index to tema else null
+                                    }
+
+                                    // 3.3 Generar explicaciones con IA
+                                    if (temasConIA.isNotEmpty() && !cursoId.isNullOrBlank()) {
+                                        Log.d("CREAR_CURSO", "🤖 Generando ${temasConIA.size} explicaciones con IA...")
+
+                                        temasConIAIndices.forEach { (index, tema) ->
+                                            try {
+                                                val temaId = "tema_$index"
+                                                Log.d("CREAR_CURSO", "   📝 Generando explicación para: $temaId - ${tema.titulo}")
+
+                                                val request = GenerarExplicacionRequest(
+                                                    cursoId = cursoId,
+                                                    temaId = temaId,
+                                                    tituloTema = tema.titulo,
+                                                    contenidoTema = tema.contenido
+                                                )
+
+                                                // ✅ LLAMADA CORREGIDA: Pasar cursoId y temaId como path parameters
+                                                val explicacionResponse = com.stiven.sos.api.ApiClient.apiService.generarExplicacionIA(
+                                                    cursoId = cursoId,  // ⬅️ Path parameter
+                                                    temaId = temaId,    // ⬅️ Path parameter
+                                                    request = request   // ⬅️ Body
+                                                )
+
+                                                if (explicacionResponse.isSuccessful) {
+                                                    Log.d("CREAR_CURSO", "   ✅ Explicación generada para $temaId")
+                                                } else {
+                                                    val errorBody = explicacionResponse.errorBody()?.string()
+                                                    Log.e("CREAR_CURSO", "   ❌ Error generando explicación para $temaId: ${explicacionResponse.code()} - $errorBody")
+                                                }
+
+                                            } catch (e: Exception) {
+                                                Log.e("CREAR_CURSO", "   ❌ Excepción generando explicación para tema_$index: ${e.message}", e)
+                                            }
+                                        }
+                                    }
+
+                                    // 3.4 Mostrar mensaje de éxito
+                                    withContext(Dispatchers.Main) {
+                                        isLoading = false
+                                        val mensaje = when {
+                                            temasConIA.isNotEmpty() -> {
+                                                "✅ Curso creado. ${temasConIA.size} explicación(es) se están generando con IA."
+                                            }
+                                            else -> "✅ Curso creado exitosamente con ${temas.size} tema(s)"
+                                        }
+                                        Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
                                         onCursoCreado()
-                                    } else {
+                                    }
+
+                                } else {
+                                    // Error al crear curso
+                                    withContext(Dispatchers.Main) {
+                                        isLoading = false
                                         val errorBody = response.errorBody()?.string()
-                                        Log.e("CREAR_CURSO", "Error ${response.code()}: $errorBody")
+                                        Log.e("CREAR_CURSO", "❌ Error ${response.code()}: $errorBody")
                                         Toast.makeText(
                                             context,
-                                            "❌ Error ${response.code()}: Verifica los datos o la conexión",
+                                            "Error ${response.code()}: $errorBody",
                                             Toast.LENGTH_LONG
                                         ).show()
                                     }
                                 }
                             } catch (e: Exception) {
+                                // Excepción general
                                 withContext(Dispatchers.Main) {
                                     isLoading = false
-                                    Log.e("CREAR_CURSO", "Excepción: ${e.message}", e)
+                                    Log.e("CREAR_CURSO", "❌ Excepción: ${e.message}", e)
                                     Toast.makeText(
                                         context,
-                                        "❌ Error de conexión: ${e.message}",
+                                        "Error: ${e.message}",
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
@@ -601,7 +683,6 @@ fun CrearCursoConTemasScreen(
         }
     }
 
-    // Diálogo para agregar/editar tema
     if (showAgregarTemaDialog || temaParaEditar != null) {
         AgregarTemaDialog(
             temaExistente = temaParaEditar,
@@ -614,10 +695,10 @@ fun CrearCursoConTemasScreen(
             onConfirm = { nuevoTema ->
                 if (temaParaEditar != null) {
                     temas = temas.map { if (it.id == temaParaEditar!!.id) nuevoTema else it }
-                    Toast.makeText(context, "✓ Tema actualizado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Tema actualizado", Toast.LENGTH_SHORT).show()
                 } else {
                     temas = temas + nuevoTema
-                    Toast.makeText(context, "✓ Tema agregado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Tema agregado", Toast.LENGTH_SHORT).show()
                 }
                 showAgregarTemaDialog = false
                 temaParaEditar = null
@@ -626,7 +707,6 @@ fun CrearCursoConTemasScreen(
     }
 }
 
-// Card de tema MEJORADO - MÁS AMPLIO Y VISUAL
 @Composable
 fun TemaItemCardMejorado(
     tema: TemaTemp,
@@ -638,7 +718,7 @@ fun TemaItemCardMejorado(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 160.dp),
+            .heightIn(min = 180.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -648,12 +728,10 @@ fun TemaItemCardMejorado(
                 .fillMaxWidth()
                 .padding(24.dp)
         ) {
-            // Header del tema
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Número del tema con gradiente
                 Box(
                     modifier = Modifier
                         .size(60.dp)
@@ -685,7 +763,6 @@ fun TemaItemCardMejorado(
 
                 Spacer(Modifier.width(20.dp))
 
-                // Información del tema
                 Column(modifier = Modifier.weight(1f)) {
                     Surface(
                         color = EduRachaColors.Success.copy(alpha = 0.15f),
@@ -710,7 +787,6 @@ fun TemaItemCardMejorado(
                     )
                 }
 
-                // Botones de acción
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     IconButton(
                         onClick = onEditar,
@@ -747,7 +823,6 @@ fun TemaItemCardMejorado(
             Divider(color = EduRachaColors.Background)
             Spacer(Modifier.height(16.dp))
 
-            // Contenido
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     Icons.Default.Description,
@@ -766,7 +841,72 @@ fun TemaItemCardMejorado(
                 )
             }
 
-            // PDF adjunto
+            if (tema.explicacion.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Divider(color = EduRachaColors.Background)
+                Spacer(Modifier.height(16.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = EduRachaColors.Primary.copy(alpha = 0.1f),
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(EduRachaColors.Primary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (tema.explicacionFuente == "ia") Icons.Default.Psychology else Icons.Default.Edit,
+                                null,
+                                modifier = Modifier.size(28.dp),
+                                tint = EduRachaColors.Primary
+                            )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Explicacion incluida",
+                                fontSize = 12.sp,
+                                color = EduRachaColors.TextSecondary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (tema.explicacionFuente == "ia") "Generada con IA" else "Escrita manualmente",
+                                fontSize = 15.sp,
+                                color = EduRachaColors.TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (tema.explicacionFuente == "ia" && tema.explicacionEstado.isNotEmpty()) {
+                                Text(
+                                    "Estado: ${tema.explicacionEstado.replaceFirstChar { it.uppercase() }}",
+                                    fontSize = 12.sp,
+                                    color = when(tema.explicacionEstado) {
+                                        "aprobada" -> EduRachaColors.Success
+                                        "pendiente" -> EduRachaColors.Accent
+                                        "rechazada" -> EduRachaColors.Error
+                                        else -> EduRachaColors.TextSecondary
+                                    }
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            "Explicacion incluida",
+                            tint = EduRachaColors.Success,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
             if (tema.archivoUrl.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 Divider(color = EduRachaColors.Background)
@@ -826,7 +966,6 @@ fun TemaItemCardMejorado(
     }
 }
 
-// Diálogo mejorado para agregar/editar tema
 @Composable
 fun AgregarTemaDialog(
     temaExistente: TemaTemp? = null,
@@ -844,10 +983,16 @@ fun AgregarTemaDialog(
     var archivoUrl by remember { mutableStateOf(temaExistente?.archivoUrl ?: "") }
     var archivoNombre by remember { mutableStateOf(temaExistente?.archivoNombre ?: "") }
 
+    var explicacion by remember { mutableStateOf(temaExistente?.explicacion ?: "") }
+    var tipoExplicacion by remember { mutableStateOf("manual") }
+    var explicacionGenerada by remember { mutableStateOf(false) }
+
     var idError by remember { mutableStateOf(false) }
     var tituloError by remember { mutableStateOf(false) }
     var contenidoError by remember { mutableStateOf(false) }
+    var explicacionError by remember { mutableStateOf(false) }
     var isUploading by remember { mutableStateOf(false) }
+    var isGeneratingExplanation by remember { mutableStateOf(false) }
 
     val pdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -861,11 +1006,11 @@ fun AgregarTemaDialog(
                         if (result.isSuccess) {
                             archivoUrl = result.getOrThrow()
                             archivoNombre = obtenerNombreArchivo(context, pdfUri)
-                            Toast.makeText(context, "✅ PDF cargado correctamente", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "PDF cargado correctamente", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(
                                 context,
-                                "❌ Error al cargar PDF: ${result.exceptionOrNull()?.message}",
+                                "Error al cargar PDF: ${result.exceptionOrNull()?.message}",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -898,14 +1043,13 @@ fun AgregarTemaDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Campo ID
                 OutlinedTextField(
                     value = temaId,
                     onValueChange = {
                         temaId = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
                         idError = false
                     },
-                    label = { Text("ID único del Tema *") },
+                    label = { Text("ID unico del Tema (Requerido)") },
                     leadingIcon = { Icon(Icons.Default.Key, null) },
                     isError = idError,
                     modifier = Modifier.fillMaxWidth(),
@@ -917,21 +1061,20 @@ fun AgregarTemaDialog(
                     ),
                     supportingText = {
                         if (idError) {
-                            Text("ID requerido y único", color = EduRachaColors.Error, fontSize = 12.sp)
+                            Text("ID requerido y unico", color = EduRachaColors.Error, fontSize = 12.sp)
                         } else if (temaExistente != null) {
                             Text("ID no editable", fontSize = 11.sp)
                         } else {
-                            Text("Ej: t1, tema1, intro", fontSize = 11.sp)
+                            Text("Ej: tema1, intro, fundamentos", fontSize = 11.sp)
                         }
                     },
                     singleLine = true
                 )
 
-                // Campo Título
                 OutlinedTextField(
                     value = titulo,
                     onValueChange = { titulo = it; tituloError = false },
-                    label = { Text("Título del Tema *") },
+                    label = { Text("Titulo del Tema (Requerido)") },
                     leadingIcon = { Icon(Icons.Default.Title, null) },
                     isError = tituloError,
                     modifier = Modifier.fillMaxWidth(),
@@ -942,17 +1085,16 @@ fun AgregarTemaDialog(
                     ),
                     supportingText = {
                         if (tituloError) {
-                            Text("El título es obligatorio", color = EduRachaColors.Error, fontSize = 12.sp)
+                            Text("El titulo es obligatorio", color = EduRachaColors.Error, fontSize = 12.sp)
                         }
                     },
                     singleLine = true
                 )
 
-                // Campo Contenido
                 OutlinedTextField(
                     value = contenido,
                     onValueChange = { contenido = it; contenidoError = false },
-                    label = { Text("Contenido del tema *") },
+                    label = { Text("Contenido del tema (Requerido)") },
                     isError = contenidoError,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -974,7 +1116,6 @@ fun AgregarTemaDialog(
 
                 Divider(color = EduRachaColors.Background, thickness = 2.dp)
 
-                // Sección de PDF
                 Text(
                     "Archivo PDF (Opcional)",
                     fontSize = 14.sp,
@@ -1059,51 +1200,225 @@ fun AgregarTemaDialog(
                     }
                 }
 
-                if (archivoUrl.isEmpty()) {
-                    Text(
-                        "💡 El PDF es opcional. Puedes agregarlo después.",
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                Divider(color = EduRachaColors.Background, thickness = 2.dp)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        null,
+                        tint = EduRachaColors.Primary,
+                        modifier = Modifier.size(24.dp)
                     )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Explicacion del Tema (OBLIGATORIA)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.Primary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            tipoExplicacion = "manual"
+                            explicacionGenerada = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (tipoExplicacion == "manual")
+                                EduRachaColors.Primary else EduRachaColors.Background
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Manual", fontSize = 13.sp)
+                    }
+
+                    Button(
+                        onClick = { tipoExplicacion = "ia" },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (tipoExplicacion == "ia")
+                                EduRachaColors.Accent else EduRachaColors.Background
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Psychology,
+                            null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("IA", fontSize = 13.sp)
+                    }
+                }
+
+                if (tipoExplicacion == "manual") {
+                    OutlinedTextField(
+                        value = explicacion,
+                        onValueChange = { explicacion = it; explicacionError = false },
+                        label = { Text("Escribe la explicacion") },
+                        isError = explicacionError,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 150.dp, max = 200.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (explicacionError) EduRachaColors.Error else EduRachaColors.Primary,
+                            focusedLabelColor = if (explicacionError) EduRachaColors.Error else EduRachaColors.Primary
+                        ),
+                        supportingText = {
+                            if (explicacionError) {
+                                Text("La explicacion es obligatoria", color = EduRachaColors.Error, fontSize = 12.sp)
+                            } else {
+                                Text("${explicacion.length}/1000 caracteres", fontSize = 11.sp)
+                            }
+                        },
+                        maxLines = 8
+                    )
+                }
+
+                if (tipoExplicacion == "ia") {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = EduRachaColors.Accent.copy(alpha = 0.1f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            EduRachaColors.Accent.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Psychology,
+                                    null,
+                                    tint = EduRachaColors.Accent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Generación Automática con IA",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.TextPrimary
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "La explicación se generará automáticamente después de crear el curso",
+                                        fontSize = 12.sp,
+                                        color = EduRachaColors.TextSecondary,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+                            Divider(color = EduRachaColors.Accent.copy(alpha = 0.2f))
+                            Spacer(Modifier.height(12.dp))
+
+                            ProcesoStep(
+                                numero = "1",
+                                texto = "El tema se creará con estado 'pendiente'",
+                                color = EduRachaColors.Accent
+                            )
+                            ProcesoStep(
+                                numero = "2",
+                                texto = "La IA generará la explicación automáticamente",
+                                color = EduRachaColors.Accent
+                            )
+                            ProcesoStep(
+                                numero = "3",
+                                texto = "Deberás revisar y aprobar antes de generar preguntas",
+                                color = EduRachaColors.Primary
+                            )
+                        }
+                    }
+                }
+
+                if (explicacion.isBlank() && tipoExplicacion == "manual") {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                null,
+                                tint = EduRachaColors.Primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "La explicacion es obligatoria para crear el tema. Los estudiantes la veran antes de iniciar el quiz.",
+                                fontSize = 12.sp,
+                                color = EduRachaColors.TextSecondary,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    // Validaciones
                     tituloError = titulo.isBlank()
                     contenidoError = contenido.isBlank()
+
+                    // Solo validar explicación si es MANUAL
+                    explicacionError = if (tipoExplicacion == "manual") {
+                        explicacion.isBlank()
+                    } else {
+                        false
+                    }
 
                     if (temaExistente == null) {
                         idError = temaId.isBlank() || temasExistentes.any { it.id == temaId }
                     }
 
-                    if (!tituloError && !contenidoError && !idError) {
+                    if (!tituloError && !contenidoError && !idError && !explicacionError) {
                         val nuevoTema = TemaTemp(
                             id = temaId.trim(),
                             titulo = titulo.trim(),
                             contenido = contenido.trim(),
                             archivoUrl = archivoUrl.trim(),
                             archivoNombre = archivoNombre.trim(),
-                            tipo = "pdf"
+                            tipo = "pdf",
+                            // ⚠️ IMPORTANTE: Dejar vacío si es IA
+                            explicacion = if (tipoExplicacion == "manual") explicacion.trim() else "",
+                            explicacionFuente = tipoExplicacion,
+                            explicacionEstado = when (tipoExplicacion) {
+                                "manual" -> "aprobada"
+                                "ia" -> "pendiente"
+                                else -> ""
+                            }
                         )
                         onConfirm(nuevoTema)
                     } else {
                         if (idError) {
-                            Toast.makeText(
-                                context,
-                                "⚠️ El ID debe ser único y no estar vacío",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else if (tituloError || contenidoError) {
-                            Toast.makeText(
-                                context,
-                                "⚠️ Completa todos los campos obligatorios",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(context, "El ID debe ser único", Toast.LENGTH_SHORT).show()
+                        } else if (explicacionError) {
+                            Toast.makeText(context, "Debes escribir la explicación", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Completa todos los campos", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -1132,11 +1447,14 @@ fun AgregarTemaDialog(
             }
         },
         containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(24.dp),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth(0.95f)
+            .fillMaxHeight(0.9f)
     )
 }
 
-// Componentes auxiliares
 @Composable
 fun SectionHeader(title: String, icon: ImageVector, color: Color) {
     Row(
@@ -1201,6 +1519,43 @@ fun CustomTextField(
     )
 }
 
+@Composable
+private fun ProcesoStep(
+    numero: String,
+    texto: String,
+    color: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                numero,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            texto,
+            fontSize = 12.sp,
+            color = EduRachaColors.TextSecondary,
+            lineHeight = 16.sp,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EstadoDropdown(
@@ -1222,7 +1577,7 @@ fun EstadoDropdown(
             value = selectedText,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Estado *") },
+            label = { Text("Estado (Requerido)") },
             leadingIcon = {
                 Icon(
                     Icons.Default.ToggleOn,

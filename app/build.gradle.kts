@@ -60,6 +60,7 @@ android {
 
 dependencies {
 
+
     // -------------------
     // CORE Y ANDROIDX
     // -------------------
@@ -94,6 +95,7 @@ dependencies {
     // -------------------
     // BOM de Firebase para gestionar versiones
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Dependencias específicas de Firebase (no es necesario añadir -ktx por separado)
     implementation("com.google.firebase:firebase-auth")

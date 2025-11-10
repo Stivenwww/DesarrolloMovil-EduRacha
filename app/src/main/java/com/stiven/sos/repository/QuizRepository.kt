@@ -122,7 +122,6 @@ class QuizRepository(private val application: Application) {
     }
 
     /**
-     * ✅ NUEVO: Sincronizar progreso con inscripción
      * Actualiza experiencia y racha en Firebase después de completar un quiz
      */
     suspend fun sincronizarProgresoConInscripcion(
@@ -144,7 +143,7 @@ class QuizRepository(private val application: Application) {
             val snapshot = inscripcionRef.get().await()
 
             if (!snapshot.exists()) {
-                Log.w(TAG, "⚠️ Inscripción no existe, creando campos de progreso")
+                Log.w(TAG, " Inscripción no existe, creando campos de progreso")
                 // Crear campos iniciales si no existen
                 val updates = hashMapOf<String, Any>(
                     "experiencia" to experienciaGanada,
@@ -152,7 +151,7 @@ class QuizRepository(private val application: Application) {
                     "ultimaFecha" to System.currentTimeMillis()
                 )
                 inscripcionRef.updateChildren(updates).await()
-                Log.d(TAG, "✅ Progreso inicial creado: XP=$experienciaGanada, Racha=${if (quizAprobado) 1 else 0}")
+                Log.d(TAG, " Progreso inicial creado: XP=$experienciaGanada, Racha=${if (quizAprobado) 1 else 0}")
                 return Result.success(Unit)
             }
 
@@ -206,7 +205,7 @@ class QuizRepository(private val application: Application) {
 
             inscripcionRef.updateChildren(updates).await()
 
-            Log.d(TAG, "✅ Progreso sincronizado correctamente:")
+            Log.d(TAG, " Progreso sincronizado correctamente:")
             Log.d(TAG, "   • XP: $expActual → $nuevaExp (+$experienciaGanada)")
             Log.d(TAG, "   • Racha: $rachaActual → $nuevaRacha")
             Log.d(TAG, "   • Aprobado: $quizAprobado")
@@ -214,7 +213,7 @@ class QuizRepository(private val application: Application) {
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error sincronizando progreso con inscripción", e)
+            Log.e(TAG, " Error sincronizando progreso con inscripción", e)
             Result.failure(e)
         }
     }
@@ -343,7 +342,7 @@ class QuizRepository(private val application: Application) {
                 }
             }
 
-            Log.d(TAG, "✅ Retroalimentación construida desde Firebase: ${preguntasFalladas.size} fallos")
+            Log.d(TAG, " Retroalimentación construida desde Firebase: ${preguntasFalladas.size} fallos")
 
             Result.success(RetroalimentacionFallosResponse(
                 quizId = quizId,
@@ -351,7 +350,7 @@ class QuizRepository(private val application: Application) {
                 preguntasFalladas = preguntasFalladas
             ))
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error construyendo retroalimentación desde Firebase", e)
+            Log.e(TAG, " Error construyendo retroalimentación desde Firebase", e)
             Result.failure(e)
         }
     }
@@ -399,6 +398,7 @@ class QuizRepository(private val application: Application) {
     /**
      * Obtener cursos inscritos
      */
+
     suspend fun obtenerCursosInscritos(): Result<List<Curso>> {
         return try {
             val userUid = prefs.getString("user_uid", "") ?: ""
@@ -406,40 +406,60 @@ class QuizRepository(private val application: Application) {
                 return Result.failure(Exception("Usuario no autenticado"))
             }
 
-            val responseCursos = ApiClient.apiService.obtenerCursos()
+            // 1. Obtener TODAS las inscripciones de la base de datos de una sola vez.
+            // Esto es mucho más eficiente que hacer una consulta por cada curso.
+            val todasLasInscripcionesSnapshot = database.getReference("inscripciones").get().await()
 
-            if (!responseCursos.isSuccessful) {
-                return Result.failure(Exception("Error al obtener cursos: ${responseCursos.code()}"))
+            if (!todasLasInscripcionesSnapshot.exists()) {
+                // Si no hay ninguna inscripción en toda la base de datos, devuelve una lista vacía.
+                return Result.success(emptyList())
             }
 
-            val todosCursos = responseCursos.body() ?: emptyList()
-            val inscripcionesRef = database.getReference("inscripciones")
-            val cursosInscritos = mutableListOf<Curso>()
+            val idsDeCursosInscritos = mutableListOf<String>()
 
-            for (curso in todosCursos) {
-                try {
-                    val snapshot = inscripcionesRef
-                        .child(curso.id!!)
-                        .child(userUid)
-                        .get()
-                        .await()
+            // 2. Iterar sobre las inscripciones para encontrar en cuáles está el usuario actual.
+            todasLasInscripcionesSnapshot.children.forEach { cursoSnapshot ->
+                // cursoSnapshot.key es el ID del curso (ej: "-Od5QwwgBXSy-nqKxECN")
+                if (cursoSnapshot.hasChild(userUid)) {
+                    val inscripcionUsuario = cursoSnapshot.child(userUid)
+                    val estado = inscripcionUsuario.child("estado").getValue(String::class.java)
 
-                    if (snapshot.exists()) {
-                        val estado = snapshot.child("estado").getValue(String::class.java)
-                        if (estado == "aprobado") {
-                            cursosInscritos.add(curso)
+                    // Añadir el ID del curso a nuestra lista si el estado es "aprobado"
+                    if (estado == "aprobado") {
+                        cursoSnapshot.key?.let { cursoId ->
+                            idsDeCursosInscritos.add(cursoId)
                         }
                     }
-                } catch (e: Exception) {
-                    continue
                 }
             }
 
-            Result.success(cursosInscritos)
+            if (idsDeCursosInscritos.isEmpty()) {
+                // Si el usuario está inscrito en cursos pero ninguno está "aprobado", devuelve una lista vacía.
+                Log.d(TAG, "El usuario no está inscrito en ningún curso con estado 'aprobado'")
+                return Result.success(emptyList())
+            }
+
+            // 3. Descargar la lista COMPLETA de cursos (ahora sí es necesario).
+            val responseCursos = ApiClient.apiService.obtenerCursos()
+            if (!responseCursos.isSuccessful) {
+                return Result.failure(Exception("Error al obtener detalles de los cursos: ${responseCursos.code()}"))
+            }
+            val todosCursos = responseCursos.body() ?: emptyList()
+
+            // 4. Filtrar la lista de todos los cursos para quedarnos solo con aquellos cuyo ID está en nuestra lista.
+            val cursosDelUsuario = todosCursos.filter { curso ->
+                curso.id in idsDeCursosInscritos
+            }
+
+            Log.d(TAG, "Cursos inscritos y aprobados encontrados: ${cursosDelUsuario.size}")
+            Result.success(cursosDelUsuario)
+
         } catch (e: Exception) {
+            Log.e(TAG, " Error en obtenerCursosInscritos", e)
             Result.failure(e)
         }
     }
+
 
     /**
      * Obtener progreso del estudiante en el curso
@@ -508,7 +528,7 @@ class QuizRepository(private val application: Application) {
                         minutosParaProximaVida = minutosParaProximaVida
                     ))
 
-                    Log.d(TAG, "✅ Vidas actualizadas: $vidasActuales/$vidasMax")
+                    Log.d(TAG, " Vidas actualizadas: $vidasActuales/$vidasMax")
                 }
             }
 
@@ -547,9 +567,9 @@ class QuizRepository(private val application: Application) {
                         practicasCompletadas = practicas
                     ))
 
-                    Log.d(TAG, "✅ Progreso actualizado: XP=$experiencia, Racha=$racha")
+                    Log.d(TAG, " Progreso actualizado: XP=$experiencia, Racha=$racha")
                 } else {
-                    Log.w(TAG, "⚠️ No existe inscripción, progreso en 0")
+                    Log.w(TAG, " No existe inscripción, progreso en 0")
                     onProgresoActualizado(ProgresoCurso(0, 0, 0))
                 }
             }

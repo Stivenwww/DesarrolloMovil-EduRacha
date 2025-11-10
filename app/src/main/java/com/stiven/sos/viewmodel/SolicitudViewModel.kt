@@ -155,7 +155,7 @@ class SolicitudViewModel : ViewModel() {
     }
 
     /**
-     * ✅ Responder a una solicitud (aceptar o rechazar) CON MENSAJE
+     *  Responder a una solicitud (aceptar o rechazar) CON MENSAJE
      */
     fun responderSolicitud(
         solicitudId: String,

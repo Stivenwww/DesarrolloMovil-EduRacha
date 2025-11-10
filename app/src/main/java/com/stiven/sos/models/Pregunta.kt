@@ -22,7 +22,7 @@ data class Pregunta(
     val fechaRevision: String? = null,
     val notasRevision: String? = null,
     val modificada: Boolean = false,
-    val explicacionCorrecta: String? = null // ✅ AGREGADO
+    val explicacionCorrecta: String? = null
 )
 
 data class Opcion(
@@ -71,13 +71,13 @@ data class EstadoUpdateResponse(
 )
 
 // ========================================================================
-// ESTADOS Y CONSTANTES - ✅ CORREGIDO
+// ESTADOS Y CONSTANTES
 // ========================================================================
 
 object EstadoPregunta {
     const val PENDIENTE_REVISION = "pendiente_revision" //Con guion bajo
     const val APROBADA = "aprobada"
-    const val RECHAZADA = "rechazada" // AGREGADO
+    const val RECHAZADA = "rechazada"
     const val TODOS = "todos"
 }
 

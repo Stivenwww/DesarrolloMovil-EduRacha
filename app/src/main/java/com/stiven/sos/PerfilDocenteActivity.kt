@@ -36,12 +36,12 @@ class PerfilDocenteActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // NO establecer contenido aquí
+
     }
 
     override fun onResume() {
         super.onResume()
-        // ✅ Establecer contenido en onResume para recargar datos cada vez
+        //  Establecer contenido en onResume para recargar datos cada vez
         setContent {
             EduRachaTheme {
                 PerfilDocenteScreen(
@@ -61,13 +61,13 @@ fun PerfilDocenteScreen(
 ) {
     val context = LocalContext.current
 
-    // ✅ Leer datos desde SharedPreferences (NO de Firebase)
+
     var userName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
     var userRole by remember { mutableStateOf("") }
     var userNickname by remember { mutableStateOf("") }
 
-    // ✅ Leer datos directamente desde SharedPreferences
+
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
 

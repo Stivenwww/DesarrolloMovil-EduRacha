@@ -1,5 +1,3 @@
-
-
 package com.stiven.sos.api
 
 import com.stiven.sos.models.*
@@ -242,4 +240,27 @@ interface ApiService {
         @Path("id") cursoId: String,
         @Path("temaId") temaId: String
     ): Response<Tema>
+
+    /**
+     * Obtener ranking completo de un curso con toda la información de Firebase
+     * Endpoint: GET /api/solicitudes/curso/{cursoId}/ranking
+     */
+    @GET("api/cursos/{cursoId}/progreso/{estudianteId}")
+    suspend fun obtenerRacha(
+        @Path("cursoId") cursoId: String,
+        @Path("estudianteId") estudianteId: String
+    ): Response<Map<String, Any>>
+
+    // ============================================
+// ENDPOINTS DE EXPLICACIONES CON IA
+// ============================================
+
+    @POST("api/cursos/{cursoId}/temas/{temaId}/generar-explicacion")
+    suspend fun generarExplicacionIA(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String,
+        @Body request: GenerarExplicacionRequest
+    ): Response<Map<String, Any>>
+
+
 }

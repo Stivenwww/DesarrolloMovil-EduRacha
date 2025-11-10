@@ -96,13 +96,13 @@ fun GestionSolicitudesScreen(
     var mensajePredeterminadoSeleccionado by remember { mutableStateOf<String?>(null) }
     var modoPersonalizado by remember { mutableStateOf(false) }
 
-    // ✅ Filtrar solicitudes del curso actual que estén PENDIENTES
+    //  Filtrar solicitudes del curso actual que estén PENDIENTES
     val solicitudesCurso = remember(solicitudUiState.solicitudes, cursoId) {
         val filtradas = solicitudUiState.solicitudes.filter {
             it.cursoId == cursoId && it.estado == EstadoSolicitud.PENDIENTE
         }
         Log.d("GestionSolicitudes", """
-            📊 Filtrando solicitudes:
+             Filtrando solicitudes:
             - Total recibidas: ${solicitudUiState.solicitudes.size}
             - Del curso $cursoId: ${filtradas.size}
         """.trimIndent())
@@ -113,7 +113,7 @@ fun GestionSolicitudesScreen(
         solicitudUiState.mensajeExito?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             solicitudViewModel.clearMessages()
-            // ✅ Recargar solicitudes después de aceptar/rechazar
+            //  Recargar solicitudes después de aceptar/rechazar
             solicitudViewModel.cargarSolicitudesDocente(docenteId)
         }
     }

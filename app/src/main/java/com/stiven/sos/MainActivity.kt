@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                         startActivity(Intent(this, CursosInscritosActivity::class.java))
                     },
                     onNavigateToRanking = {
-                        startActivity(Intent(this, RankingActivity::class.java))
+                        startActivity(Intent(this, RankingDetalleActivity::class.java))
                     }
                 )
             }

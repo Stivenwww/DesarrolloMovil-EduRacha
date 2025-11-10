@@ -59,9 +59,9 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
                     onNavigateToCreateCourse = { navigateTo(CrearCursoActivity::class.java) },
                     onNavigateToValidation = { handleValidationClick() },
-                    onNavigateToReports = { navigateTo(ListaEstudiantesActivity::class.java) },
+                    onNavigateToReports = { navigateTo(RankingDetalleActivity::class.java) },
                     onNavigateToGroups = { navigateTo(GestionGruposActivity::class.java) },
-                    onNavigateToStudents = { navigateTo(ListaEstudiantesActivity::class.java) },
+                    onNavigateToStudents = { navigateTo(SeleccionarCursoRankingActivity::class.java) },
                     onNavigateToCourses = { handleCoursesClick() },
                     onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) },
                     onNavigateToCreateQuestion = { navigateTo(CrearPreguntaActivity::class.java) }// ✅ NUEVO
