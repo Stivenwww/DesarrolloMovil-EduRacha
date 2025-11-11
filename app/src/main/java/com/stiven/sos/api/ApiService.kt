@@ -58,9 +58,8 @@ interface ApiService {
     @PUT("api/cursos/{id}")
     suspend fun actualizarCurso(
         @Path("id") id: String,
-        @Body curso: Curso
+        @Body curso: CursoRequest  // ✅ CAMBIAR de Curso a CursoRequest
     ): Response<ApiResponse>
-
     @DELETE("api/cursos/{id}")
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
 

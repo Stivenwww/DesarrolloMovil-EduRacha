@@ -15,7 +15,7 @@ class CursoRepository {
      */
     suspend fun crearCurso(curso: Curso): Result<ApiResponse> {
         return try {
-            // Convertir Curso a CursoRequest (elimina el campo id y convierte Tema a TemaRequest)
+            // Convertir Curso a CursoRequest
             val cursoRequest = curso.toRequest()
 
             // Log para debug
@@ -23,7 +23,11 @@ class CursoRepository {
             Log.d("CursoRepository", "- Titulo: ${cursoRequest.titulo}")
             Log.d("CursoRepository", "- Codigo: ${cursoRequest.codigo}")
             Log.d("CursoRepository", "- DocenteId: ${cursoRequest.docenteId}")
+            Log.d("CursoRepository", "- Duración: ${cursoRequest.duracionDias} días")
+            Log.d("CursoRepository", "- Fecha inicio: ${cursoRequest.fechaInicio}")
+            Log.d("CursoRepository", "- Fecha fin: ${cursoRequest.fechaFin}")
             Log.d("CursoRepository", "- Total temas: ${cursoRequest.temas?.size ?: 0}")
+            Log.d("CursoRepository", "- Tiene programación: ${cursoRequest.programacion != null}")
 
             val response = api.crearCurso(cursoRequest)
 
@@ -88,16 +92,40 @@ class CursoRepository {
 
     /**
      * Actualizar curso existente
+     * ✅ ACTUALIZADO - Ahora convierte a CursoRequest
      */
     suspend fun actualizarCurso(id: String, curso: Curso): Result<ApiResponse> {
         return try {
-            val response = api.actualizarCurso(id, curso)
+            // ✅ Convertir Curso a CursoRequest
+            val cursoRequest = curso.toRequest()
+
+            Log.d("CursoRepository", "Actualizando curso $id:")
+            Log.d("CursoRepository", "- Titulo: ${cursoRequest.titulo}")
+            Log.d("CursoRepository", "- Total temas: ${cursoRequest.temas?.size ?: 0}")
+            Log.d("CursoRepository", "- Programación temporal: ${cursoRequest.programacion != null}")
+            Log.d("CursoRepository", "- Fecha inicio: ${cursoRequest.fechaInicio}")
+            Log.d("CursoRepository", "- Fecha fin: ${cursoRequest.fechaFin}")
+
+            // Validar que tiene fechas
+            if (cursoRequest.fechaInicio == 0L || cursoRequest.fechaFin == 0L) {
+                Log.w("CursoRepository", "⚠️ Curso sin fechas de inicio/fin definidas")
+            }
+
+            // Validar programación
+            cursoRequest.programacion?.let { prog ->
+                Log.d("CursoRepository", "- Temas ordenados: ${prog.temasOrdenados.size}")
+                Log.d("CursoRepository", "- Distribución temporal: ${prog.distribucionTemporal.size}")
+            }
+
+            val response = api.actualizarCurso(id, cursoRequest)
+
             if (response.isSuccessful && response.body() != null) {
-                Log.d("CursoRepository", " Curso actualizado exitosamente")
+                Log.d("CursoRepository", "✅ Curso actualizado exitosamente")
                 Result.success(response.body()!!)
             } else {
-                Log.e("CursoRepository", "Error al actualizar curso: ${response.code()}")
-                Result.failure(Exception("Error al actualizar curso: ${response.code()}"))
+                val errorBody = response.errorBody()?.string()
+                Log.e("CursoRepository", "❌ Error al actualizar curso: ${response.code()}: $errorBody")
+                Result.failure(Exception("Error al actualizar curso: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
             Log.e("CursoRepository", "❌ Excepción al actualizar curso", e)

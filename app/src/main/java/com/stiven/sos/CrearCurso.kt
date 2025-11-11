@@ -42,10 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.stiven.sos.models.CursoRequest
-import com.stiven.sos.models.GenerarExplicacionRequest
-import com.stiven.sos.models.TemaRequest
-import com.stiven.sos.models.UserPreferences
+import com.stiven.sos.models.*
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +54,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class CrearCursoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,7 +88,8 @@ data class TemaTemp(
     val explicacionFuente: String = "",
     val explicacionEstado: String = "pendiente",
     val fechaCreacion: String = obtenerFechaActual(),
-    val explicacionUltimaActualizacion: String = obtenerFechaActual()
+    val explicacionUltimaActualizacion: String = obtenerFechaActual(),
+    val programacion: ProgramacionTema? = null
 )
 
 // ============================================
@@ -98,8 +97,17 @@ data class TemaTemp(
 // ============================================
 
 fun obtenerFechaActual(): String {
-    val formato = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val formato = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    formato.timeZone = TimeZone.getTimeZone("UTC")
     return formato.format(Date())
+}
+
+fun obtenerTimestampActual(): Long {
+    return System.currentTimeMillis()
+}
+
+fun calcularFechaFin(fechaInicio: Long, duracionDias: Int): Long {
+    return fechaInicio + TimeUnit.DAYS.toMillis(duracionDias.toLong())
 }
 
 private suspend fun simularSubidaPdf(context: Context, uri: Uri): Result<String> {
@@ -120,6 +128,53 @@ private fun obtenerNombreArchivo(context: Context, uri: Uri): String {
     } ?: uri.lastPathSegment ?: "archivo.pdf"
 }
 
+/**
+ * ✅ NUEVA FUNCIÓN: Genera programación automática para el curso
+ */
+fun generarProgramacionAutomatica(
+    temas: List<TemaTemp>,
+    fechaInicio: Long,
+    fechaFin: Long
+): ProgramacionCurso? {
+    if (temas.isEmpty() || fechaInicio == 0L || fechaFin == 0L) return null
+
+    val duracionTotal = fechaFin - fechaInicio
+    val diasPorTema = TimeUnit.MILLISECONDS.toDays(duracionTotal).toInt() / temas.size
+
+    if (diasPorTema <= 0) return null
+
+    val temasOrdenados = mutableListOf<String>()
+    val distribucionTemporal = mutableMapOf<String, RangoTema>()
+
+    var fechaActual = fechaInicio
+
+    temas.forEachIndexed { index, tema ->
+        temasOrdenados.add(tema.id)
+
+        val fechaFinalTema = if (index == temas.size - 1) {
+            fechaFin
+        } else {
+            fechaActual + TimeUnit.DAYS.toMillis(diasPorTema.toLong())
+        }
+
+        distribucionTemporal[tema.id] = RangoTema(
+            temaId = tema.id,
+            titulo = tema.titulo,
+            fechaInicio = fechaActual,
+            fechaFin = fechaFinalTema,
+            quizzesRequeridos = diasPorTema,
+            diasAsignados = diasPorTema
+        )
+
+        fechaActual = fechaFinalTema
+    }
+
+    return ProgramacionCurso(
+        temasOrdenados = temasOrdenados,
+        distribucionTemporal = distribucionTemporal
+    )
+}
+
 // ============================================
 // PANTALLA PRINCIPAL
 // ============================================
@@ -134,7 +189,6 @@ fun CrearCursoConTemasScreen(
     val scrollState = rememberScrollState()
     val docenteId = remember { UserPreferences.getUserUid(context) }
 
-    // 🔍 DEBUG: Verificar el valor del docenteId (se ejecuta solo una vez)
     LaunchedEffect(Unit) {
         Log.d("CREAR_CURSO", "🔍 docenteId obtenido: '$docenteId'")
         if (docenteId.isNullOrBlank()) {
@@ -148,6 +202,10 @@ fun CrearCursoConTemasScreen(
     var descripcion by remember { mutableStateOf("") }
     var duracionDias by remember { mutableStateOf("") }
     var estado by remember { mutableStateOf("activo") }
+
+    // ✅ NUEVOS ESTADOS: Fechas
+    var fechaInicio by remember { mutableStateOf(obtenerTimestampActual()) }
+    var fechaFin by remember { mutableStateOf(0L) }
 
     // Estados de errores
     var tituloError by remember { mutableStateOf(false) }
@@ -168,10 +226,16 @@ fun CrearCursoConTemasScreen(
     var progresoTotal by remember { mutableStateOf(0) }
     var temaActual by remember { mutableStateOf("") }
 
-    // Fecha actual - calculada una sola vez
     val fechaActual = remember { obtenerFechaActual() }
 
-    // Animación optimizada
+    // ✅ Calcular fecha fin cuando cambia la duración
+    LaunchedEffect(duracionDias) {
+        val dias = duracionDias.toIntOrNull()
+        if (dias != null && dias > 0) {
+            fechaFin = calcularFechaFin(fechaInicio, dias)
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "bookAnimation")
     val bookRotation by infiniteTransition.animateFloat(
         initialValue = -5f,
@@ -183,9 +247,7 @@ fun CrearCursoConTemasScreen(
         label = "bookRotation"
     )
 
-    // Scaffold principal
     Scaffold(
-        //  containerColor movido DENTRO de los paréntesis del Scaffold
         containerColor = EduRachaColors.Background
     ) { paddingValues ->
         Column(
@@ -255,7 +317,6 @@ fun CrearCursoConTemasScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Vista previa del título
                     AnimatedVisibility(
                         visible = titulo.isNotEmpty(),
                         enter = fadeIn() + slideInVertically(),
@@ -302,7 +363,6 @@ fun CrearCursoConTemasScreen(
                         }
                     }
 
-                    // Título principal si no hay vista previa
                     if (titulo.isEmpty()) {
                         Text(
                             "Crear Curso Completo",
@@ -324,7 +384,7 @@ fun CrearCursoConTemasScreen(
                                 color = Color.White.copy(alpha = 0.2f)
                             ) {
                                 Text(
-                                    fechaActual,
+                                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -344,7 +404,6 @@ fun CrearCursoConTemasScreen(
                     .padding(horizontal = 20.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Sección: Información del curso
                 SectionHeader("INFORMACIÓN DEL CURSO", Icons.Default.Info, EduRachaColors.Primary)
 
                 Card(
@@ -413,7 +472,58 @@ fun CrearCursoConTemasScreen(
                             )
                         }
 
-                        // Indicador de docente asignado
+                        // ✅ MOSTRAR FECHAS CALCULADAS
+                        if (duracionDias.isNotEmpty() && duracionDias.toIntOrNull() != null) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.CalendarMonth,
+                                            null,
+                                            tint = EduRachaColors.Primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            "Programación del Curso",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = EduRachaColors.TextPrimary
+                                        )
+                                    }
+
+                                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                    Text(
+                                        "Inicio: ${sdf.format(Date(fechaInicio))}",
+                                        fontSize = 13.sp,
+                                        color = EduRachaColors.TextSecondary
+                                    )
+                                    if (fechaFin != 0L) {
+                                        Text(
+                                            "Fin: ${sdf.format(Date(fechaFin))}",
+                                            fontSize = 13.sp,
+                                            color = EduRachaColors.TextSecondary
+                                        )
+                                        Text(
+                                            "Duración: ${duracionDias} días",
+                                            fontSize = 13.sp,
+                                            color = EduRachaColors.Success,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -454,7 +564,6 @@ fun CrearCursoConTemasScreen(
                     }
                 }
 
-                // Sección: Temas del curso
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -474,7 +583,6 @@ fun CrearCursoConTemasScreen(
                     }
                 }
 
-                // Lista de temas o mensaje vacío
                 if (temas.isEmpty()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -526,7 +634,6 @@ fun CrearCursoConTemasScreen(
                     }
                 }
 
-                // Advertencia sobre temas con IA
                 val temasConIA = temas.filter { it.explicacionFuente == "ia" }
 
                 if (temasConIA.isNotEmpty()) {
@@ -631,10 +738,8 @@ fun CrearCursoConTemasScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
-                // Botón crear curso
                 Button(
                     onClick = {
-                        // 🔥 1. PRIMERO: Validar docenteId
                         if (docenteId.isNullOrBlank()) {
                             Toast.makeText(
                                 context,
@@ -644,7 +749,6 @@ fun CrearCursoConTemasScreen(
                             return@Button
                         }
 
-                        // 2. Validar campos del formulario
                         tituloError = titulo.isBlank()
                         codigoError = codigo.isBlank()
                         descripcionError = descripcion.isBlank()
@@ -655,7 +759,6 @@ fun CrearCursoConTemasScreen(
                             return@Button
                         }
 
-                        // 3. Validar temas
                         if (temas.isEmpty()) {
                             Toast.makeText(context, "Agrega al menos un tema", Toast.LENGTH_LONG).show()
                             return@Button
@@ -670,20 +773,23 @@ fun CrearCursoConTemasScreen(
                             return@Button
                         }
 
-                        // 4. Decidir flujo según tipo de temas
+                        val programacion = generarProgramacionAutomatica(temas, fechaInicio, fechaFin)
+
                         val temasIA = temas.filter { it.explicacionFuente == "ia" }
                         if (temasIA.isNotEmpty()) {
                             showAdvertenciaIADialog = true
                         } else {
-                            // Si no hay temas con IA, crear directamente
                             crearCursoDirectamente(
                                 context = context,
                                 titulo = titulo,
                                 codigo = codigo,
                                 descripcion = descripcion,
-                                docenteId = docenteId, // ✅ Ya validado como non-null
+                                docenteId = docenteId,
                                 duracionDias = duracionDias,
+                                fechaInicio = fechaInicio,
+                                fechaFin = fechaFin,
                                 temas = temas,
+                                programacion = programacion,
                                 estado = estado,
                                 fechaActual = fechaActual,
                                 onLoadingChange = { isLoading = it },
@@ -715,7 +821,6 @@ fun CrearCursoConTemasScreen(
         }
     }
 
-    // Diálogo de advertencia antes de crear
     if (showAdvertenciaIADialog) {
         AdvertenciaIADialog(
             temasConIA = temas.filter { it.explicacionFuente == "ia" },
@@ -723,7 +828,6 @@ fun CrearCursoConTemasScreen(
             onConfirm = {
                 showAdvertenciaIADialog = false
 
-                // 🔥 VALIDACIÓN ADICIONAL del docenteId
                 if (docenteId.isNullOrBlank()) {
                     Toast.makeText(
                         context,
@@ -738,14 +842,19 @@ fun CrearCursoConTemasScreen(
                 progresoCurrent = 0
                 temaActual = ""
 
+                val programacion = generarProgramacionAutomatica(temas, fechaInicio, fechaFin)
+
                 crearCursoConIA(
                     context = context,
                     titulo = titulo,
                     codigo = codigo,
                     descripcion = descripcion,
-                    docenteId = docenteId, // ✅ Ya validado como non-null
+                    docenteId = docenteId,
                     duracionDias = duracionDias,
+                    fechaInicio = fechaInicio,
+                    fechaFin = fechaFin,
                     temas = temas,
+                    programacion = programacion,
                     estado = estado,
                     fechaActual = fechaActual,
                     onLoadingChange = { isLoading = it },
@@ -763,7 +872,6 @@ fun CrearCursoConTemasScreen(
         )
     }
 
-    // Diálogo de progreso de generación
     if (showProgresoGeneracionDialog) {
         ProgresoGeneracionDialog(
             progresoCurrent = progresoCurrent,
@@ -772,7 +880,6 @@ fun CrearCursoConTemasScreen(
         )
     }
 
-    // Diálogo agregar/editar tema
     if (showAgregarTemaDialog || temaParaEditar != null) {
         AgregarTemaDialog(
             temaExistente = temaParaEditar,
@@ -824,7 +931,6 @@ fun AdvertenciaIADialog(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Encabezado
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -860,7 +966,6 @@ fun AdvertenciaIADialog(
 
                 Divider(color = EduRachaColors.Background, thickness = 1.dp)
 
-                // Información
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         "¿Qué va a pasar?",
@@ -916,7 +1021,6 @@ fun AdvertenciaIADialog(
                     }
                 }
 
-                // Botones
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -978,7 +1082,6 @@ fun ProgresoGeneracionDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Animación de carga
                 Box(
                     modifier = Modifier
                         .size(80.dp)
@@ -1017,7 +1120,6 @@ fun ProgresoGeneracionDialog(
                     )
                 }
 
-                // Barra de progreso
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1154,7 +1256,7 @@ fun AgregarTemaDialog(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Fecha: $fechaActual",
+                    "Fecha: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())}",
                     fontSize = 12.sp,
                     color = EduRachaColors.TextSecondary
                 )
@@ -1502,7 +1604,6 @@ fun AgregarTemaDialog(
                     tituloError = titulo.isBlank()
                     contenidoError = contenido.isBlank()
 
-                    // Solo validar explicación si es MANUAL
                     explicacionError = if (tipoExplicacion == "manual") {
                         explicacion.isBlank()
                     } else {
@@ -1523,7 +1624,7 @@ fun AgregarTemaDialog(
                             tipo = if (archivoUrl.isNotEmpty()) "pdf" else "texto",
                             explicacion = if (tipoExplicacion == "manual") explicacion.trim() else "",
                             explicacionFuente = tipoExplicacion,
-                            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
+                            explicacionEstado = "pendiente"
                         )
                         onConfirm(nuevoTema)
                     } else {
@@ -2071,7 +2172,10 @@ private fun crearCursoDirectamente(
     descripcion: String,
     docenteId: String,
     duracionDias: String,
+    fechaInicio: Long,
+    fechaFin: Long,
     temas: List<TemaTemp>,
+    programacion: ProgramacionCurso?,
     estado: String,
     fechaActual: String,
     onLoadingChange: (Boolean) -> Unit,
@@ -2094,7 +2198,8 @@ private fun crearCursoDirectamente(
                 else -> null
             },
             explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
-            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
+            explicacionEstado = "pendiente",
+            programacion = temaTemp.programacion
         )
     }
 
@@ -2104,7 +2209,10 @@ private fun crearCursoDirectamente(
         descripcion = descripcion.trim(),
         docenteId = docenteId,
         duracionDias = duracionDias.toInt(),
+        fechaInicio = fechaInicio,
+        fechaFin = fechaFin,
         temas = temasMap,
+        programacion = programacion,
         estado = estado,
         fechaCreacion = fechaActual
     )
@@ -2138,7 +2246,10 @@ private fun crearCursoConIA(
     descripcion: String,
     docenteId: String,
     duracionDias: String,
+    fechaInicio: Long,
+    fechaFin: Long,
     temas: List<TemaTemp>,
+    programacion: ProgramacionCurso?,
     estado: String,
     fechaActual: String,
     onLoadingChange: (Boolean) -> Unit,
@@ -2162,7 +2273,8 @@ private fun crearCursoConIA(
                 else -> null
             },
             explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
-            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
+            explicacionEstado = "pendiente",
+            programacion = temaTemp.programacion
         )
     }
 
@@ -2172,7 +2284,10 @@ private fun crearCursoConIA(
         descripcion = descripcion.trim(),
         docenteId = docenteId,
         duracionDias = duracionDias.toInt(),
+        fechaInicio = fechaInicio,
+        fechaFin = fechaFin,
         temas = temasMap,
+        programacion = programacion,
         estado = estado,
         fechaCreacion = fechaActual
     )
@@ -2293,5 +2408,3 @@ private suspend fun generarExplicacionesConReintentos(
 
     Log.d("CREAR_CURSO", "📊 Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
 }
-
-

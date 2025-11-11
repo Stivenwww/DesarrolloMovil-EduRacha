@@ -7,12 +7,15 @@ import androidx.lifecycle.viewModelScope
 import com.stiven.sos.api.ApiClient
 import com.stiven.sos.models.Curso
 import com.stiven.sos.models.EstadoSolicitud
+import com.stiven.sos.models.ProgramacionCurso
+import com.stiven.sos.models.RangoTema
 import com.stiven.sos.repository.CursoRepository
 import com.stiven.sos.utils.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 data class CursoUiState(
     val cursos: List<Curso> = emptyList(),
@@ -30,11 +33,9 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(CursoUiState())
     val uiState = _uiState.asStateFlow()
 
-    //  Flag para evitar múltiples llamadas simultáneas
+    // Flag para evitar múltiples llamadas simultáneas
     private var isLoadingCursos = false
     private var isLoadingSolicitudes = false
-
-
 
     fun obtenerCursos() {
         // ✅ Prevenir llamadas duplicadas
@@ -155,6 +156,9 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * ✅ ACTUALIZADO - Con soporte completo para programación
+     */
     fun actualizarCurso(curso: Curso) {
         val id = curso.id
 
@@ -170,13 +174,33 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
+
+            // Validar que el curso tenga las fechas necesarias
+            if (curso.fechaInicio == 0L || curso.fechaFin == 0L) {
+                Log.w("CursoViewModel", "⚠️ Curso sin fechas, se guardará pero sin distribución temporal")
+            }
+
+            // Si el curso tiene programación, validar su consistencia
+            curso.programacion?.let { prog ->
+                val temasIds = curso.temas?.keys ?: emptySet()
+                val temasOrdenados = prog.temasOrdenados.toSet()
+
+                if (temasOrdenados != temasIds) {
+                    Log.w("CursoViewModel", "⚠️ La programación no coincide con los temas del curso")
+                }
+
+                Log.d("CursoViewModel", "📅 Programación incluida:")
+                Log.d("CursoViewModel", "   - Temas ordenados: ${prog.temasOrdenados.size}")
+                Log.d("CursoViewModel", "   - Distribución temporal: ${prog.distribucionTemporal.size}")
+            }
+
             repository.actualizarCurso(id, curso)
                 .onSuccess {
-                    Log.d("CursoViewModel", "✅ Curso ${curso.titulo} actualizado")
+                    Log.d("CursoViewModel", "✅ Curso '${curso.titulo}' actualizado con éxito")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            operationSuccess = "Curso '${curso.titulo}' actualizado"
+                            operationSuccess = "Curso '${curso.titulo}' actualizado correctamente"
                         )
                     }
                     obtenerCursos()
@@ -193,12 +217,72 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * ✅ HELPER - Generar programación automática basada en fechas del curso
+     */
+    fun generarProgramacionAutomatica(curso: Curso): ProgramacionCurso? {
+        val temas = curso.temas ?: return null
+        if (temas.isEmpty()) return null
+
+        // Validar que el curso tenga fechas
+        if (curso.fechaInicio == 0L || curso.fechaFin == 0L) {
+            Log.e("CursoViewModel", "❌ No se puede generar programación sin fechas de inicio/fin")
+            return null
+        }
+
+        val temasLista = temas.values.toList()
+        val cantidadTemas = temasLista.size
+        val duracionTotal = curso.fechaFin - curso.fechaInicio
+        val diasPorTema = TimeUnit.MILLISECONDS.toDays(duracionTotal).toInt() / cantidadTemas
+
+        if (diasPorTema <= 0) {
+            Log.e("CursoViewModel", "❌ Duración inválida para generar programación")
+            return null
+        }
+
+        val temasOrdenados = mutableListOf<String>()
+        val distribucionTemporal = mutableMapOf<String, RangoTema>()
+
+        var fechaActual = curso.fechaInicio
+
+        temasLista.forEachIndexed { index, tema ->
+            val temaId = tema.id ?: return@forEachIndexed
+            temasOrdenados.add(temaId)
+
+            val fechaFinalTema = if (index == temasLista.size - 1) {
+                curso.fechaFin // Último tema llega hasta el final
+            } else {
+                fechaActual + TimeUnit.DAYS.toMillis(diasPorTema.toLong())
+            }
+
+            distribucionTemporal[temaId] = RangoTema(
+                temaId = temaId,
+                titulo = tema.titulo,
+                fechaInicio = fechaActual,
+                fechaFin = fechaFinalTema,
+                quizzesRequeridos = diasPorTema, // 1 quiz por día
+                diasAsignados = diasPorTema
+            )
+
+            fechaActual = fechaFinalTema
+        }
+
+        Log.d("CursoViewModel", "✅ Programación generada automáticamente:")
+        Log.d("CursoViewModel", "   - ${temasOrdenados.size} temas")
+        Log.d("CursoViewModel", "   - $diasPorTema días por tema")
+
+        return ProgramacionCurso(
+            temasOrdenados = temasOrdenados,
+            distribucionTemporal = distribucionTemporal
+        )
+    }
+
     fun eliminarCurso(id: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.eliminarCurso(id)
                 .onSuccess {
-                    Log.d("CursoViewModel", " Curso eliminado")
+                    Log.d("CursoViewModel", "✅ Curso eliminado")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -208,7 +292,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", " Error eliminando curso", exception)
+                    Log.e("CursoViewModel", "❌ Error eliminando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
