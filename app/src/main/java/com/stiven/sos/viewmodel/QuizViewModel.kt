@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.google.firebase.auth.FirebaseAuth
+
+
 
 data class QuizUiState(
     val isLoading: Boolean = false,
@@ -45,7 +48,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     private var vidasListener: ValueEventListener? = null
     private var progresoListener: ValueEventListener? = null
 
-    // Guardar cursoId y temaId activos
     private var currentCursoId: String? = null
     private var currentTemaId: String? = null
 
@@ -55,6 +57,24 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     private val finalizarMutex = Mutex()
     private val iniciarMutex = Mutex()
 
+    // Agregar al inicio de QuizViewModel
+    init {
+        verificarAutenticacion()
+    }
+
+    private fun verificarAutenticacion() {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            Log.e(TAG, " Usuario no autenticado en Firebase")
+            _uiState.value = _uiState.value.copy(
+                error = "Debes iniciar sesión para continuar"
+            )
+        } else {
+            Log.d(TAG, "✅ Usuario autenticado: ${currentUser.uid}")
+        }
+    }
+
+
     // ============================================
     // OBSERVADORES EN TIEMPO REAL
     // ============================================
@@ -63,12 +83,9 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         currentCursoId = cursoId
         val userId = prefs.getString("user_uid", "") ?: return
 
-        Log.d(TAG, " Iniciando observadores para curso: $cursoId")
+        Log.d(TAG, "🔍 Iniciando observadores para curso: $cursoId")
 
-        // Observar vidas en tiempo real
         observarVidas(cursoId, userId)
-
-        // Observar progreso en tiempo real
         observarProgreso(cursoId, userId)
     }
 
@@ -80,10 +97,10 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     vidas = vidas,
                     sinVidas = vidas.vidasActuales == 0
                 )
-                Log.d(TAG, " Vidas actualizadas: ${vidas.vidasActuales}/${vidas.vidasMax}")
+                Log.d(TAG, "💚 Vidas actualizadas: ${vidas.vidasActuales}/${vidas.vidasMax}")
             },
             onError = { error ->
-                Log.e(TAG, "Error al observar vidas", error)
+                Log.e(TAG, "❌ Error al observar vidas", error)
             }
         )
     }
@@ -93,10 +110,10 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             cursoId = cursoId,
             onProgresoActualizado = { progreso ->
                 _uiState.value = _uiState.value.copy(progreso = progreso)
-                Log.d(TAG, " Progreso actualizado: XP=${progreso.experiencia}, Racha=${progreso.rachaDias}")
+                Log.d(TAG, " Progreso actualizado: XP=${progreso.experiencia}, Racha=${progreso.rachaDias}, Vidas=${progreso.vidas}")
             },
             onError = { error ->
-                Log.e(TAG, "Error al observar progreso", error)
+                Log.e(TAG, " Error al observar progreso", error)
             }
         )
     }
@@ -114,7 +131,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
         vidasListener = null
         progresoListener = null
-        // NO limpiar currentCursoId aquí para mantenerlo durante el quiz
     }
 
     override fun onCleared() {
@@ -130,7 +146,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cargarCursosInscritos() {
         if (_uiState.value.isLoading) {
-            Log.w(TAG, "Ya se están cargando los cursos")
+            Log.w(TAG, "⏳ Ya se están cargando los cursos")
             return
         }
 
@@ -143,12 +159,14 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         isLoading = false,
                         cursosInscritos = cursos
                     )
+                    Log.d(TAG, "✅ ${cursos.size} cursos cargados")
                 },
                 onFailure = { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = e.message ?: "Error al cargar cursos"
                     )
+                    Log.e(TAG, "❌ Error al cargar cursos", e)
                 }
             )
         }
@@ -165,6 +183,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             repository.marcarExplicacionVista(temaId).fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(isLoading = false)
+                    Log.d(TAG, "✅ Explicación marcada como vista")
                     onSuccess()
                 },
                 onFailure = { e ->
@@ -172,6 +191,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         isLoading = false,
                         error = e.message
                     )
+                    Log.e(TAG, "❌ Error al marcar explicación", e)
                 }
             )
         }
@@ -184,39 +204,38 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     fun iniciarQuiz(cursoId: String, temaId: String) {
         viewModelScope.launch {
             iniciarMutex.withLock {
-                // GUARDAR IDs INMEDIATAMENTE
                 currentCursoId = cursoId
                 currentTemaId = temaId
 
-                Log.d(TAG, "IDs guardados - Curso: $cursoId, Tema: $temaId")
+                Log.d(TAG, "🎯 IDs guardados - Curso: $cursoId, Tema: $temaId")
 
-                // Verificar vidas antes de iniciar
                 val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 5
                 if (vidasActuales == 0) {
                     _uiState.value = _uiState.value.copy(
                         error = "No tienes vidas disponibles",
                         mostrarDialogoSinVidas = true
                     )
+                    Log.w(TAG, "⚠️ Sin vidas disponibles")
                     return@withLock
                 }
 
                 if (_uiState.value.quizActivo != null) {
-                    Log.w(TAG, "Ya hay un quiz activo")
+                    Log.w(TAG, "⚠️ Ya hay un quiz activo")
                     return@withLock
                 }
 
                 if (_uiState.value.isLoading) {
-                    Log.w(TAG, "Ya se está iniciando un quiz")
+                    Log.w(TAG, "⚠️ Ya se está iniciando un quiz")
                     return@withLock
                 }
 
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-                Log.d(TAG, "Iniciando quiz - Curso: $cursoId, Tema: $temaId")
+                Log.d(TAG, "🚀 Iniciando quiz - Curso: $cursoId, Tema: $temaId")
 
                 repository.iniciarQuiz(cursoId, temaId).fold(
                     onSuccess = { response ->
-                        Log.d(TAG, "Quiz iniciado exitosamente: ${response.quizId}")
+                        Log.d(TAG, "✅ Quiz iniciado exitosamente: ${response.quizId}")
 
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
@@ -228,7 +247,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     },
                     onFailure = { e ->
-                        Log.e(TAG, " Error al iniciar quiz", e)
+                        Log.e(TAG, "❌ Error al iniciar quiz", e)
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = e.message ?: "Error al iniciar quiz"
@@ -261,7 +280,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             tiempoInicioPregunta = System.currentTimeMillis()
         )
 
-        Log.d(TAG, "Respuesta registrada - Pregunta: $preguntaId, Opción: $respuestaSeleccionada, Tiempo: ${tiempoUsado}s")
+        Log.d(TAG, "✍️ Respuesta registrada - Pregunta: $preguntaId, Opción: $respuestaSeleccionada, Tiempo: ${tiempoUsado}s")
     }
 
     // ============================================
@@ -272,32 +291,32 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             finalizarMutex.withLock {
                 if (_uiState.value.finalizando) {
-                    Log.w(TAG, "Ya se está finalizando el quiz")
+                    Log.w(TAG, "⚠️ Ya se está finalizando el quiz")
                     return@withLock
                 }
 
                 val quizId = _uiState.value.quizActivo?.quizId
                 if (quizId == null) {
-                    Log.e(TAG, "No hay quiz activo para finalizar")
+                    Log.e(TAG, "❌ No hay quiz activo para finalizar")
                     return@withLock
                 }
 
                 val respuestas = _uiState.value.respuestasUsuario
                 if (respuestas.isEmpty()) {
-                    Log.e(TAG, "No hay respuestas para enviar")
+                    Log.e(TAG, "❌ No hay respuestas para enviar")
                     _uiState.value = _uiState.value.copy(error = "No hay respuestas registradas")
                     return@withLock
                 }
 
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null, finalizando = true)
 
-                Log.d(TAG, "Finalizando quiz: $quizId con ${respuestas.size} respuestas")
+                Log.d(TAG, "🏁 Finalizando quiz: $quizId con ${respuestas.size} respuestas")
 
                 repository.finalizarQuiz(quizId, respuestas).fold(
                     onSuccess = { resultado ->
-                        Log.d(TAG, "Quiz finalizado exitosamente")
-                        Log.d(TAG, "Correctas: ${resultado.preguntasCorrectas}, Incorrectas: ${resultado.preguntasIncorrectas}")
-                        Log.d(TAG, "XP ganada: ${resultado.experienciaGanada}, Vidas restantes: ${resultado.vidasRestantes}")
+                        Log.d(TAG, "✅ Quiz finalizado exitosamente")
+                        Log.d(TAG, "📊 Correctas: ${resultado.preguntasCorrectas}, Incorrectas: ${resultado.preguntasIncorrectas}")
+                        Log.d(TAG, "⭐ XP ganada: ${resultado.experienciaGanada}, Vidas restantes: ${resultado.vidasRestantes}")
 
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
@@ -305,45 +324,13 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                             finalizando = false
                         )
 
-                        //  SINCRONIZAR PROGRESO CON INSCRIPCIÓN
-                        if (currentCursoId != null) {
-                            Log.d(TAG, " Sincronizando progreso para curso: $currentCursoId")
-
-                            val totalPreguntas = resultado.preguntasCorrectas + resultado.preguntasIncorrectas
-                            val porcentaje = if (totalPreguntas > 0) {
-                                (resultado.preguntasCorrectas * 100) / totalPreguntas
-                            } else 0
-
-                            val aprobado = porcentaje >= 70
-
-                            Log.d(TAG, " Calculando: $porcentaje% correcto → Aprobado: $aprobado")
-
-                            // Lanzar sincronización sin bloquear
-                            viewModelScope.launch {
-                                repository.sincronizarProgresoConInscripcion(
-                                    cursoId = currentCursoId!!,
-                                    experienciaGanada = resultado.experienciaGanada,
-                                    quizAprobado = aprobado
-                                ).fold(
-                                    onSuccess = {
-                                        Log.d(TAG, " Progreso actualizado en Firebase correctamente")
-                                    },
-                                    onFailure = { e ->
-                                        Log.e(TAG, "Error actualizando progreso: ${e.message}", e)
-                                    }
-                                )
-                            }
-                        } else {
-                            Log.e(TAG, " currentCursoId es null, no se puede sincronizar progreso")
-                        }
-
                         // Si hubo fallos, cargar retroalimentación
                         if (resultado.preguntasIncorrectas > 0) {
                             obtenerRetroalimentacion(quizId)
                         }
                     },
                     onFailure = { e ->
-                        Log.e(TAG, "Error al finalizar quiz", e)
+                        Log.e(TAG, "❌ Error al finalizar quiz", e)
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = e.message ?: "Error al finalizar quiz",
@@ -361,7 +348,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun obtenerRetroalimentacion(quizId: String) {
         if (_uiState.value.isLoading) {
-            Log.w(TAG, "Ya se está cargando la retroalimentación")
+            Log.w(TAG, "⚠️ Ya se está cargando la retroalimentación")
             return
         }
 
@@ -370,38 +357,14 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
             repository.obtenerRetroalimentacion(quizId).fold(
                 onSuccess = { retroalimentacion ->
-                    Log.d(TAG, " Retroalimentación cargada: ${retroalimentacion.totalFallos} fallos")
+                    Log.d(TAG, "💡 Retroalimentación cargada: ${retroalimentacion.totalFallos} fallos")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         retroalimentacion = retroalimentacion
                     )
                 },
                 onFailure = { e ->
-                    Log.e(TAG, " Error al obtener retroalimentación", e)
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
-                }
-            )
-        }
-    }
-
-    // ============================================
-    // OBTENER INFO DEL TEMA
-    // ============================================
-
-    fun obtenerTemaInfo(cursoId: String, temaId: String) {
-        if (_uiState.value.isLoading) {
-            Log.w(TAG, "Ya se está cargando la información del tema")
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-            repository.obtenerTemaInfo(cursoId, temaId).fold(
-                onSuccess = { info ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, temaInfo = info)
-                },
-                onFailure = { e ->
+                    Log.e(TAG, "❌ Error al obtener retroalimentación", e)
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                 }
             )
@@ -423,7 +386,6 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             error = null,
             finalizando = false
         )
-        // NO limpiar currentCursoId aquí para mantener los observadores
     }
 
     fun limpiarError() {

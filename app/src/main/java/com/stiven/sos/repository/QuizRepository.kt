@@ -10,8 +10,6 @@ import com.google.firebase.database.DatabaseError
 import com.stiven.sos.api.ApiClient
 import com.stiven.sos.models.*
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import android.util.Log
 
 class QuizRepository(private val application: Application) {
@@ -22,91 +20,146 @@ class QuizRepository(private val application: Application) {
     private val prefs = application.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
 
     /**
-     * Obtener token de autenticación
-     */
-    private suspend fun getAuthToken(): String {
-        val currentUser = auth.currentUser
-            ?: throw Exception("Usuario no autenticado")
-
-        return currentUser.getIdToken(false).await().token
-            ?: throw Exception("No se pudo obtener el token")
-    }
-
-    /**
-     * Marcar explicación como vista
+     * ✅ Marcar explicación como vista - CORREGIDO
      */
     suspend fun marcarExplicacionVista(temaId: String): Result<Unit> {
         return try {
-            val token = getAuthToken()
+            // ✅ IMPORTANTE: Verificar que el usuario esté autenticado
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "❌ Usuario no autenticado en Firebase")
+                return Result.failure(Exception("Usuario no autenticado"))
+            }
+
+            Log.d(TAG, "📱 Marcando explicación como vista para tema: $temaId")
+            Log.d(TAG, "👤 Usuario: ${currentUser.uid}")
+
+            // ✅ Verificar que el token sea válido
+            val token = currentUser.getIdToken(true).await()
+            Log.d(TAG, "✅ Token obtenido: ${token.token?.take(30)}...")
+
             val request = mapOf("temaId" to temaId)
             val response = ApiClient.apiService.marcarExplicacionVista(request)
 
-            if (response.isSuccessful) {
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception("Error al marcar explicación: ${response.code()}"))
+            when (response.code()) {
+                200 -> {
+                    Log.d(TAG, "✅ Explicación marcada como vista correctamente")
+                    Result.success(Unit)
+                }
+                401 -> {
+                    Log.e(TAG, "❌ Token rechazado por el backend")
+                    Result.failure(Exception("Token inválido. Por favor, vuelve a iniciar sesión."))
+                }
+                400 -> {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e(TAG, "❌ Error 400: $errorBody")
+                    Result.failure(Exception(errorBody ?: "Solicitud inválida"))
+                }
+                else -> {
+                    Log.e(TAG, "❌ Error ${response.code()}: ${response.message()}")
+                    Result.failure(Exception("Error al marcar explicación: ${response.code()}"))
+                }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "❌ Exception: ${e.message}", e)
+            Result.failure(Exception("Error de conexión: ${e.message}"))
         }
     }
 
     /**
-     * Iniciar quiz
+     * ✅ Iniciar quiz - ACTUALIZADO
      */
     suspend fun iniciarQuiz(cursoId: String, temaId: String): Result<IniciarQuizResponse> {
         return try {
-            val token = getAuthToken()
+            // Verificar autenticación
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "❌ Usuario no autenticado")
+                return Result.failure(Exception("Usuario no autenticado"))
+            }
+
+            Log.d(TAG, "🚀 Iniciando quiz - Curso: $cursoId, Tema: $temaId")
+            Log.d(TAG, "👤 Usuario: ${currentUser.uid}")
+
             val request = IniciarQuizRequest(cursoId = cursoId, temaId = temaId)
             val response = ApiClient.apiService.iniciarQuiz(request)
 
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("Respuesta vacía del servidor"))
-            } else {
-                val errorMsg = when (response.code()) {
-                    400 -> "No tienes vidas disponibles o no estás inscrito"
-                    404 -> "Curso o tema no encontrado"
-                    else -> "Error al iniciar quiz: ${response.code()}"
+            when (response.code()) {
+                200 -> {
+                    response.body()?.let {
+                        Log.d(TAG, "✅ Quiz iniciado: ${it.quizId} con ${it.preguntas.size} preguntas")
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Respuesta vacía del servidor"))
                 }
-                Result.failure(Exception(errorMsg))
+                400 -> {
+                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
+                    Log.e(TAG, "❌ Validación fallida: $errorBody")
+                    Result.failure(Exception(errorBody))
+                }
+                401 -> {
+                    Log.e(TAG, "❌ Token inválido o expirado")
+                    Result.failure(Exception("Sesión expirada. Por favor, vuelve a iniciar sesión."))
+                }
+                404 -> {
+                    Log.e(TAG, "❌ Curso o tema no encontrado")
+                    Result.failure(Exception("Curso o tema no encontrado"))
+                }
+                else -> {
+                    Log.e(TAG, "❌ Error ${response.code()}: ${response.message()}")
+                    Result.failure(Exception("Error al iniciar quiz: ${response.code()}"))
+                }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "❌ Exception al iniciar quiz: ${e.message}", e)
+            Result.failure(Exception("Error de conexión. Verifica tu internet."))
         }
     }
 
     /**
-     * Finalizar quiz
+     * ✅ Finalizar quiz
      */
     suspend fun finalizarQuiz(
         quizId: String,
         respuestas: List<RespuestaUsuario>
     ): Result<FinalizarQuizResponse> {
         return try {
-            val token = getAuthToken()
             val request = FinalizarQuizRequest(quizId = quizId, respuestas = respuestas)
             val response = ApiClient.apiService.finalizarQuiz(request)
 
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("Respuesta vacía del servidor"))
-            } else {
-                Result.failure(Exception("Error al finalizar quiz: ${response.code()}"))
+            when (response.code()) {
+                200 -> {
+                    response.body()?.let {
+                        Log.d(TAG, "✅ Quiz finalizado")
+                        Log.d(TAG, "📊 Correctas: ${it.preguntasCorrectas}, Incorrectas: ${it.preguntasIncorrectas}")
+                        Log.d(TAG, "⭐ XP ganada: ${it.experienciaGanada}, Vidas restantes: ${it.vidasRestantes}")
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Respuesta vacía del servidor"))
+                }
+                400 -> {
+                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
+                    Log.e(TAG, "❌ Error al finalizar: $errorBody")
+                    Result.failure(Exception(errorBody))
+                }
+                401 -> {
+                    Log.e(TAG, "❌ Token inválido")
+                    Result.failure(Exception("Sesión expirada"))
+                }
+                else -> {
+                    Log.e(TAG, "❌ Error ${response.code()}")
+                    Result.failure(Exception("Error al finalizar quiz: ${response.code()}"))
+                }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Log.e(TAG, "❌ Error de red: ${e.message}", e)
+            Result.failure(Exception("Error de conexión"))
         }
     }
 
     /**
-     * Obtener revisión del quiz
+     * ✅ Obtener revisión del quiz
      */
     suspend fun obtenerRevisionQuiz(quizId: String): Result<RevisionQuizResponse> {
         return try {
-            val token = getAuthToken()
             val response = ApiClient.apiService.obtenerRevisionQuiz(quizId)
 
             if (response.isSuccessful) {
@@ -122,283 +175,40 @@ class QuizRepository(private val application: Application) {
     }
 
     /**
-     * Actualiza experiencia y racha en Firebase después de completar un quiz
-     */
-    suspend fun sincronizarProgresoConInscripcion(
-        cursoId: String,
-        experienciaGanada: Int,
-        quizAprobado: Boolean
-    ): Result<Unit> {
-        return try {
-            val userUid = prefs.getString("user_uid", "") ?: ""
-            if (userUid.isEmpty()) {
-                return Result.failure(Exception("Usuario no autenticado"))
-            }
-
-            val inscripcionRef = database.getReference("inscripciones")
-                .child(cursoId)
-                .child(userUid)
-
-            // Obtener inscripción actual
-            val snapshot = inscripcionRef.get().await()
-
-            if (!snapshot.exists()) {
-                Log.w(TAG, " Inscripción no existe, creando campos de progreso")
-                // Crear campos iniciales si no existen
-                val updates = hashMapOf<String, Any>(
-                    "experiencia" to experienciaGanada,
-                    "diasConsecutivos" to if (quizAprobado) 1 else 0,
-                    "ultimaFecha" to System.currentTimeMillis()
-                )
-                inscripcionRef.updateChildren(updates).await()
-                Log.d(TAG, " Progreso inicial creado: XP=$experienciaGanada, Racha=${if (quizAprobado) 1 else 0}")
-                return Result.success(Unit)
-            }
-
-            // Obtener valores actuales
-            val expActual = snapshot.child("experiencia").getValue(Int::class.java) ?: 0
-            val rachaActual = snapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
-            val ultimaFecha = snapshot.child("ultimaFecha").getValue(Long::class.java) ?: 0L
-
-            // Calcular nueva experiencia (SIEMPRE se suma)
-            val nuevaExp = expActual + experienciaGanada
-
-            // Calcular nueva racha (solo si aprobó con 70% o más)
-            val ahora = System.currentTimeMillis()
-            val unDiaEnMilis = 24 * 60 * 60 * 1000L
-            val diferenciaDias = if (ultimaFecha > 0) {
-                (ahora - ultimaFecha) / unDiaEnMilis
-            } else {
-                0L
-            }
-
-            val nuevaRacha = if (quizAprobado) {
-                when {
-                    ultimaFecha == 0L -> {
-                        Log.d(TAG, "Primera vez completando quiz aprobado")
-                        1
-                    }
-                    diferenciaDias == 0L -> {
-                        Log.d(TAG, "Mismo día, racha se mantiene")
-                        rachaActual // Mismo día, no incrementar
-                    }
-                    diferenciaDias == 1L -> {
-                        Log.d(TAG, "Día consecutivo, incrementando racha")
-                        rachaActual + 1
-                    }
-                    else -> {
-                        Log.d(TAG, "Se rompió la racha (${diferenciaDias} días), reiniciando")
-                        1
-                    }
-                }
-            } else {
-                Log.d(TAG, "Quiz no aprobado, racha se mantiene")
-                rachaActual // No cambiar racha si no aprobó
-            }
-
-            // Actualizar Firebase
-            val updates = hashMapOf<String, Any>(
-                "experiencia" to nuevaExp,
-                "diasConsecutivos" to nuevaRacha,
-                "ultimaFecha" to ahora
-            )
-
-            inscripcionRef.updateChildren(updates).await()
-
-            Log.d(TAG, " Progreso sincronizado correctamente:")
-            Log.d(TAG, "   • XP: $expActual → $nuevaExp (+$experienciaGanada)")
-            Log.d(TAG, "   • Racha: $rachaActual → $nuevaRacha")
-            Log.d(TAG, "   • Aprobado: $quizAprobado")
-
-            Result.success(Unit)
-
-        } catch (e: Exception) {
-            Log.e(TAG, " Error sincronizando progreso con inscripción", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener retroalimentación
+     * ✅ Obtener retroalimentación de errores
      */
     suspend fun obtenerRetroalimentacion(quizId: String): Result<RetroalimentacionFallosResponse> {
         return try {
-            val userUid = prefs.getString("user_uid", "") ?: ""
-            if (userUid.isEmpty()) {
-                return Result.failure(Exception("Usuario no autenticado"))
-            }
-
-            // Primero verificar en Firebase si el quiz tiene errores
-            val quizSnapshot = database.getReference("quizzes").child(quizId).get().await()
-
-            if (!quizSnapshot.exists()) {
-                return Result.failure(Exception("Quiz no encontrado"))
-            }
-
-            val preguntasIncorrectas = quizSnapshot.child("preguntasIncorrectas").getValue(Int::class.java) ?: 0
-
-            Log.d(TAG, "Quiz $quizId - Preguntas incorrectas en Firebase: $preguntasIncorrectas")
-
-            // Si no hay errores, devolver retroalimentación vacía
-            if (preguntasIncorrectas == 0) {
-                Log.d(TAG, "Quiz perfecto - No hay errores")
-                return Result.success(RetroalimentacionFallosResponse(
-                    quizId = quizId,
-                    totalFallos = 0,
-                    preguntasFalladas = emptyList()
-                ))
-            }
-
-            // Si hay errores, intentar obtener la retroalimentación del backend
-            val token = getAuthToken()
             val response = ApiClient.apiService.obtenerRetroalimentacion(quizId)
 
             when (response.code()) {
                 200 -> {
                     response.body()?.let {
-                        Log.d(TAG, "Retroalimentación obtenida: ${it.totalFallos} fallos")
+                        Log.d(TAG, "💡 Retroalimentación: ${it.totalFallos} fallos")
                         Result.success(it)
-                    } ?: Result.failure(Exception("Respuesta vacía del servidor"))
+                    } ?: Result.failure(Exception("Respuesta vacía"))
                 }
                 404 -> {
-                    Log.w(TAG, "Backend no tiene retroalimentación, construyendo desde Firebase")
-                    construirRetroalimentacionDesdeFirebase(quizId, userUid)
+                    Log.d(TAG, "ℹ️ Sin retroalimentación (quiz perfecto)")
+                    Result.success(RetroalimentacionFallosResponse(
+                        quizId = quizId,
+                        totalFallos = 0,
+                        preguntasFalladas = emptyList()
+                    ))
                 }
                 else -> {
-                    Result.failure(Exception("Error al obtener retroalimentación: ${response.code()}"))
+                    Result.failure(Exception("Error ${response.code()}"))
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error obteniendo retroalimentación", e)
+            Log.e(TAG, "❌ Error obteniendo retroalimentación", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Construir retroalimentación desde Firebase
+     * ✅ Obtener cursos inscritos
      */
-    private suspend fun construirRetroalimentacionDesdeFirebase(
-        quizId: String,
-        userId: String
-    ): Result<RetroalimentacionFallosResponse> = withContext(Dispatchers.IO) {
-        try {
-            val quizRef = database.getReference("quizzes").child(quizId)
-            val snapshot = quizRef.get().await()
-
-            if (!snapshot.exists()) {
-                return@withContext Result.failure(Exception("Quiz no encontrado en Firebase"))
-            }
-
-            val respuestasSnapshot = snapshot.child("respuestas")
-            val preguntasFalladas = mutableListOf<RetroalimentacionPregunta>()
-
-            respuestasSnapshot.children.forEach { respuestaSnapshot ->
-                try {
-                    val esCorrecta = respuestaSnapshot.child("esCorrecta").getValue(Boolean::class.java) ?: true
-
-                    if (!esCorrecta) {
-                        val preguntaId = respuestaSnapshot.child("preguntaId").getValue(String::class.java) ?: ""
-
-                        if (preguntaId.isNotEmpty()) {
-                            val preguntaSnapshot = database.getReference("preguntas").child(preguntaId).get().await()
-
-                            if (preguntaSnapshot.exists()) {
-                                val textoPregunta = preguntaSnapshot.child("texto").getValue(String::class.java) ?: "Pregunta sin texto"
-                                val respuestaUsuario = respuestaSnapshot.child("respuestaSeleccionada").getValue(Int::class.java) ?: -1
-                                val respuestaCorrecta = preguntaSnapshot.child("respuestaCorrecta").getValue(Int::class.java) ?: 0
-
-                                val explicacion = preguntaSnapshot.child("explicacionCorrecta").getValue(String::class.java)
-                                    ?: preguntaSnapshot.child("explicacion").getValue(String::class.java)
-                                    ?: "No hay explicación disponible para esta pregunta"
-
-                                val opcionesSnapshot = preguntaSnapshot.child("opciones")
-                                var respuestaUsuarioTexto = "Opción no encontrada"
-                                var respuestaCorrectaTexto = "Opción no encontrada"
-
-                                opcionesSnapshot.children.forEachIndexed { index, opcion ->
-                                    val textoOpcion = opcion.child("texto").getValue(String::class.java) ?: ""
-                                    if (index == respuestaUsuario) {
-                                        respuestaUsuarioTexto = textoOpcion
-                                    }
-                                    if (index == respuestaCorrecta) {
-                                        respuestaCorrectaTexto = textoOpcion
-                                    }
-                                }
-
-                                preguntasFalladas.add(RetroalimentacionPregunta(
-                                    preguntaId = preguntaId,
-                                    texto = textoPregunta,
-                                    respuestaUsuarioTexto = respuestaUsuarioTexto,
-                                    respuestaCorrectaTexto = respuestaCorrectaTexto,
-                                    explicacion = explicacion
-                                ))
-
-                                Log.d(TAG, "Pregunta fallada construida: $preguntaId")
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error procesando respuesta individual", e)
-                }
-            }
-
-            Log.d(TAG, " Retroalimentación construida desde Firebase: ${preguntasFalladas.size} fallos")
-
-            Result.success(RetroalimentacionFallosResponse(
-                quizId = quizId,
-                totalFallos = preguntasFalladas.size,
-                preguntasFalladas = preguntasFalladas
-            ))
-        } catch (e: Exception) {
-            Log.e(TAG, " Error construyendo retroalimentación desde Firebase", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener vidas del curso
-     */
-    suspend fun obtenerVidas(cursoId: String): Result<VidasResponse> {
-        return try {
-            val token = getAuthToken()
-            val response = ApiClient.apiService.obtenerVidas(cursoId)
-
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("No se pudieron obtener las vidas"))
-            } else {
-                Result.failure(Exception("Error al obtener vidas: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener información del tema
-     */
-    suspend fun obtenerTemaInfo(cursoId: String, temaId: String): Result<TemaInfoResponse> {
-        return try {
-            val token = getAuthToken()
-            val response = ApiClient.apiService.obtenerTemaInfo(cursoId, temaId)
-
-            if (response.isSuccessful) {
-                response.body()?.let {
-                    Result.success(it)
-                } ?: Result.failure(Exception("Información no encontrada"))
-            } else {
-                Result.failure(Exception("Error al obtener información: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Obtener cursos inscritos
-     */
-
     suspend fun obtenerCursosInscritos(): Result<List<Curso>> {
         return try {
             val userUid = prefs.getString("user_uid", "") ?: ""
@@ -406,63 +216,49 @@ class QuizRepository(private val application: Application) {
                 return Result.failure(Exception("Usuario no autenticado"))
             }
 
-            // 1. Obtener TODAS las inscripciones de la base de datos de una sola vez.
-            // Esto es mucho más eficiente que hacer una consulta por cada curso.
-            val todasLasInscripcionesSnapshot = database.getReference("inscripciones").get().await()
+            val inscripcionesSnapshot = database.getReference("inscripciones").get().await()
 
-            if (!todasLasInscripcionesSnapshot.exists()) {
-                // Si no hay ninguna inscripción en toda la base de datos, devuelve una lista vacía.
+            if (!inscripcionesSnapshot.exists()) {
                 return Result.success(emptyList())
             }
 
-            val idsDeCursosInscritos = mutableListOf<String>()
+            val cursosAprobadosIds = mutableListOf<String>()
 
-            // 2. Iterar sobre las inscripciones para encontrar en cuáles está el usuario actual.
-            todasLasInscripcionesSnapshot.children.forEach { cursoSnapshot ->
-                // cursoSnapshot.key es el ID del curso (ej: "-Od5QwwgBXSy-nqKxECN")
+            inscripcionesSnapshot.children.forEach { cursoSnapshot ->
                 if (cursoSnapshot.hasChild(userUid)) {
-                    val inscripcionUsuario = cursoSnapshot.child(userUid)
-                    val estado = inscripcionUsuario.child("estado").getValue(String::class.java)
+                    val inscripcion = cursoSnapshot.child(userUid)
+                    val estado = inscripcion.child("estado").getValue(String::class.java)
 
-                    // Añadir el ID del curso a nuestra lista si el estado es "aprobado"
                     if (estado == "aprobado") {
-                        cursoSnapshot.key?.let { cursoId ->
-                            idsDeCursosInscritos.add(cursoId)
-                        }
+                        cursoSnapshot.key?.let { cursosAprobadosIds.add(it) }
                     }
                 }
             }
 
-            if (idsDeCursosInscritos.isEmpty()) {
-                // Si el usuario está inscrito en cursos pero ninguno está "aprobado", devuelve una lista vacía.
-                Log.d(TAG, "El usuario no está inscrito en ningún curso con estado 'aprobado'")
+            if (cursosAprobadosIds.isEmpty()) {
+                Log.d(TAG, "ℹ️ No hay cursos aprobados")
                 return Result.success(emptyList())
             }
 
-            // 3. Descargar la lista COMPLETA de cursos (ahora sí es necesario).
             val responseCursos = ApiClient.apiService.obtenerCursos()
             if (!responseCursos.isSuccessful) {
-                return Result.failure(Exception("Error al obtener detalles de los cursos: ${responseCursos.code()}"))
+                return Result.failure(Exception("Error al obtener cursos: ${responseCursos.code()}"))
             }
+
             val todosCursos = responseCursos.body() ?: emptyList()
+            val cursosInscritos = todosCursos.filter { it.id in cursosAprobadosIds }
 
-            // 4. Filtrar la lista de todos los cursos para quedarnos solo con aquellos cuyo ID está en nuestra lista.
-            val cursosDelUsuario = todosCursos.filter { curso ->
-                curso.id in idsDeCursosInscritos
-            }
-
-            Log.d(TAG, "Cursos inscritos y aprobados encontrados: ${cursosDelUsuario.size}")
-            Result.success(cursosDelUsuario)
+            Log.d(TAG, "✅ ${cursosInscritos.size} cursos inscritos")
+            Result.success(cursosInscritos)
 
         } catch (e: Exception) {
-            Log.e(TAG, " Error en obtenerCursosInscritos", e)
+            Log.e(TAG, "❌ Error en obtenerCursosInscritos", e)
             Result.failure(e)
         }
     }
 
-
     /**
-     * Obtener progreso del estudiante en el curso
+     * ✅ Obtener progreso del estudiante - ACTUALIZADO para usar Firebase rachas
      */
     suspend fun obtenerProgresoCurso(cursoId: String): Result<ProgresoCurso> {
         return try {
@@ -471,32 +267,39 @@ class QuizRepository(private val application: Application) {
                 return Result.failure(Exception("Usuario no autenticado"))
             }
 
-            val inscripcionRef = database.getReference("inscripciones")
+            // ✅ Leer directamente desde Firebase rachas
+            val rachaSnapshot = database.getReference("rachas")
                 .child(cursoId)
                 .child(userUid)
+                .get()
+                .await()
 
-            val snapshot = inscripcionRef.get().await()
-
-            if (snapshot.exists()) {
-                val experiencia = snapshot.child("experiencia").getValue(Int::class.java) ?: 0
-                val racha = snapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
-                val practicasCompletadas = 0
-
-                Result.success(ProgresoCurso(
-                    experiencia = experiencia,
-                    rachaDias = racha,
-                    practicasCompletadas = practicasCompletadas
-                ))
-            } else {
-                Result.success(ProgresoCurso(0, 0, 0))
+            if (!rachaSnapshot.exists()) {
+                Log.d(TAG, "ℹ️ No hay datos de racha, usando valores por defecto")
+                return Result.success(ProgresoCurso(0, 0, 5))
             }
+
+            val experiencia = rachaSnapshot.child("experiencia").getValue(Int::class.java) ?: 0
+            val rachaDias = rachaSnapshot.child("rachaDias").getValue(Int::class.java)
+                ?: rachaSnapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
+            val vidas = rachaSnapshot.child("vidas").getValue(Int::class.java) ?: 5
+
+            Log.d(TAG, "✅ Progreso obtenido: XP=$experiencia, Racha=$rachaDias, Vidas=$vidas")
+
+            Result.success(ProgresoCurso(
+                experiencia = experiencia,
+                rachaDias = rachaDias,
+                vidas = vidas
+            ))
+
         } catch (e: Exception) {
+            Log.e(TAG, "❌ Error obteniendo progreso", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Observar vidas en tiempo real
+     * ✅ Observar vidas en tiempo real desde Firebase - ACTUALIZADO
      */
     fun observarVidasTiempoReal(
         cursoId: String,
@@ -504,36 +307,38 @@ class QuizRepository(private val application: Application) {
         onError: (Exception) -> Unit
     ): ValueEventListener {
         val userUid = prefs.getString("user_uid", "") ?: ""
-        val inscripcionRef = database.getReference("inscripciones").child(cursoId).child(userUid)
+        val rachaRef = database.getReference("rachas").child(cursoId).child(userUid)
 
-        val listener = inscripcionRef.addValueEventListener(object : ValueEventListener {
+        val listener = rachaRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
-                    val vidasActuales = snapshot.child("vidasActuales").getValue(Int::class.java) ?: 5
-                    val vidasMax = snapshot.child("vidasMax").getValue(Int::class.java) ?: 5
-                    val ultimaRegen = snapshot.child("ultimaRegen").getValue(Long::class.java) ?: 0L
+                    val vidas = snapshot.child("vidas").getValue(Int::class.java) ?: 5
+                    val vidasMax = 5
 
+                    // Calcular regeneración
+                    val ultimaRegen = snapshot.child("ultimaRegen").getValue(Long::class.java)
+                        ?: snapshot.child("ultimaFecha").getValue(Long::class.java) ?: 0L
                     val ahora = System.currentTimeMillis()
-                    val VIDA_REGEN_MINUTOS = 30
-                    val minutosParaProximaVida = if (vidasActuales < vidasMax) {
-                        val minutosTranscurridos = ((ahora - ultimaRegen) / (1000 * 60)).toInt()
-                        (VIDA_REGEN_MINUTOS - minutosTranscurridos).coerceAtLeast(0)
-                    } else {
-                        0
-                    }
+                    val tiempoTranscurrido = ahora - ultimaRegen
+                    val minutosParaProxima = if (vidas < vidasMax && ultimaRegen > 0) {
+                        30 - ((tiempoTranscurrido / (1000 * 60)).toInt() % 30)
+                    } else 0
 
                     onVidasActualizadas(VidasResponse(
-                        vidasActuales = vidasActuales,
+                        vidasActuales = vidas,
                         vidasMax = vidasMax,
-                        minutosParaProximaVida = minutosParaProximaVida
+                        minutosParaProximaVida = minutosParaProxima
                     ))
 
-                    Log.d(TAG, " Vidas actualizadas: $vidasActuales/$vidasMax")
+                    Log.d(TAG, "💚 Vidas actualizadas: $vidas/$vidasMax (próxima en ${minutosParaProxima}min)")
+                } else {
+                    // Valores por defecto si no existe
+                    onVidasActualizadas(VidasResponse(5, 5, 0))
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e(TAG, "Error observando vidas: ${error.message}")
+                Log.e(TAG, "❌ Error observando vidas: ${error.message}")
                 onError(Exception(error.message))
             }
         })
@@ -542,7 +347,7 @@ class QuizRepository(private val application: Application) {
     }
 
     /**
-     * Observar progreso en tiempo real (DESDE INSCRIPCIONES)
+     * ✅ Observar progreso en tiempo real desde Firebase - ACTUALIZADO
      */
     fun observarProgresoTiempoReal(
         cursoId: String,
@@ -550,32 +355,30 @@ class QuizRepository(private val application: Application) {
         onError: (Exception) -> Unit
     ): ValueEventListener {
         val userUid = prefs.getString("user_uid", "") ?: ""
-        val inscripcionRef = database.getReference("inscripciones")
-            .child(cursoId)
-            .child(userUid)
+        val rachaRef = database.getReference("rachas").child(cursoId).child(userUid)
 
-        val listener = inscripcionRef.addValueEventListener(object : ValueEventListener {
+        val listener = rachaRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val experiencia = snapshot.child("experiencia").getValue(Int::class.java) ?: 0
-                    val racha = snapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
-                    val practicas = 0
+                    val rachaDias = snapshot.child("rachaDias").getValue(Int::class.java)
+                        ?: snapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
+                    val vidas = snapshot.child("vidas").getValue(Int::class.java) ?: 5
 
                     onProgresoActualizado(ProgresoCurso(
                         experiencia = experiencia,
-                        rachaDias = racha,
-                        practicasCompletadas = practicas
+                        rachaDias = rachaDias,
+                        vidas = vidas
                     ))
 
-                    Log.d(TAG, " Progreso actualizado: XP=$experiencia, Racha=$racha")
+                    Log.d(TAG, "📊 Progreso: XP=$experiencia, Racha=$rachaDias, Vidas=$vidas")
                 } else {
-                    Log.w(TAG, " No existe inscripción, progreso en 0")
-                    onProgresoActualizado(ProgresoCurso(0, 0, 0))
+                    onProgresoActualizado(ProgresoCurso(0, 0, 5))
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e(TAG, "Error observando progreso: ${error.message}")
+                Log.e(TAG, "❌ Error observando progreso: ${error.message}")
                 onError(Exception(error.message))
             }
         })
@@ -584,33 +387,28 @@ class QuizRepository(private val application: Application) {
     }
 
     /**
-     * Detener observación de un listener
+     * Detener observación
      */
     fun detenerObservacion(cursoId: String, listener: ValueEventListener, tipo: String) {
         val userUid = prefs.getString("user_uid", "") ?: ""
 
         when (tipo) {
-            "vidas" -> {
-                database.getReference("inscripciones")
+            "vidas", "progreso" -> {
+                database.getReference("rachas")
                     .child(cursoId)
                     .child(userUid)
                     .removeEventListener(listener)
-            }
-            "progreso" -> {
-                database.getReference("inscripciones")
-                    .child(cursoId)
-                    .child(userUid)
-                    .removeEventListener(listener)
+                Log.d(TAG, "🛑 Observador detenido: $tipo")
             }
         }
     }
 }
 
 /**
- * Modelo para progreso del curso
+ * ✅ Modelo para progreso del curso
  */
 data class ProgresoCurso(
     val experiencia: Int = 0,
     val rachaDias: Int = 0,
-    val practicasCompletadas: Int = 0
+    val vidas: Int = 5
 )

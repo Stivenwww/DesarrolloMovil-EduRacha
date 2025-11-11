@@ -118,10 +118,11 @@ data class TemaInfoResponse(
     val inscrito: Boolean
 )
 
+// ✅ ACTUALIZADO: Modelo compatible con Firebase rachas
 data class VidasResponse(
-    val vidasActuales: Int,
-    val vidasMax: Int,
-    val minutosParaProximaVida: Int
+    val vidasActuales: Int = 5,
+    val vidasMax: Int = 5,
+    val minutosParaProximaVida: Int = 0
 )
 
 data class HistorialQuizzesResponse(
@@ -129,7 +130,7 @@ data class HistorialQuizzesResponse(
 )
 
 // ============================================
-// RETROALIMENTACIÓN DE FALLOS - NUEVO
+// RETROALIMENTACIÓN DE FALLOS
 // ============================================
 
 data class RetroalimentacionFallosResponse(
@@ -153,13 +154,24 @@ data class RetroalimentacionPregunta(
 data class Inscripcion(
     val userId: String = "",
     val cursoId: String = "",
-    val estado: String = "en_progreso",
+    val estado: String = "pendiente",
+    val fechaInscripcion: Long = 0,
+    val fechaAprobacion: Long? = null,
     val vidasActuales: Int = 5,
     val vidasMax: Int = 5,
     val ultimaRegen: Long = 0,
     val intentosHechos: Int = 0,
-    val experiencia: Int = 0,
+    val experienciaTotal: Int = 0,
+    val diasConsecutivos: Int = 0,
+    val ultimaFechaActividad: Long = 0
+)
+
+//  Modelo para rachas en Firebase (coincide con backend)
+data class RachaFirebase(
     val diasConsecutivos: Int = 0,
     val ultimaFecha: Long = 0,
-    val vidas: Int = 5
+    val vidas: Int = 5,
+    val experiencia: Int = 0,
+    val rachaDias: Int = 0, // alias para diasConsecutivos
+    val ultimaRegen: Long = 0
 )

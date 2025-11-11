@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 
 /**
  * Clase para guardar y recuperar datos del usuario usando SharedPreferences
- * ✅ Usa commit() en lugar de apply() para garantizar escritura síncrona
+ *  Usa commit() en lugar de apply() para garantizar escritura síncrona
  */
 object UserPreferences {
     private const val PREF_NAME = "EduRachaUserPrefs"
@@ -22,7 +22,7 @@ object UserPreferences {
 
     /**
      * Guarda los datos del usuario después del registro o login
-     * ✅ USA commit() que es SÍNCRONO en lugar de apply() que es ASÍNCRONO
+     *  USA commit() que es SÍNCRONO en lugar de apply() que es ASÍNCRONO
      */
     fun saveUserData(
         context: Context,
@@ -47,7 +47,7 @@ object UserPreferences {
             putString(KEY_USER_EMAIL, correo)
             putString(KEY_USER_ROLE, rol)
             putBoolean(KEY_IS_LOGGED_IN, true)
-        }.commit() // ✅ commit() espera a que se complete el guardado (SÍNCRONO)
+        }.commit() // commit() espera a que se complete el guardado (SÍNCRONO)
 
         android.util.Log.d("UserPreferences", "Guardado exitoso: $success")
 
@@ -114,7 +114,7 @@ object UserPreferences {
 
     /**
      * Limpia todos los datos del usuario (para logout)
-     * ✅ También usa commit() para asegurar limpieza inmediata
+     *  También usa commit() para asegurar limpieza inmediata
      */
     fun clearUserData(context: Context) {
         android.util.Log.d("UserPreferences", "=== LIMPIANDO TODOS LOS DATOS ===")

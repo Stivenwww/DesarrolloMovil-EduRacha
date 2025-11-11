@@ -93,10 +93,10 @@ class CursoRepository {
         return try {
             val response = api.actualizarCurso(id, curso)
             if (response.isSuccessful && response.body() != null) {
-                Log.d("CursoRepository", "✅ Curso actualizado exitosamente")
+                Log.d("CursoRepository", " Curso actualizado exitosamente")
                 Result.success(response.body()!!)
             } else {
-                Log.e("CursoRepository", "❌ Error al actualizar curso: ${response.code()}")
+                Log.e("CursoRepository", "Error al actualizar curso: ${response.code()}")
                 Result.failure(Exception("Error al actualizar curso: ${response.code()}"))
             }
         } catch (e: Exception) {

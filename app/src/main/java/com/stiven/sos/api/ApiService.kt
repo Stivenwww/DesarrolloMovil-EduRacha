@@ -183,46 +183,63 @@ interface ApiService {
     // QUIZ - CON AUTENTICACIÓN
     // ============================================
 
-    @POST("quiz/explicacion/marcar-vista")
-    suspend fun marcarExplicacionVista(
-        @Body request: Map<String, String>
-    ): Response<Map<String, String>>
-
+    /**
+     * Iniciar un nuevo quiz
+     *  El backend valida:
+     * - Token JWT válido
+     * - Inscripción aprobada
+     * - Vidas disponibles
+     * - Explicación vista
+     * - Preguntas suficientes
+     */
     @POST("quiz/iniciar")
     suspend fun iniciarQuiz(
         @Body request: IniciarQuizRequest
     ): Response<IniciarQuizResponse>
 
+    /**
+     * Finalizar un quiz y obtener resultados
+     * El backend actualiza:
+     * - Vidas (-1 por cada error)
+     * - Experiencia (+XP según aciertos)
+     * - Racha (días consecutivos)
+     * - Estado del tema
+     */
     @POST("quiz/finalizar")
     suspend fun finalizarQuiz(
         @Body request: FinalizarQuizRequest
     ): Response<FinalizarQuizResponse>
 
+    /**
+     * Obtener revisión del quiz
+     */
     @GET("quiz/revision/{quizId}")
     suspend fun obtenerRevisionQuiz(
         @Path("quizId") quizId: String
     ): Response<RevisionQuizResponse>
 
-    @GET("quiz/historial")
-    suspend fun obtenerHistorialQuizzes(
-        @Query("cursoId") cursoId: String? = null
-    ): Response<HistorialQuizzesResponse>
+    /**
+     * Marcar explicación como vista
+     */
+    @POST("quiz/explicacion-vista")
+    suspend fun marcarExplicacionVista(
+        @Body request: Map<String, String>
+    ): Response<Map<String, String>>
 
-    @GET("quiz/curso/{cursoId}/vidas")
-    suspend fun obtenerVidas(
-        @Path("cursoId") cursoId: String
-    ): Response<VidasResponse>
-
-    @GET("quiz/curso/{cursoId}/tema/{temaId}/info")
-    suspend fun obtenerTemaInfo(
-        @Path("cursoId") cursoId: String,
-        @Path("temaId") temaId: String
-    ): Response<TemaInfoResponse>
-
+    /**
+     * Obtener retroalimentación de errores
+     */
     @GET("quiz/{quizId}/retroalimentacion")
     suspend fun obtenerRetroalimentacion(
         @Path("quizId") quizId: String
     ): Response<RetroalimentacionFallosResponse>
+
+    /** Obtener vidas actuales con regeneración automática
+     */
+    @GET("quiz/vidas/{cursoId}")
+    suspend fun obtenerVidas(
+        @Path("cursoId") cursoId: String
+    ): Response<Map<String, Any>>
 
 
     // ============================================
@@ -262,7 +279,7 @@ interface ApiService {
         @Body request: GenerarExplicacionRequest
     ): Response<Map<String, Any>>
 
-    // ✅ AGREGAR ESTE ENDPOINT
+    //  AGREGAR ESTE ENDPOINT
     @PUT("api/cursos/{cursoId}/temas/{temaId}/validar-explicacion")
     suspend fun actualizarEstadoExplicacion(
         @Path("cursoId") cursoId: String,

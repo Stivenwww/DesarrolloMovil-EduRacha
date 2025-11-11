@@ -194,7 +194,7 @@ fun CrearCursoConTemasScreen(
                 .padding(paddingValues)
         ) {
 
-        // Header con gradiente
+            // Header con gradiente
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2293,3 +2293,5 @@ private suspend fun generarExplicacionesConReintentos(
 
     Log.d("CREAR_CURSO", "📊 Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
 }
+
+
