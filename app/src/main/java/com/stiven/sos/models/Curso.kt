@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 @Parcelize
 @Serializable
 data class TemaRequest(
+    val id: String? = null,
     val titulo: String,
     val contenido: String,
     val archivoUrl: String? = null,
@@ -102,8 +103,9 @@ fun Curso.toRequest(): CursoRequest {
         descripcion = this.descripcion,
         docenteId = this.docenteId,
         duracionDias = this.duracionDias,
-        temas = this.temas?.mapValues { (_, tema) ->
+        temas = this.temas?.mapValues { (key, tema) ->  // Usar 'key' también
             TemaRequest(
+                id = tema.id ?: key,  //  Usar el id del tema o la key del mapa
                 titulo = tema.titulo,
                 contenido = tema.contenido,
                 archivoUrl = tema.archivoUrl,

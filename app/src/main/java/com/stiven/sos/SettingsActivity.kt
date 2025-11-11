@@ -213,7 +213,6 @@ fun SettingsScreen(
 
 
 
-// En tu archivo: SettingsActivity.kt
 
 private fun updateUserProfile(
     context: Context,

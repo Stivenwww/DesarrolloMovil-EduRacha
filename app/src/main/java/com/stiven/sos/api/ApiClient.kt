@@ -21,9 +21,9 @@ object ApiClient {
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
         .addInterceptor(authInterceptor) //  Se añade el interceptor de autenticación
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true) // Se mantiene la configuración de reintentos
         .build()
 

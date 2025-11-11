@@ -10,7 +10,7 @@ import retrofit2.http.*
 interface ApiService {
 
     // ============================================
-    // ENDPOINT DE REGISTRO - NUEVO
+    // ENDPOINT DE REGISTRO
     // ============================================
 
     /**
