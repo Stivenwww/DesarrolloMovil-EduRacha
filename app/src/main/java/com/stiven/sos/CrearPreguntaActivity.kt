@@ -1215,6 +1215,7 @@ fun LoadingOverlay(modo: ModoCreacion?) {
     }
 }
 
+// ✅ DIÁLOGO DE CURSOS CON SCROLL
 @Composable
 fun SelectorCursoDialogSimple(
     cursos: List<Curso>,
@@ -1228,7 +1229,13 @@ fun SelectorCursoDialogSimple(
             if (cursos.isEmpty()) {
                 Text("No hay cursos disponibles")
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp) // ✅ Altura máxima
+                        .verticalScroll(rememberScrollState()), // ✅ SCROLL AGREGADO
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     cursos.forEach { curso ->
                         Card(
                             modifier = Modifier
@@ -1263,6 +1270,7 @@ fun SelectorCursoDialogSimple(
     )
 }
 
+// ✅ DIÁLOGO DE TEMAS CON SCROLL
 @Composable
 fun SelectorTemaDialogSimple(
     temas: List<Tema>,
@@ -1276,7 +1284,13 @@ fun SelectorTemaDialogSimple(
             if (temas.isEmpty()) {
                 Text("No hay temas disponibles en este curso")
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp) // ✅ Altura máxima
+                        .verticalScroll(rememberScrollState()), // ✅ SCROLL AGREGADO
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     temas.forEach { tema ->
                         Card(
                             modifier = Modifier
