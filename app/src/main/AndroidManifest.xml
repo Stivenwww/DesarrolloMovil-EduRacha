@@ -57,10 +57,17 @@
             android:name=".NotificacionesActivity"
             android:exported="false" />
 
-        <!-- Activities de Estudiantes -->
         <activity
-            android:name=".ListaEstudiantesActivity"
-            android:exported="false" />
+            android:name=".SeleccionarCursoExplicacionesActivity"
+            android:exported="false"
+            android:label="Seleccionar Curso" />
+
+        <activity
+            android:name=".GestionExplicacionesActivity"
+            android:exported="false"
+            android:label="Gestión de Explicaciones" />
+
+        <!-- Activities de Estudiantes -->
         <activity
             android:name=".DetalleEstudianteActivity"
             android:exported="false" />

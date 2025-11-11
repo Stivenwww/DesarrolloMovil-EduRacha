@@ -1523,11 +1523,7 @@ fun AgregarTemaDialog(
                             tipo = if (archivoUrl.isNotEmpty()) "pdf" else "texto",
                             explicacion = if (tipoExplicacion == "manual") explicacion.trim() else "",
                             explicacionFuente = tipoExplicacion,
-                            explicacionEstado = when (tipoExplicacion) {
-                                "manual" -> "aprobada"
-                                "ia" -> "pendiente"
-                                else -> "pendiente"
-                            }
+                            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
                         )
                         onConfirm(nuevoTema)
                     } else {
@@ -2098,11 +2094,7 @@ private fun crearCursoDirectamente(
                 else -> null
             },
             explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
-            explicacionEstado = when {
-                temaTemp.explicacionFuente == "manual" -> "aprobada"
-                temaTemp.explicacionFuente == "ia" -> "pendiente"
-                else -> "pendiente"
-            }
+            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
         )
     }
 
@@ -2170,11 +2162,7 @@ private fun crearCursoConIA(
                 else -> null
             },
             explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
-            explicacionEstado = when {
-                temaTemp.explicacionFuente == "manual" -> "aprobada"
-                temaTemp.explicacionFuente == "ia" -> "pendiente"
-                else -> "pendiente"
-            }
+            explicacionEstado = "pendiente" // ✅ SIEMPRE PENDIENTE
         )
     }
 

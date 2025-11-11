@@ -8,13 +8,15 @@ import com.stiven.sos.repository.TemaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class TemasUiState(
     val temas: List<Tema> = emptyList(),
     val temaSeleccionado: Tema? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val operationSuccess: String? = null // ✅ AGREGAR
 )
 
 class TemaViewModel : ViewModel() {
@@ -70,6 +72,44 @@ class TemaViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    fun actualizarEstadoExplicacion(
+        cursoId: String,
+        temaId: String,
+        nuevoEstado: String
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
+
+            when (val result = repository.actualizarEstadoExplicacion(cursoId, temaId, nuevoEstado)) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            operationSuccess = "Explicación ${nuevoEstado} exitosamente"
+                        )
+                    }
+                    // Recargar la lista de temas pendientes
+                    cargarTemasPorCurso(cursoId, "pendiente")
+                }
+                is ApiResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            error = result.message,
+                            isLoading = false
+                        )
+                    }
+                }
+                is ApiResult.Loading -> {
+                    _uiState.update { it.copy(isLoading = true) }
+                }
+            }
+        }
+    }
+
+    fun clearSuccessMessage() {
+        _uiState.update { it.copy(operationSuccess = null) }
     }
 
     fun clearError() {

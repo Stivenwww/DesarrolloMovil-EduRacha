@@ -64,7 +64,8 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToStudents = { navigateTo(SeleccionarCursoRankingActivity::class.java) },
                     onNavigateToCourses = { handleCoursesClick() },
                     onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) },
-                    onNavigateToCreateQuestion = { navigateTo(CrearPreguntaActivity::class.java) }// ✅ NUEVO
+                    onNavigateToCreateQuestion = { navigateTo(CrearPreguntaActivity::class.java) },
+                    onNavigateToExplicaciones = { navigateTo(SeleccionarCursoExplicacionesActivity::class.java) }// ✅ NUEVO
                 )
             }
         }
@@ -108,7 +109,8 @@ fun PanelDocenteScreen(
     onNavigateToStudents: () -> Unit,
     onNavigateToCourses: () -> Unit,
     onNavigateToReviewedQuestions: () -> Unit,
-    onNavigateToCreateQuestion: () -> Unit// ✅ NUEVO PARÁMETRO
+    onNavigateToCreateQuestion: () -> Unit,
+    onNavigateToExplicaciones: () -> Unit// ✅ NUEVO PARÁMETRO
 ) {
     val context = LocalContext.current
     val greeting = remember { getGreeting() }
@@ -236,6 +238,15 @@ fun PanelDocenteScreen(
                 icon = Icons.Outlined.CheckCircle,
                 backgroundColor = EduRachaColors.Accent,
                 onClick = onNavigateToValidation
+            )
+
+            // ✅ NUEVA CARD: Gestión de Explicaciones
+            MainToolCard(
+                title = "Gestión de Explicaciones",
+                description = "Revisa y valida explicaciones generadas por IA",
+                icon = Icons.Outlined.Description,
+                backgroundColor = Color(0xFF10B981), // Color verde
+                onClick = onNavigateToExplicaciones
             )
             // ✅ NUEVA CARD: Crear Pregunta
             MainToolCard(

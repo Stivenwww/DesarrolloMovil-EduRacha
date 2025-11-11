@@ -42,4 +42,27 @@ class TemaRepository {
             ApiResult.Error(e.message ?: "Error desconocido al obtener el tema")
         }
     }
+
+
+    //  AGREGAR
+    suspend fun actualizarEstadoExplicacion(
+        cursoId: String,
+        temaId: String,
+        nuevoEstado: String
+    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.actualizarEstadoExplicacion(
+                cursoId = cursoId,
+                temaId = temaId,
+                estado = mapOf("estado" to nuevoEstado)
+            )
+            if (response.isSuccessful) {
+                ApiResult.Success(Unit)
+            } else {
+                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Error al actualizar estado")
+        }
+    }
 }

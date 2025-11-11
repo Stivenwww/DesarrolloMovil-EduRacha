@@ -262,5 +262,13 @@ interface ApiService {
         @Body request: GenerarExplicacionRequest
     ): Response<Map<String, Any>>
 
+    // ✅ AGREGAR ESTE ENDPOINT
+    @PUT("api/cursos/{cursoId}/temas/{temaId}/validar-explicacion")
+    suspend fun actualizarEstadoExplicacion(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String,
+        @Body estado: Map<String, String>
+    ): Response<Map<String, Any>>
+
 
 }
