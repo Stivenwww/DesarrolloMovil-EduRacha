@@ -177,19 +177,12 @@ interface ApiService {
         @Body request: RespuestaSolicitudRequest
     ): Response<Unit>
 
-
     // ============================================
-    // QUIZ - CON AUTENTICACIÓN
+    // ENDPOINTS DE QUIZ
     // ============================================
 
     /**
      * Iniciar un nuevo quiz
-     *  El backend valida:
-     * - Token JWT válido
-     * - Inscripción aprobada
-     * - Vidas disponibles
-     * - Explicación vista
-     * - Preguntas suficientes
      */
     @POST("quiz/iniciar")
     suspend fun iniciarQuiz(
@@ -198,11 +191,6 @@ interface ApiService {
 
     /**
      * Finalizar un quiz y obtener resultados
-     * El backend actualiza:
-     * - Vidas (-1 por cada error)
-     * - Experiencia (+XP según aciertos)
-     * - Racha (días consecutivos)
-     * - Estado del tema
      */
     @POST("quiz/finalizar")
     suspend fun finalizarQuiz(
@@ -212,7 +200,7 @@ interface ApiService {
     /**
      * Obtener revisión del quiz
      */
-    @GET("quiz/revision/{quizId}")
+    @GET("quiz/{quizId}/revision")
     suspend fun obtenerRevisionQuiz(
         @Path("quizId") quizId: String
     ): Response<RevisionQuizResponse>
@@ -233,14 +221,68 @@ interface ApiService {
         @Path("quizId") quizId: String
     ): Response<RetroalimentacionFallosResponse>
 
-    /** Obtener vidas actuales con regeneración automática
+    /**
+     * Obtener vidas actuales con regeneración automática
      */
     @GET("quiz/vidas/{cursoId}")
     suspend fun obtenerVidas(
         @Path("cursoId") cursoId: String
     ): Response<Map<String, Any>>
 
+    //  ENDPOINTS PARA MODOS DE QUIZ
 
+    /**
+     * Verificar modos disponibles para un tema
+     */
+    @GET("api/quiz/modos-disponibles")
+    suspend fun verificarModosDisponibles(
+        @Query("cursoId") cursoId: String,
+        @Query("temaId") temaId: String
+    ): Response<ModoQuizDisponibleResponse>
+
+    /**
+     * Verificar disponibilidad del quiz final
+     */
+    @GET("api/quiz/final/disponible")
+    suspend fun verificarQuizFinalDisponible(
+        @Query("cursoId") cursoId: String
+    ): Response<QuizFinalDisponibleResponse>
+
+    /**
+     * Iniciar quiz final
+     */
+    @POST("api/quiz/final/iniciar")
+    suspend fun iniciarQuizFinal(
+        @Body request: Map<String, String>
+    ): Response<IniciarQuizResponse>
+
+    // ============================================
+    // ENDPOINTS DE PROGRESO Y RACHA
+    // ============================================
+
+    /**
+     * Obtener racha del estudiante autenticado
+     */
+    @GET("api/solicitudes/curso/{cursoId}/racha")
+    suspend fun obtenerRacha(
+        @Path("cursoId") cursoId: String
+    ): Response<RachaResponse>
+
+    /**
+     * Obtener experiencia del estudiante autenticado
+     */
+    @GET("api/solicitudes/curso/{cursoId}/experiencia")
+    suspend fun obtenerExperiencia(
+        @Path("cursoId") cursoId: String
+    ): Response<Map<String, Any>>
+
+    /**
+     * Regenerar vidas
+     */
+    @POST("api/solicitudes/curso/{cursoId}/regenerar-vidas")
+    suspend fun regenerarVidas(
+        @Path("cursoId") cursoId: String
+    ): Response<Map<String, Any>>
     // ============================================
 // ENDPOINTS DE TEMAS
 // ============================================

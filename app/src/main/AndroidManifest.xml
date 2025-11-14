@@ -54,7 +54,10 @@
             android:name=".SettingsActivity"
             android:exported="false" />
         <activity
-            android:name=".NotificacionesActivity"
+            android:name=".NotificacionesDocenteActivity"
+            android:exported="false" />
+        <activity
+            android:name=".NotificacionesEstudianteActivity"
             android:exported="false" />
 
         <activity

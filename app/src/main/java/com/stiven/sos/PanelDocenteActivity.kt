@@ -55,7 +55,7 @@ class PanelDocenteActivity : ComponentActivity() {
                     cursoViewModel = cursoViewModel,
                     preguntasViewModel = preguntasViewModel,
                     onNavigateToProfile = { navigateTo(PerfilDocenteActivity::class.java) },
-                    onNavigateToNotifications = { navigateTo(NotificacionesActivity::class.java) },
+                    onNavigateToNotifications = { navigateTo(NotificacionesDocenteActivity::class.java) },
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
                     onNavigateToCreateCourse = { navigateTo(CrearCursoActivity::class.java) },
                     onNavigateToValidation = { handleValidationClick() },

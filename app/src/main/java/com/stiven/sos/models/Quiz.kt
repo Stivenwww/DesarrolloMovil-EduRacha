@@ -15,7 +15,7 @@ data class Quiz(
     val inicio: String = "",
     val fin: String? = null,
     val tiempoUsadoSeg: Int = 0,
-    val estado: String = "en_progreso",
+    val estado: String = "en_progreso", // "en_progreso", "finalizado", "abandonado"
     val intentoNumero: Int = 1,
     val preguntasCorrectas: Int = 0,
     val preguntasIncorrectas: Int = 0,
@@ -25,7 +25,12 @@ data class Quiz(
     val bonificacionRapidez: Int = 0,
     val bonificacionPrimeraVez: Int = 0,
     val bonificacionTodoCorrecto: Int = 0,
-    val respuestas: List<RespuestaQuiz> = emptyList()
+    val respuestas: List<RespuestaQuiz> = emptyList(),
+
+    // ✅ NUEVOS CAMPOS
+    val modo: String = "oficial", // "oficial" | "practica" | "final"
+    val vidasIniciales: Int = 5,
+    val vidasFinales: Int = 5
 )
 
 data class QuizPregunta(
@@ -46,7 +51,8 @@ data class RespuestaQuiz(
 
 data class IniciarQuizRequest(
     val cursoId: String,
-    val temaId: String
+    val temaId: String,
+    val modo: String = "oficial" // modo del quiz
 )
 
 data class FinalizarQuizRequest(
@@ -118,7 +124,6 @@ data class TemaInfoResponse(
     val inscrito: Boolean
 )
 
-// ✅ ACTUALIZADO: Modelo compatible con Firebase rachas
 data class VidasResponse(
     val vidasActuales: Int = 5,
     val vidasMax: Int = 5,
@@ -166,12 +171,26 @@ data class Inscripcion(
     val ultimaFechaActividad: Long = 0
 )
 
-//  Modelo para rachas en Firebase (coincide con backend)
-data class RachaFirebase(
+//  MODELOS PARA MODOS DE QUIZ
+
+data class ModoQuizDisponibleResponse(
+    val temaId: String,
+    val temaAprobado: Boolean,
+    val modosDisponibles: List<String>, // ["oficial", "practica"]
+    val modoRecomendado: String,
+    val mensaje: String
+)
+
+data class QuizFinalDisponibleResponse(
+    val disponible: Boolean,
+    val temasAprobados: Int,
+    val totalTemas: Int,
+    val mensaje: String
+)
+
+//  PARA RACHA (compatible con backend)
+data class RachaResponse(
     val diasConsecutivos: Int = 0,
     val ultimaFecha: Long = 0,
-    val vidas: Int = 5,
-    val experiencia: Int = 0,
-    val rachaDias: Int = 0, // alias para diasConsecutivos
-    val ultimaRegen: Long = 0
+    val mejorRacha: Int = 0
 )

@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                 MainEstudianteScreen(
                     solicitudViewModel = solicitudViewModel,
                     onNavigateToProfile = { navigateTo(PerfilDocenteActivity::class.java) },
-                    onNavigateToNotifications = { navigateTo(NotificacionesActivity::class.java) },
+                    onNavigateToNotifications = { navigateTo(NotificacionesEstudianteActivity::class.java) },
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
                     onNavigateToCursos = {
                         startActivity(Intent(this, CursosDisponiblesActivity::class.java))

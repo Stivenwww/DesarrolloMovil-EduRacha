@@ -3,7 +3,6 @@ package com.stiven.sos
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
@@ -20,27 +19,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.stiven.sos.models.RetroalimentacionFallosResponse
+import com.stiven.sos.repository.QuizRepository
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
-import com.stiven.sos.viewmodel.QuizViewModel
+import kotlinx.coroutines.launch
 
 class RetroalimentacionActivity : ComponentActivity() {
 
-    private val quizViewModel: QuizViewModel by viewModels()
     private lateinit var quizId: String
+    private lateinit var repository: QuizRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         quizId = intent.getStringExtra("quizId") ?: ""
-
-        // Cargar retroalimentación
-        quizViewModel.obtenerRetroalimentacion(quizId)
+        repository = QuizRepository(application)
 
         setContent {
             EduRachaTheme {
                 RetroalimentacionScreen(
-                    quizViewModel = quizViewModel,
+                    quizId = quizId,
+                    repository = repository,
                     onCerrar = { finish() }
                 )
             }
@@ -51,11 +51,30 @@ class RetroalimentacionActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RetroalimentacionScreen(
-    quizViewModel: QuizViewModel,
+    quizId: String,
+    repository: QuizRepository,
     onCerrar: () -> Unit
 ) {
-    val uiState by quizViewModel.uiState.collectAsState()
-    val retroalimentacion = uiState.retroalimentacion
+    var isLoading by remember { mutableStateOf(true) }
+    var retroalimentacion by remember { mutableStateOf<RetroalimentacionFallosResponse?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // ✅ Cargar retroalimentación al iniciar
+    LaunchedEffect(quizId) {
+        scope.launch {
+            repository.obtenerRetroalimentacion(quizId).fold(
+                onSuccess = { data ->
+                    retroalimentacion = data
+                    isLoading = false
+                },
+                onFailure = { e ->
+                    error = e.message
+                    isLoading = false
+                }
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -84,7 +103,7 @@ fun RetroalimentacionScreen(
         containerColor = EduRachaColors.Background
     ) { padding ->
         when {
-            uiState.isLoading -> {
+            isLoading -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -104,8 +123,42 @@ fun RetroalimentacionScreen(
                 }
             }
 
+            error != null -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Error,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = EduRachaColors.Error
+                        )
+                        Text(
+                            text = "Error al cargar retroalimentación",
+                            color = EduRachaColors.Error,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Button(
+                            onClick = onCerrar,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EduRachaColors.Primary
+                            )
+                        ) {
+                            Text("Cerrar")
+                        }
+                    }
+                }
+            }
+
             retroalimentacion != null -> {
-                if (retroalimentacion.totalFallos == 0) {
+                if (retroalimentacion!!.totalFallos == 0) {
                     // ✅ Sin errores
                     Box(
                         modifier = Modifier
@@ -186,7 +239,7 @@ fun RetroalimentacionScreen(
                                             color = EduRachaColors.TextPrimary
                                         )
                                         Text(
-                                            text = "${retroalimentacion.totalFallos} pregunta(s) para revisar",
+                                            text = "${retroalimentacion!!.totalFallos} pregunta(s) para revisar",
                                             fontSize = 14.sp,
                                             color = EduRachaColors.TextSecondary
                                         )
@@ -196,7 +249,7 @@ fun RetroalimentacionScreen(
                         }
 
                         // Preguntas falladas
-                        itemsIndexed(retroalimentacion.preguntasFalladas) { index, pregunta ->
+                        itemsIndexed(retroalimentacion!!.preguntasFalladas) { index, pregunta ->
                             PreguntaFalladaCard(
                                 numero = index + 1,
                                 pregunta = pregunta
@@ -224,20 +277,6 @@ fun RetroalimentacionScreen(
                             }
                         }
                     }
-                }
-            }
-
-            else -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No se pudo cargar la retroalimentación",
-                        color = EduRachaColors.Error
-                    )
                 }
             }
         }
