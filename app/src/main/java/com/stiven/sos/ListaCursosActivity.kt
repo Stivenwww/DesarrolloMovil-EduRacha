@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import android.os.Bundle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
 
 class ListaCursosActivity : ComponentActivity() {
     private val cursoViewModel: CursoViewModel by viewModels()
@@ -68,7 +69,6 @@ class ListaCursosActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Recargar preguntas pendientes cuando volvemos a esta pantalla
         val proposito = intent.getStringExtra("PROPOSITO")
         if (proposito == "VALIDAR_PREGUNTAS") {
             preguntaViewModel.cargarPreguntas(
@@ -96,18 +96,16 @@ fun ListaCursosScreen(
     val errorMessage = cursoUiState.error
     val successMessage = cursoUiState.operationSuccess
 
-    // Estados para la UI
     var searchQuery by remember { mutableStateOf("") }
     var estadoFiltro by remember { mutableStateOf("Todos") }
     var cursoParaDialogoDetalle by remember { mutableStateOf<Curso?>(null) }
     var cursoParaDialogoTemas by remember { mutableStateOf<Curso?>(null) }
+    var cursoParaEliminar by remember { mutableStateOf<Curso?>(null) }
     val esModoValidacion = proposito == "VALIDAR_PREGUNTAS"
 
-    // Efecto para cargar los cursos y preguntas al inicio
     LaunchedEffect(Unit) {
         cursoViewModel.obtenerCursos()
         if (esModoValidacion) {
-            // Cargar preguntas pendientes para mostrar contadores
             preguntaViewModel.cargarPreguntas(
                 cursoId = null,
                 estado = EstadoPregunta.PENDIENTE_REVISION
@@ -115,7 +113,6 @@ fun ListaCursosScreen(
         }
     }
 
-    // Efecto para mostrar mensajes de Toast
     LaunchedEffect(errorMessage, successMessage) {
         errorMessage?.let {
             Toast.makeText(context, "Error: $it", Toast.LENGTH_LONG).show()
@@ -127,7 +124,6 @@ fun ListaCursosScreen(
         }
     }
 
-    // Lógica de filtrado que depende de la búsqueda y el filtro de estado
     val cursosFiltrados = remember(cursos, searchQuery, estadoFiltro) {
         cursos.filter { curso ->
             val cumpleBusqueda = searchQuery.isBlank() ||
@@ -141,8 +137,6 @@ fun ListaCursosScreen(
         }
     }
 
-    // Calcular preguntas pendientes por curso
-    // CORRECCIÓN: Filtrar solo las que realmente están pendientes
     val preguntasPendientes = remember(preguntaUiState.preguntas) {
         preguntaUiState.preguntas.filter {
             it.estado == EstadoPregunta.PENDIENTE_REVISION
@@ -196,7 +190,6 @@ fun ListaCursosScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // Buscador y filtro
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -220,7 +213,6 @@ fun ListaCursosScreen(
                 }
             }
 
-            // Contenido principal de la pantalla
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     isLoading && cursos.isEmpty() -> {
@@ -298,16 +290,32 @@ fun ListaCursosScreen(
         }
     }
 
-    // Diálogo para mostrar los detalles del curso (modo gestión)
+    // Diálogo de detalles del curso mejorado
     if (cursoParaDialogoDetalle != null) {
-        CursoDetailDialog(
+        CursoDetailDialogMejorado(
             curso = cursoParaDialogoDetalle!!,
-            viewModel = cursoViewModel,
-            onDismiss = { cursoParaDialogoDetalle = null }
+            onDismiss = { cursoParaDialogoDetalle = null },
+            onEdit = { /* Se maneja internamente */ },
+            onDelete = {
+                cursoParaEliminar = cursoParaDialogoDetalle
+                cursoParaDialogoDetalle = null
+            }
         )
     }
 
-    // Diálogo para seleccionar un tema (modo validación)
+    // Diálogo de confirmación de eliminación
+    if (cursoParaEliminar != null) {
+        ConfirmDeleteDialog(
+            curso = cursoParaEliminar!!,
+            onConfirm = {
+                cursoViewModel.eliminarCurso(cursoParaEliminar!!.id!!)
+                cursoParaEliminar = null
+            },
+            onDismiss = { cursoParaEliminar = null }
+        )
+    }
+
+    // Diálogo para seleccionar tema
     if (cursoParaDialogoTemas != null) {
         SeleccionarTemaDialog(
             curso = cursoParaDialogoTemas!!,
@@ -316,12 +324,12 @@ fun ListaCursosScreen(
                 .groupBy { it.temaId }
                 .mapValues { it.value.size },
             onDismiss = { cursoParaDialogoTemas = null },
-            onTemaSelected = { cursoId, temaId ->
-                android.util.Log.d("ListaCursos", "Navegando a ValidacionPreguntas con cursoId=$cursoId, temaId=$temaId")
+            onTemaSelected = { cursoId, temaId, temaTitulo ->
                 val intent = Intent(context, ValidacionPreguntasActivity::class.java).apply {
                     putExtra("CURSO_ID", cursoId)
                     putExtra("CURSO_TITULO", cursoParaDialogoTemas?.titulo ?: "")
                     putExtra("TEMA_ID", temaId)
+                    putExtra("TEMA_TITULO", temaTitulo) // ✅ AGREGADO
                 }
                 context.startActivity(intent)
                 cursoParaDialogoTemas = null
@@ -438,7 +446,6 @@ fun AnimatedCursoCard(
                                 }
                             }
 
-                            // Mostrar badge de preguntas pendientes
                             if (preguntasPendientes != null && preguntasPendientes > 0) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
@@ -477,52 +484,181 @@ fun AnimatedCursoCard(
     }
 }
 
-
-
 @Composable
-fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> Unit) {
+fun CursoDetailDialogMejorado(
+    curso: Curso,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val context = LocalContext.current
     var modoEdicion by remember { mutableStateOf(false) }
-    var titulo by remember { mutableStateOf(curso.titulo) }
-    var descripcion by remember { mutableStateOf(curso.descripcion) }
-    var duracionDias by remember { mutableStateOf(curso.duracionDias.toString()) }
-    var estado by remember { mutableStateOf(curso.estado) }
 
-    AlertDialog(
-        onDismissRequest = { if (!modoEdicion) onDismiss() },
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.MenuBook, null, tint = obtenerColorEstado(estado), modifier = Modifier.size(32.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(if (modoEdicion) "Editar curso" else curso.titulo, fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                if (modoEdicion) {
-                    OutlinedTextField(titulo, { titulo = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(descripcion, { descripcion = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 5)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(duracionDias, { duracionDias = it.filter { c -> c.isDigit() } }, label = { Text("Duración (días)") }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(12.dp))
-                    Text("Estado", fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
-                    Spacer(Modifier.height(6.dp))
-                    DropdownMenuEstado(estado, { estado = it })
-                } else {
-                    DetailRow("Código", curso.codigo, Icons.Outlined.Tag, EduRachaColors.Primary)
-                    Spacer(Modifier.height(12.dp))
-                    DetailRow("Duración", "${curso.duracionDias} días", Icons.Outlined.CalendarToday, EduRachaColors.Accent)
-                    Spacer(Modifier.height(12.dp))
-                    DetailRow("Estado", curso.estado.replaceFirstChar { it.uppercase() }, obtenerIconoEstado(curso.estado), obtenerColorEstado(curso.estado))
-                    Spacer(Modifier.height(12.dp))
-                    DetailRow("ID Docente", curso.docenteId, Icons.Outlined.Person, EduRachaColors.Secondary)
+    if (modoEdicion) {
+        EditarCursoDialog(
+            curso = curso,
+            onDismiss = { modoEdicion = false; onDismiss() },
+            onCancel = { modoEdicion = false }
+        )
+    } else {
+        DetallesCursoDialog(
+            curso = curso,
+            onDismiss = onDismiss,
+            onEdit = { modoEdicion = true },
+            onDelete = onDelete
+        )
+    }
+}
 
-                    // 🆕 NUEVO: Botón para ver usuarios asignados
-                    Spacer(Modifier.height(16.dp))
-                    HorizontalDivider(color = EduRachaColors.Background)
-                    Spacer(Modifier.height(16.dp))
+@Composable
+fun DetallesCursoDialog(
+    curso: Curso,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val context = LocalContext.current
 
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header con color de estado
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(
+                                    obtenerColorEstado(curso.estado),
+                                    obtenerColorEstado(curso.estado).copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.MenuBook,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            curso.titulo,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Contenido
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    // Info Cards
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        InfoCard(
+                            icon = Icons.Outlined.Tag,
+                            label = "Código",
+                            value = curso.codigo,
+                            color = EduRachaColors.Primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        InfoCard(
+                            icon = Icons.Outlined.CalendarToday,
+                            label = "Duración",
+                            value = "${curso.duracionDias} días",
+                            color = EduRachaColors.Accent,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        InfoCard(
+                            icon = obtenerIconoEstado(curso.estado),
+                            label = "Estado",
+                            value = curso.estado.replaceFirstChar { it.uppercase() },
+                            color = obtenerColorEstado(curso.estado),
+                            modifier = Modifier.weight(1f)
+                        )
+                        InfoCard(
+                            icon = Icons.Outlined.Person,
+                            label = "Docente ID",
+                            value = curso.docenteId.take(8) + "...",
+                            color = EduRachaColors.Secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Descripción
+                    if (curso.descripcion.isNotEmpty()) {
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            "Descripción",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = EduRachaColors.Background
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(
+                                curso.descripcion,
+                                fontSize = 14.sp,
+                                color = EduRachaColors.TextSecondary,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+
+                    // Botón de usuarios asignados
+                    Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = {
                             val intent = Intent(context, UsuariosAsignadosActivity::class.java).apply {
@@ -531,71 +667,352 @@ fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> 
                             }
                             context.startActivity(intent)
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EduRachaColors.Info
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Icon(
                             Icons.Default.People,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Ver Usuarios Asignados", fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Ver Usuarios Asignados",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                     }
 
-                    if (curso.descripcion.isNotEmpty()) {
-                        Spacer(Modifier.height(16.dp))
-                        HorizontalDivider(color = EduRachaColors.Background)
-                        Spacer(Modifier.height(16.dp))
-                        Row(verticalAlignment = Alignment.Top) {
-                           Icon(Icons.Outlined.Description, null, tint = EduRachaColors.Secondary, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Descripción", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary)
-                                Spacer(Modifier.height(8.dp))
-                                Text(curso.descripcion, fontSize = 13.sp, color = EduRachaColors.TextSecondary, lineHeight = 18.sp)
-                            }
+                    // Botones de acción
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDelete,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = EduRachaColors.Error
+                            ),
+                            border = BorderStroke(2.dp, EduRachaColors.Error),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Eliminar", fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = onEdit,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EduRachaColors.Primary
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Editar", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            if (modoEdicion) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { modoEdicion = false }, Modifier.weight(1f)) { Text("Cancelar") }
+        }
+    }
+}
+
+@Composable
+fun EditarCursoDialog(
+    curso: Curso,
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val viewModel: CursoViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    var titulo by remember { mutableStateOf(curso.titulo) }
+    var descripcion by remember { mutableStateOf(curso.descripcion) }
+    var duracionDias by remember { mutableStateOf(curso.duracionDias.toString()) }
+    var estado by remember { mutableStateOf(curso.estado) }
+
+    Dialog(onDismissRequest = onCancel) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(28.dp)
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(EduRachaColors.Primary.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = EduRachaColors.Primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            "Editar Curso",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary
+                        )
+                        Text(
+                            "Actualiza la información del curso",
+                            fontSize = 14.sp,
+                            color = EduRachaColors.TextSecondary
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(28.dp))
+
+                // Campos de edición
+                OutlinedTextField(
+                    value = titulo,
+                    onValueChange = { titulo = it },
+                    label = { Text("Título del curso") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    leadingIcon = {
+                        Icon(Icons.Outlined.MenuBook, null, tint = EduRachaColors.Primary)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EduRachaColors.Primary,
+                        focusedLabelColor = EduRachaColors.Primary
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = descripcion,
+                    onValueChange = { descripcion = it },
+                    label = { Text("Descripción") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    minLines = 4,
+                    maxLines = 6,
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Description, null, tint = EduRachaColors.Primary)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EduRachaColors.Primary,
+                        focusedLabelColor = EduRachaColors.Primary
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = duracionDias,
+                    onValueChange = { duracionDias = it.filter { c -> c.isDigit() } },
+                    label = { Text("Duración (días)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    leadingIcon = {
+                        Icon(Icons.Outlined.CalendarToday, null, tint = EduRachaColors.Primary)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EduRachaColors.Primary,
+                        focusedLabelColor = EduRachaColors.Primary
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    "Estado del curso",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = EduRachaColors.TextPrimary
+                )
+                Spacer(Modifier.height(8.dp))
+                EstadoSelectorMejorado(
+                    estadoSeleccionado = estado,
+                    onEstadoSeleccionado = { estado = it }
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                // Botones de acción
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(2.dp, EduRachaColors.TextSecondary.copy(alpha = 0.3f))
+                    ) {
+                        Text("Cancelar", fontWeight = FontWeight.SemiBold)
+                    }
                     Button(
                         onClick = {
                             val cursoActualizado = curso.copy(
-                                id = curso.id,
                                 titulo = titulo,
                                 descripcion = descripcion,
                                 duracionDias = duracionDias.toIntOrNull() ?: curso.duracionDias,
                                 estado = estado
                             )
                             viewModel.actualizarCurso(cursoActualizado)
-                            modoEdicion = false
                             onDismiss()
                         },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success)
-                    ) { Text("Guardar") }
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EduRachaColors.Success
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Guardar", fontWeight = FontWeight.SemiBold)
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConfirmDeleteDialog(
+    curso: Curso,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(EduRachaColors.Error.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = EduRachaColors.Error,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                "¿Eliminar curso?",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Estás a punto de eliminar el curso:",
+                    fontSize = 14.sp,
+                    color = EduRachaColors.TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = EduRachaColors.Error.copy(alpha = 0.05f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            curso.titulo,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Código: ${curso.codigo}",
+                            fontSize = 13.sp,
+                            color = EduRachaColors.TextSecondary
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Esta acción no se puede deshacer. Se eliminarán todos los datos asociados al curso.",
+                    fontSize = 13.sp,
+                    color = EduRachaColors.TextSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = EduRachaColors.Error
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Sí, eliminar curso", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
         },
         dismissButton = {
-            if (!modoEdicion) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { viewModel.eliminarCurso(curso.id!!); onDismiss() },
-                        Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EduRachaColors.Error)
-                    ) { Text("Eliminar") }
-                    Button(onClick = { modoEdicion = true }, Modifier.weight(1f)) { Text("Editar") }
-                }
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                border = BorderStroke(2.dp, EduRachaColors.TextSecondary.copy(alpha = 0.3f))
+            ) {
+                Text("Cancelar", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
         },
         shape = RoundedCornerShape(24.dp),
@@ -604,11 +1021,127 @@ fun CursoDetailDialog(curso: Curso, viewModel: CursoViewModel, onDismiss: () -> 
 }
 
 @Composable
+fun InfoCard(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.08f)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                label,
+                fontSize = 11.sp,
+                color = EduRachaColors.TextSecondary,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                value,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+fun EstadoSelectorMejorado(
+    estadoSeleccionado: String,
+    onEstadoSeleccionado: (String) -> Unit
+) {
+    val estados = listOf(
+        "activo" to Icons.Outlined.CheckCircle,
+        "inactivo" to Icons.Outlined.Cancel,
+        "borrador" to Icons.Outlined.Edit,
+        "archivado" to Icons.Outlined.Archive
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        estados.forEach { (estado, icono) ->
+            val isSelected = estado == estadoSeleccionado
+            val color = obtenerColorEstado(estado)
+
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEstadoSeleccionado(estado) },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) color.copy(alpha = 0.15f)
+                    else EduRachaColors.Background
+                ),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) color else EduRachaColors.SurfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        icono,
+                        contentDescription = null,
+                        tint = if (isSelected) color else EduRachaColors.TextSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        estado.replaceFirstChar { it.uppercase() },
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) color else EduRachaColors.TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SeleccionarTemaDialog(
     curso: Curso,
     preguntasPorTema: Map<String, Int>,
     onDismiss: () -> Unit,
-    onTemaSelected: (cursoId: String, temaId: String) -> Unit
+    onTemaSelected: (cursoId: String, temaId: String, temaTitulo: String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -628,13 +1161,14 @@ fun SeleccionarTemaDialog(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(temas, key = { it.key }) { (key, tema) ->
                         val temaIdReal = tema.id
+                        val temaTitulo = tema.titulo
                         val cantidadPendientes = preguntasPorTema[temaIdReal] ?: 0
 
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    onTemaSelected(curso.id!!, temaIdReal)
+                                    onTemaSelected(curso.id!!, temaIdReal, temaTitulo)
                                 },
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, EduRachaColors.SurfaceVariant)
@@ -743,51 +1277,6 @@ fun EstadoFilterDropdown(estadoSeleccionado: String, onEstadoChange: (String) ->
 }
 
 @Composable
-fun DetailRow(label: String, value: String, icon: ImageVector, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier.size(40.dp).clip(CircleShape).background(color.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(label, fontSize = 12.sp, color = EduRachaColors.TextSecondary)
-            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = EduRachaColors.TextPrimary)
-        }
-    }
-}
-
-@Composable
-fun DropdownMenuEstado(estadoSeleccionado: String, onEstadoSeleccionado: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val opciones = listOf("activo", "inactivo", "borrador", "archivado")
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                estadoSeleccionado.replaceFirstChar { it.uppercase() },
-                modifier = Modifier.weight(1f),
-                color = EduRachaColors.TextPrimary
-            )
-            Icon(Icons.Default.ArrowDropDown, "Abrir menú")
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            opciones.forEach { opcion ->
-                DropdownMenuItem(
-                    text = { Text(opcion.replaceFirstChar { it.uppercase() }) },
-                    onClick = { onEstadoSeleccionado(opcion); expanded = false }
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun ErrorMessage(message: String, onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
@@ -859,7 +1348,6 @@ fun EmptyCursosState(isSearchActive: Boolean) {
     }
 }
 
-// Funciones auxiliares de estilo
 private fun obtenerColorEstado(estado: String): Color {
     return when (estado.lowercase()) {
         "activo" -> EduRachaColors.Success

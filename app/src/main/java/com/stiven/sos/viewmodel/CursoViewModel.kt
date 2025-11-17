@@ -9,6 +9,7 @@ import com.stiven.sos.models.Curso
 import com.stiven.sos.models.EstadoSolicitud
 import com.stiven.sos.models.ProgramacionCurso
 import com.stiven.sos.models.RangoTema
+import com.stiven.sos.models.UsuarioAsignado
 import com.stiven.sos.repository.CursoRepository
 import com.stiven.sos.utils.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,9 @@ import java.util.concurrent.TimeUnit
 data class CursoUiState(
     val cursos: List<Curso> = emptyList(),
     val solicitudesPorCurso: Map<String, Int> = emptyMap(),
+    val estudiantesPorCurso: Map<String, List<UsuarioAsignado>> = emptyMap(),
     val isLoading: Boolean = false,
+    val isLoadingEstudiantes: Boolean = false,
     val error: String? = null,
     val operationSuccess: String? = null
 )
@@ -38,7 +41,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     private var isLoadingSolicitudes = false
 
     fun obtenerCursos() {
-        // ✅ Prevenir llamadas duplicadas
+        // Prevenir llamadas duplicadas
         if (isLoadingCursos) {
             Log.w("CursoViewModel", "⚠️ Ya se están cargando cursos, ignorando llamada duplicada")
             return
@@ -69,8 +72,81 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * ✅ NUEVA FUNCIÓN: Carga estudiantes de todos los cursos del docente
+     */
+    fun cargarEstudiantesTotales() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingEstudiantes = true) }
+
+            try {
+                val cursosIds = _uiState.value.cursos.mapNotNull { it.id }
+
+                if (cursosIds.isEmpty()) {
+                    Log.w("CursoViewModel", "⚠️ No hay cursos para cargar estudiantes")
+                    _uiState.update {
+                        it.copy(
+                            isLoadingEstudiantes = false,
+                            estudiantesPorCurso = emptyMap()
+                        )
+                    }
+                    return@launch
+                }
+
+                Log.d("CursoViewModel", "🔍 Cargando estudiantes de ${cursosIds.size} cursos")
+
+                val estudiantesPorCurso = mutableMapOf<String, List<UsuarioAsignado>>()
+
+                // Cargar estudiantes de cada curso
+                cursosIds.forEach { cursoId ->
+                    try {
+                        val response = ApiClient.apiService.obtenerEstudiantesPorCurso(cursoId)
+
+                        if (response.isSuccessful) {
+                            val estudiantes = response.body() ?: emptyList()
+                            estudiantesPorCurso[cursoId] = estudiantes
+
+                            Log.d("CursoViewModel", "✅ Curso $cursoId: ${estudiantes.size} estudiantes")
+                        } else {
+                            Log.w("CursoViewModel", "⚠️ Error al cargar estudiantes del curso $cursoId: ${response.code()}")
+                            estudiantesPorCurso[cursoId] = emptyList()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CursoViewModel", "❌ Error cargando estudiantes del curso $cursoId", e)
+                        estudiantesPorCurso[cursoId] = emptyList()
+                    }
+                }
+
+                // Calcular totales
+                val totalEstudiantes = estudiantesPorCurso.values.flatten()
+                val estudiantesUnicos = totalEstudiantes.map { it.uid }.toSet()
+
+                Log.d("CursoViewModel", "📊 RESUMEN DE ESTUDIANTES:")
+                Log.d("CursoViewModel", "   - Total asignaciones: ${totalEstudiantes.size}")
+                Log.d("CursoViewModel", "   - Estudiantes únicos: ${estudiantesUnicos.size}")
+                Log.d("CursoViewModel", "   - Cursos con estudiantes: ${estudiantesPorCurso.filter { it.value.isNotEmpty() }.size}")
+
+                _uiState.update {
+                    it.copy(
+                        estudiantesPorCurso = estudiantesPorCurso,
+                        isLoadingEstudiantes = false
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.e("CursoViewModel", "❌ Error general al cargar estudiantes", e)
+                _uiState.update {
+                    it.copy(
+                        isLoadingEstudiantes = false,
+                        estudiantesPorCurso = emptyMap()
+                    )
+                }
+            }
+        }
+    }
+
     private fun cargarSolicitudesPendientes() {
-        // ✅ Prevenir llamadas duplicadas
+        // Prevenir llamadas duplicadas
         if (isLoadingSolicitudes) {
             Log.w("CursoViewModel", "⚠️ Ya se están cargando solicitudes, ignorando")
             return

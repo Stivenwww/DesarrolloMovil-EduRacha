@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.EstadoPregunta
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
-import com.stiven.sos.models.UserPreferences
 import com.stiven.sos.viewmodel.CursoViewModel
 import com.stiven.sos.viewmodel.PreguntaViewModel
 import java.util.*
@@ -59,14 +58,13 @@ class PanelDocenteActivity : ComponentActivity() {
                     onNavigateToSettings = { navigateTo(SettingsActivity::class.java) },
                     onNavigateToCreateCourse = { navigateTo(CrearCursoActivity::class.java) },
                     onNavigateToValidation = { handleValidationClick() },
-                  //  onNavigateToReports = { navigateTo(RankingDetalleActivity::class.java) },
                     onNavigateToReports = { navigateTo(ReportesActivity::class.java) },
                     onNavigateToGroups = { navigateTo(GestionGruposActivity::class.java) },
                     onNavigateToStudents = { navigateTo(SeleccionarCursoRankingActivity::class.java) },
                     onNavigateToCourses = { handleCoursesClick() },
                     onNavigateToReviewedQuestions = { navigateTo(PreguntasRevisadasActivity::class.java) },
                     onNavigateToCreateQuestion = { navigateTo(CrearPreguntaActivity::class.java) },
-                    onNavigateToExplicaciones = { navigateTo(SeleccionarCursoExplicacionesActivity::class.java) }// ✅ NUEVO
+                    onNavigateToExplicaciones = { navigateTo(SeleccionarCursoExplicacionesActivity::class.java) }
                 )
             }
         }
@@ -111,22 +109,20 @@ fun PanelDocenteScreen(
     onNavigateToCourses: () -> Unit,
     onNavigateToReviewedQuestions: () -> Unit,
     onNavigateToCreateQuestion: () -> Unit,
-    onNavigateToExplicaciones: () -> Unit// ✅ NUEVO PARÁMETRO
+    onNavigateToExplicaciones: () -> Unit
 ) {
     val context = LocalContext.current
     val greeting = remember { getGreeting() }
 
-    // ✅ Estados para almacenar datos del usuario
+    // Estados para almacenar datos del usuario
     var fullName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
     var userRole by remember { mutableStateOf("") }
     var userUid by remember { mutableStateOf("") }
 
-    // ✅ Leer datos directamente desde SharedPreferences cada vez que se compone
+    // Leer datos desde SharedPreferences
     LaunchedEffect(Unit) {
-        // Acceso directo a SharedPreferences para asegurar lectura actualizada
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
-
         fullName = prefs.getString("user_name", null) ?: "Usuario"
         userEmail = prefs.getString("user_email", null) ?: ""
         userRole = prefs.getString("user_role", null) ?: "estudiante"
@@ -150,13 +146,31 @@ fun PanelDocenteScreen(
         }
     }
 
-    // ✅ NUEVO: Contar preguntas aprobadas y rechazadas
     val preguntasAprobadas = remember(preguntasUiState.preguntas) {
         preguntasUiState.preguntas.count { it.estado == EstadoPregunta.APROBADA }
     }
 
     val preguntasRechazadas = remember(preguntasUiState.preguntas) {
         preguntasUiState.preguntas.count { it.estado == EstadoPregunta.RECHAZADA }
+    }
+
+    // ✅ Cargar estudiantes totales cuando haya cursos disponibles
+    LaunchedEffect(cursoUiState.cursos) {
+        if (cursoUiState.cursos.isNotEmpty()) {
+            android.util.Log.d("PanelDocente", "🔄 Cargando estudiantes de ${cursoUiState.cursos.size} cursos")
+            cursoViewModel.cargarEstudiantesTotales()
+        }
+    }
+
+    // ✅ Calcular el total de estudiantes únicos
+    val totalEstudiantes = remember(cursoUiState.estudiantesPorCurso) {
+        val todosEstudiantes = cursoUiState.estudiantesPorCurso.values.flatten()
+        val estudiantesUnicos = todosEstudiantes.map { it.uid }.toSet()
+
+        android.util.Log.d("PanelDocente", "📊 Total estudiantes únicos: ${estudiantesUnicos.size}")
+        android.util.Log.d("PanelDocente", "📊 Total asignaciones: ${todosEstudiantes.size}")
+
+        estudiantesUnicos.size
     }
 
     LaunchedEffect(preguntasUiState.preguntas) {
@@ -205,7 +219,7 @@ fun PanelDocenteScreen(
             )
             CompactStatCard(
                 label = "Estudiantes",
-                value = "124",
+                value = if (cursoUiState.isLoadingEstudiantes) "..." else "$totalEstudiantes",
                 icon = Icons.Outlined.Groups,
                 iconColor = EduRachaColors.Success,
                 modifier = Modifier.weight(1f),
@@ -240,29 +254,25 @@ fun PanelDocenteScreen(
                 backgroundColor = EduRachaColors.Accent,
                 onClick = onNavigateToValidation
             )
-
-            // ✅ NUEVA CARD: Gestión de Explicaciones
             MainToolCard(
                 title = "Gestión de Explicaciones",
                 description = "Revisa y valida explicaciones generadas por IA",
                 icon = Icons.Outlined.Description,
-                backgroundColor = Color(0xFF10B981), // Color verde
+                backgroundColor = Color(0xFF10B981),
                 onClick = onNavigateToExplicaciones
             )
-            // ✅ NUEVA CARD: Crear Pregunta
             MainToolCard(
                 title = "Crear Pregunta",
                 description = "Crea preguntas manualmente o genera con IA",
                 icon = Icons.Outlined.QuestionAnswer,
-                backgroundColor = Color(0xFF8B5CF6), // Color morado
+                backgroundColor = Color(0xFF8B5CF6),
                 onClick = onNavigateToCreateQuestion
             )
-            // ✅ NUEVA CARD: Preguntas Revisadas
             MainToolCard(
                 title = "Preguntas Revisadas",
                 description = "Ver historial de preguntas aprobadas y rechazadas ($preguntasAprobadas aprobadas, $preguntasRechazadas rechazadas)",
                 icon = Icons.Outlined.History,
-                backgroundColor = Color(0xFF6366F1), // Color índigo
+                backgroundColor = Color(0xFF6366F1),
                 onClick = onNavigateToReviewedQuestions
             )
             MainToolCard(
@@ -310,7 +320,6 @@ fun UserHeader(
                     .clickable(onClick = onNavigateToProfile),
                 contentAlignment = Alignment.Center
             ) {
-                // Mostrar inicial del nombre
                 Text(
                     text = fullName.firstOrNull()?.uppercase() ?: "U",
                     fontSize = 24.sp,
@@ -339,7 +348,6 @@ fun UserHeader(
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
-                // Mostrar badge del rol
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (userRole == "docente") EduRachaColors.Primary.copy(alpha = 0.15f)

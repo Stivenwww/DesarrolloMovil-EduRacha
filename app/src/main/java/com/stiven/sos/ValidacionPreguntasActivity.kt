@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.*
@@ -44,6 +45,7 @@ class ValidacionPreguntasActivity : ComponentActivity() {
         val cursoTitulo = intent.getStringExtra("CURSO_TITULO") ?: "Curso"
         val cursoId = intent.getStringExtra("CURSO_ID") ?: ""
         val temaId = intent.getStringExtra("TEMA_ID") ?: ""
+        val temaTitulo = intent.getStringExtra("TEMA_TITULO") ?: temaId
 
         setContent {
             EduRachaTheme {
@@ -51,6 +53,7 @@ class ValidacionPreguntasActivity : ComponentActivity() {
                     cursoTitulo = cursoTitulo,
                     cursoId = cursoId,
                     temaId = temaId,
+                    temaTitulo = temaTitulo,
                     viewModel = viewModel,
                     onNavigateBack = { finish() }
                 )
@@ -64,6 +67,7 @@ fun ValidacionPreguntasScreen(
     cursoTitulo: String,
     cursoId: String,
     temaId: String,
+    temaTitulo: String,
     viewModel: PreguntaViewModel,
     onNavigateBack: () -> Unit
 ) {
@@ -99,7 +103,7 @@ fun ValidacionPreguntasScreen(
         topBar = {
             ValidacionTopAppBar(
                 cursoTitulo = cursoTitulo,
-                temaId = temaId,
+                temaTitulo = temaTitulo,
                 pendingCount = preguntasFiltradas.size,
                 onNavigateBack = onNavigateBack
             )
@@ -211,34 +215,133 @@ fun ValidacionPreguntasScreen(
 @Composable
 fun ValidacionTopAppBar(
     cursoTitulo: String,
-    temaId: String,
+    temaTitulo: String,
     pendingCount: Int,
     onNavigateBack: () -> Unit
 ) {
-    TopAppBar(
-        title = {
-            Column {
-                Text(
-                    "Validar: $cursoTitulo",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    "$pendingCount preguntas pendientes | Tema: $temaId",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
-            }
-        },
-        navigationIcon = {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(EduRachaColors.Primary)
+            .shadow(4.dp)
+    ) {
+        // Barra superior con botón de volver
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(onClick = onNavigateBack) {
-                Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White
+                )
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.Primary),
-        modifier = Modifier.shadow(4.dp)
-    )
+
+            Spacer(Modifier.width(8.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Validación de Preguntas",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = cursoTitulo,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Sección de información del tema y contador
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White.copy(alpha = 0.15f)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Info del tema
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        Icons.Outlined.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White
+                    )
+                    Column {
+                        Text(
+                            text = "Tema",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = temaTitulo,
+                            fontSize = 13.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Badge de preguntas pendientes
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (pendingCount > 0)
+                        Color(0xFFFFA726)
+                    else
+                        EduRachaColors.Success,
+                    shadowElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (pendingCount > 0) Icons.Outlined.HourglassTop else Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.White
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$pendingCount",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = if (pendingCount == 1) "pendiente" else "pendientes",
+                                fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -326,7 +429,7 @@ fun PreguntaCard(
                 if (index < pregunta.opciones.size - 1) Spacer(Modifier.height(8.dp))
             }
 
-            // ✅ MOSTRAR EXPLICACIÓN (OBLIGATORIA)
+            // Mostrar explicación
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.height(12.dp))
@@ -475,7 +578,7 @@ fun PreguntaCard(
         }
     }
 
-    // ✅ DIÁLOGO DE EDICIÓN ACTUALIZADO CON EXPLICACIÓN
+    // Diálogo de Edición
     if (showEditDialog) {
         var textoEditado by remember { mutableStateOf(pregunta.texto) }
         var explicacionEditada by remember { mutableStateOf(pregunta.explicacionCorrecta ?: "") }
@@ -567,7 +670,7 @@ fun PreguntaCard(
 
                     HorizontalDivider()
 
-                    // ✅ CAMPO PARA EDITAR EXPLICACIÓN
+                    // Campo para editar explicación
                     Text(
                         "Explicación (Obligatoria) *",
                         fontSize = 14.sp,
