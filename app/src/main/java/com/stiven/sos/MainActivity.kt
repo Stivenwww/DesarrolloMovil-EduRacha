@@ -63,7 +63,8 @@ class MainActivity : ComponentActivity() {
                         startActivity(Intent(this, CursosInscritosActivity::class.java))
                     },
                     onNavigateToRanking = {
-                        startActivity(Intent(this, RankingDetalleActivity::class.java))
+                        startActivity(Intent(this, RankingEstudianteActivity::class.java))
+
                     }
                 )
             }
@@ -158,7 +159,7 @@ fun MainEstudianteScreen(
                 icon = Icons.Outlined.School,
                 iconColor = EduRachaColors.Success,
                 modifier = Modifier.weight(1f),
-                onClick = onNavigateToCursosInscritos
+                onClick = onNavigateToRanking
             )
             CompactStatCardEstudiante(
                 label = "Pendientes",
@@ -216,6 +217,7 @@ fun MainEstudianteScreen(
                         EduRachaColors.Success.copy(alpha = 0.8f)
                     )
                 ),
+
                 onClick = onNavigateToCursosInscritos
             )
 

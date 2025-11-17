@@ -4,20 +4,30 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.stiven.sos.api.ApiClient
 import com.stiven.sos.models.Curso
 import com.stiven.sos.models.RankingEstudiante
-import com.stiven.sos.models.UsuarioAsignado
+import com.stiven.sos.repository.RankingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+
+enum class TipoRanking {
+    EXPERIENCIA,
+    RACHA,
+    VIDAS
+}
 
 data class RankingUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val cursosInscritos: List<Curso> = emptyList(),
-    val rankingEstudiantes: List<RankingEstudiante> = emptyList()
+    val rankingEstudiantes: List<RankingEstudiante> = emptyList(),
+    val tipoRanking: TipoRanking = TipoRanking.EXPERIENCIA
 )
 
 class RankingViewModel : ViewModel() {
@@ -26,12 +36,16 @@ class RankingViewModel : ViewModel() {
     val uiState: StateFlow<RankingUiState> = _uiState.asStateFlow()
 
     private val apiService = ApiClient.apiService
+    private val rankingRepository = RankingRepository()
     private val auth = FirebaseAuth.getInstance()
 
     fun obtenerUsuarioActualId(): String? {
         return auth.currentUser?.uid
     }
 
+    /**
+     * Cargar cursos inscritos (ESTUDIANTES - usando Firebase)
+     */
     fun cargarCursosInscritos() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -45,32 +59,23 @@ class RankingViewModel : ViewModel() {
                     return@launch
                 }
 
+                Log.d("RankingViewModel", "Obteniendo cursos para usuario: $userId")
                 val responseCursos = apiService.obtenerCursos()
 
                 if (responseCursos.isSuccessful && responseCursos.body() != null) {
-                    val todosCursos: List<Curso> = responseCursos.body()!!
+                    val todosCursos = responseCursos.body()!!
                     val cursosInscritos = mutableListOf<Curso>()
 
                     for (curso in todosCursos) {
-                        try {
-                            if (curso.id != null) {
-                                val responseEstudiantes = apiService.obtenerEstudiantesPorCurso(curso.id)
-                                if (responseEstudiantes.isSuccessful) {
-                                    val estudiantes: List<UsuarioAsignado> = responseEstudiantes.body() ?: emptyList()
-                                    // ✅ Usando .uid explícitamente (el campo real)
-                                    val estaInscrito = estudiantes.any { estudiante ->
-                                        estudiante.uid == userId && estudiante.estado == "activo"
-                                    }
-                                    if (estaInscrito) {
-                                        cursosInscritos.add(curso)
-                                    }
-                                }
+                        if (curso.id != null) {
+                            val tieneProgreso = verificarProgresoEnFirebase(userId, curso.id)
+                            if (tieneProgreso) {
+                                cursosInscritos.add(curso)
                             }
-                        } catch (e: Exception) {
-                            Log.e("RankingViewModel", "Error checking curso ${curso.id}", e)
                         }
                     }
 
+                    Log.d("RankingViewModel", "Cursos inscritos encontrados: ${cursosInscritos.size}")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         cursosInscritos = cursosInscritos
@@ -91,110 +96,113 @@ class RankingViewModel : ViewModel() {
         }
     }
 
-    fun cargarRankingCurso(cursoId: String) {
+    private suspend fun verificarProgresoEnFirebase(userId: String, cursoId: String): Boolean {
+        return suspendCancellableCoroutine { cont ->
+            FirebaseDatabase.getInstance()
+                .getReference("usuarios/$userId/cursos/$cursoId/progreso")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    cont.resume(snapshot.exists())
+                }
+                .addOnFailureListener {
+                    cont.resume(false)
+                }
+        }
+    }
+
+    /**
+     * Cargar ranking de un curso específico
+     */
+    fun cargarRankingCurso(cursoId: String, tipo: TipoRanking = TipoRanking.EXPERIENCIA) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null,
+                tipoRanking = tipo
+            )
+
             try {
-                Log.d("RankingViewModel", "🔍 Cargando ranking para curso: $cursoId")
+                Log.d("RankingViewModel", "🔍 Cargando ranking: $tipo para curso: $cursoId")
 
-                val responseEstudiantes = apiService.obtenerEstudiantesPorCurso(cursoId)
-
-                if (!responseEstudiantes.isSuccessful) {
-                    val errorMsg = "Error al obtener estudiantes: ${responseEstudiantes.code()} - ${responseEstudiantes.message()}"
-                    Log.e("RankingViewModel", errorMsg)
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = errorMsg
-                    )
-                    return@launch
+                val result = when (tipo) {
+                    TipoRanking.EXPERIENCIA -> rankingRepository.obtenerRankingPorExperiencia(cursoId)
+                    TipoRanking.RACHA -> rankingRepository.obtenerRankingPorRacha(cursoId)
+                    TipoRanking.VIDAS -> rankingRepository.obtenerRankingPorVidas(cursoId)
                 }
 
-                val todosEstudiantes: List<UsuarioAsignado> = responseEstudiantes.body() ?: emptyList()
-                Log.d("RankingViewModel", "📚 Total estudiantes recibidos: ${todosEstudiantes.size}")
-
-                val estudiantes = todosEstudiantes.filter { est ->
-                    est.estado == "activo"
-                }
-                Log.d("RankingViewModel", "✅ Estudiantes activos: ${estudiantes.size}")
-
-                if (estudiantes.isEmpty()) {
-                    Log.w("RankingViewModel", "⚠️ No hay estudiantes activos en el curso")
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        rankingEstudiantes = emptyList()
-                    )
-                    return@launch
-                }
-
-                val ranking = mutableListOf<RankingEstudiante>()
-
-                for (estudiante in estudiantes) {
-                    try {
-                        // ✅ Usando .uid explícitamente para el endpoint
-                        Log.d("RankingViewModel", "🔄 Obteniendo racha de: ${estudiante.nombre} (${estudiante.uid})")
-                        val responseRacha = apiService.obtenerRacha(cursoId, estudiante.uid)
-
-                        if (responseRacha.isSuccessful && responseRacha.body() != null) {
-                            val racha: Map<String, Any> = responseRacha.body()!!
-                            val experiencia = (racha["experiencia"] as? Number)?.toInt() ?: 0
-                            val diasConsecutivos = (racha["diasConsecutivos"] as? Number)?.toInt() ?: 0
-
-                            Log.d("RankingViewModel", "   ✅ ${estudiante.nombre}: $experiencia XP, $diasConsecutivos días")
-
-                            ranking.add(
-                                RankingEstudiante(
-                                    id = estudiante.uid, // ✅ Usar uid para el ID en el ranking
-                                    nombre = estudiante.nombre,
-                                    experiencia = experiencia,
-                                    diasConsecutivos = diasConsecutivos
-                                )
-                            )
-                        } else {
-                            Log.w("RankingViewModel", "   ⚠️ No se encontró racha para ${estudiante.nombre}, usando valores por defecto")
-                            ranking.add(
-                                RankingEstudiante(
-                                    id = estudiante.uid,
-                                    nombre = estudiante.nombre,
-                                    experiencia = 0,
-                                    diasConsecutivos = 0
-                                )
-                            )
-                        }
-                    } catch (e: Exception) {
-                        Log.e("RankingViewModel", "❌ Error getting racha for ${estudiante.nombre} (${estudiante.uid})", e)
-                        ranking.add(
-                            RankingEstudiante(
-                                id = estudiante.uid,
-                                nombre = estudiante.nombre,
-                                experiencia = 0,
-                                diasConsecutivos = 0
-                            )
+                result.fold(
+                    onSuccess = { ranking ->
+                        Log.d("RankingViewModel", "✅ Ranking cargado: ${ranking.size} estudiantes")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            rankingEstudiantes = ranking,
+                            error = null
+                        )
+                    },
+                    onFailure = { error ->
+                        Log.e("RankingViewModel", "❌ Error: ${error.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "Error al cargar ranking: ${error.message}"
                         )
                     }
-                }
-
-                val rankingOrdenado: List<RankingEstudiante> = ranking.sortedWith(
-                    compareByDescending<RankingEstudiante> { it.experiencia }
-                        .thenByDescending { it.diasConsecutivos }
-                )
-
-                Log.d("RankingViewModel", "🏆 Ranking final: ${rankingOrdenado.size} estudiantes")
-                rankingOrdenado.forEachIndexed { index, est ->
-                    Log.d("RankingViewModel", "   ${index + 1}. ${est.nombre}: ${est.experiencia} XP")
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    rankingEstudiantes = rankingOrdenado
                 )
 
             } catch (e: Exception) {
-                val errorMsg = "Error al cargar ranking: ${e.message}"
-                Log.e("RankingViewModel", "❌ $errorMsg", e)
-                e.printStackTrace()
+                Log.e("RankingViewModel", "❌ Excepción: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = errorMsg
+                    error = "Error inesperado: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Cargar ranking general (todos los cursos)
+     */
+    fun cargarRankingGeneral(tipo: TipoRanking = TipoRanking.EXPERIENCIA) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null,
+                tipoRanking = tipo
+            )
+
+            try {
+                Log.d("RankingViewModel", "🌐 Cargando ranking general: $tipo")
+
+                val filtro = when (tipo) {
+                    TipoRanking.EXPERIENCIA -> "experiencia"
+                    TipoRanking.RACHA -> "racha"
+                    TipoRanking.VIDAS -> "vidas"
+                }
+
+                val result = rankingRepository.obtenerRankingGeneral(filtro)
+
+                result.fold(
+                    onSuccess = { ranking ->
+                        Log.d("RankingViewModel", "✅ Ranking general: ${ranking.size} estudiantes")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            rankingEstudiantes = ranking,
+                            error = null
+                        )
+                    },
+                    onFailure = { error ->
+                        Log.e("RankingViewModel", "❌ Error ranking general: ${error.message}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "Error al cargar ranking general: ${error.message}"
+                        )
+                    }
+                )
+
+            } catch (e: Exception) {
+                Log.e("RankingViewModel", "❌ Excepción ranking general: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Error inesperado: ${e.message}"
                 )
             }
         }

@@ -139,6 +139,8 @@ dependencies {
 
     // App Distribution (no es una dependencia de la app, sino del plugin de Gradle)
 
+    implementation("com.squareup.okhttp3:okhttp:4.12.0") // nueva si algo la borro stiven
+
     // -------------------
     // TESTING
     // -------------------

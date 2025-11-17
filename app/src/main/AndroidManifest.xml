@@ -138,6 +138,17 @@
             android:exported="false" />
 
 
+        <activity
+            android:name=".ReportesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PreviewReporteActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".RankingEstudianteActivity"
+            android:exported="false" />
 
         <activity
             android:name=".SeleccionarCursoRankingActivity"

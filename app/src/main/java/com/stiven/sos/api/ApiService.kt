@@ -3,7 +3,8 @@ package com.stiven.sos.api
 import com.stiven.sos.models.*
 import retrofit2.Response
 import retrofit2.http.*
-
+import okhttp3.ResponseBody
+import retrofit2.http.Streaming
 /**
  * Interfaz que define todos los endpoints de la API de EduRacha usando Retrofit.
  */
@@ -58,7 +59,7 @@ interface ApiService {
     @PUT("api/cursos/{id}")
     suspend fun actualizarCurso(
         @Path("id") id: String,
-        @Body curso: CursoRequest  // ✅ CAMBIAR de Curso a CursoRequest
+        @Body curso: CursoRequest
     ): Response<ApiResponse>
     @DELETE("api/cursos/{id}")
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
@@ -70,7 +71,7 @@ interface ApiService {
      */
 
 
-    @GET("api/solicitudes/curso/{id}/estudiantes")
+    @GET("api/cursos/{id}/estudiantes")
     suspend fun obtenerEstudiantesPorCurso(
         @Path("id") cursoId: String
     ): Response<List<UsuarioAsignado>>
@@ -329,4 +330,102 @@ interface ApiService {
     ): Response<Map<String, Any>>
 
 
+    // ============================================
+    // ENDPOINTS DE RANKING (COMPLETOS)
+    // ============================================
+
+    /**
+     * Obtener ranking por experiencia
+     */
+    @GET("api/cursos/ranking/{cursoId}")
+    suspend fun obtenerRankingPorExperiencia(
+        @Path("cursoId") cursoId: String
+    ): Response<List<RankingEstudianteAPI>>
+
+    /**
+     * Obtener ranking por racha
+     */
+    @GET("api/cursos/ranking/{cursoId}/racha")
+    suspend fun obtenerRankingPorRacha(
+        @Path("cursoId") cursoId: String
+    ): Response<List<RankingEstudianteAPI>>
+
+    /**
+     * Obtener ranking por vidas
+     */
+    @GET("api/cursos/ranking/{cursoId}/vidas")
+    suspend fun obtenerRankingPorVidas(
+        @Path("cursoId") cursoId: String
+    ): Response<List<RankingEstudianteAPI>>
+
+    /**
+     * Ranking general (todos los cursos)
+     */
+    @GET("api/cursos/ranking/general")
+    suspend fun obtenerRankingGeneral(): Response<List<RankingEstudianteAPI>>
+
+    @GET("api/cursos/ranking/general/{filtro}")
+    suspend fun obtenerRankingGeneralConFiltro(
+        @Path("filtro") filtro: String
+    ): Response<List<RankingEstudianteAPI>>
+
+// ============================================
+    // ENDPOINTS DE REPORTES EXCEL - VISTA PREVIA (JSON)
+    // ============================================
+
+    @GET("reportes/debug/cursos/{cursoId}/diario/fecha/{fecha}")
+    suspend fun obtenerVistaPreviewReporteDiario(
+        @Path("cursoId") cursoId: String,
+        @Path("fecha") fecha: String
+    ): Response<DatosReporteDiarioResponse>
+
+    @GET("reportes/debug/cursos/{cursoId}/tema/{temaId}")
+    suspend fun obtenerVistaPreviewReporteTema(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<DatosReporteTemaResponse>
+
+    @GET("reportes/debug/cursos/{cursoId}/general")
+    suspend fun obtenerVistaPreviewReporteGeneral(
+        @Path("cursoId") cursoId: String
+    ): Response<DatosReporteGeneralResponse>
+
+    @GET("reportes/debug/cursos/{cursoId}/rango")
+    suspend fun obtenerVistaPreviewReporteRango(
+        @Path("cursoId") cursoId: String,
+        @Query("desde") desde: String,
+        @Query("hasta") hasta: String
+    ): Response<DatosReporteRangoResponse>
+
+    // ============================================
+    // ENDPOINTS DE REPORTES EXCEL - DESCARGA
+    // ============================================
+
+    @GET("reportes/cursos/{cursoId}/diario/fecha/{fecha}")
+    @Streaming
+    suspend fun descargarReporteDiario(
+        @Path("cursoId") cursoId: String,
+        @Path("fecha") fecha: String
+    ): Response<ResponseBody>
+
+    @GET("reportes/cursos/{cursoId}/tema/{temaId}")
+    @Streaming
+    suspend fun descargarReporteTema(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<ResponseBody>
+
+    @GET("reportes/cursos/{cursoId}/general")
+    @Streaming
+    suspend fun descargarReporteGeneral(
+        @Path("cursoId") cursoId: String
+    ): Response<ResponseBody>
+
+    @GET("reportes/cursos/{cursoId}/rango")
+    @Streaming
+    suspend fun descargarReporteRango(
+        @Path("cursoId") cursoId: String,
+        @Query("desde") desde: String,
+        @Query("hasta") hasta: String
+    ): Response<ResponseBody>
 }

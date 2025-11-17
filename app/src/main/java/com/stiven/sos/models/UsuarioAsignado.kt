@@ -3,9 +3,10 @@ package com.stiven.sos.models
 import com.google.gson.annotations.SerializedName
 
 
+
 data class UsuarioAsignado(
 
-    @SerializedName("id")
+    @SerializedName(value = "userId", alternate = ["id"])
     val uid: String = "",
 
     val nombre: String = "",
@@ -19,7 +20,6 @@ data class UsuarioAsignado(
 
     @SerializedName("fechaRegistro")
     val fechaRegistro: String? = null
-
 )
 
 /**
