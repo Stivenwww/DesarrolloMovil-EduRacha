@@ -119,7 +119,7 @@ fun ReportesScreenComplete(
         listOf(estadoDiario, estadoTema, estadoGeneral, estadoRango).forEach { estado ->
             when (estado) {
                 is ReporteEstado.Exito -> {
-                    Toast.makeText(context, "✅ Reporte guardado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, " Reporte guardado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()
@@ -128,7 +128,7 @@ fun ReportesScreenComplete(
                     }
                 }
                 is ReporteEstado.Error -> {
-                    Toast.makeText(context, "❌ Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, " Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()

@@ -83,7 +83,7 @@ data class Tema(
 ) : Parcelable
 
 /**
- * Modelo de Curso desde backend
+ * Modelo de Curso desde backenda
  */
 @Parcelize
 @Serializable

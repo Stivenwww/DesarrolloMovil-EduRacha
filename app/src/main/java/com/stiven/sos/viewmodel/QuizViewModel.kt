@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.stiven.sos.models.*
 import com.stiven.sos.repository.ProgresoCurso
@@ -18,10 +19,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.*
 
+
+/**
+ * ESTADO DE LA UI DEL QUIZ
+ *
+ * Contiene todo el estado necesario para la interfaz del quiz incluyendo:
+ * - Estado del quiz activo
+ * - Progreso del usuario
+ * - Vidas disponibles
+ * - Flags de validacion criticos
+ */
 data class QuizUiState(
     val isLoading: Boolean = false,
     val quizActivo: IniciarQuizResponse? = null,
@@ -44,12 +54,26 @@ data class QuizUiState(
     val modosDisponibles: ModoQuizDisponibleResponse? = null,
     val modoActual: String = "oficial",
     val puedeHacerPractica: Boolean = false,
-    // ✅ NUEVOS ESTADOS PARA RACHA Y CONTROL DIARIO
     val yaResolviHoy: Boolean = false,
     val mostrarCelebracionRacha: Boolean = false,
     val rachaSubio: Boolean = false,
     val horasParaNuevoQuiz: Int = 0,
-    val minutosParaNuevoQuiz: Int = 0
+    val minutosParaNuevoQuiz: Int = 0,
+    val respuestaProcesada: Boolean = false,
+    val mostrarConfetti: Boolean = false,
+    val porcentajeQuizOficial: Int = 0,
+    val mostrarDialogoTemaAprobado: Boolean = false,
+    val quizFinalYaCompletado: Boolean = false,
+    val mostrarDialogoQuizFinalCompletado: Boolean = false,
+
+    // Indica si el quiz fue interrumpido por perdida de vidas
+    // Cuando esto es true, el usuario DEBE ser redirigido inmediatamente
+    val quizInterrumpidoPorVidas: Boolean = false,
+    val mostrarDialogoPeriodoFinalizado: Boolean = false,
+    val mostrarDialogoErrorGeneral: Boolean = false,
+    val mensajeErrorDetallado: String = "",
+    val tituloError: String = ""
+
 )
 
 enum class TipoMensaje {
@@ -82,59 +106,258 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     private fun verificarAutenticacion() {
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser == null) {
-            Log.e(TAG, "Usuario no autenticado")
-            mostrarMensaje("Debes iniciar sesión para continuar", TipoMensaje.ERROR)
+            Log.e(TAG, "Usuario no autenticado en Firebase")
+            mostrarMensaje("Debes iniciar sesion para continuar", TipoMensaje.ERROR)
         } else {
-            Log.d(TAG, " Usuario autenticado: ${currentUser.uid}")
+            Log.d(TAG, "Usuario autenticado correctamente: ${currentUser.uid}")
         }
     }
+    /**
+     * INICIAR OBSERVADORES EN TIEMPO REAL
+     */
+
+// ============================================================================
+// PASO 1: ACTUALIZAR QuizViewModel - Mejorar detección de vidas
+// ============================================================================
+
+// En QuizViewModel.kt, actualizar la función iniciarObservadores:
 
     fun iniciarObservadores(cursoId: String, temaId: String = "") {
-        Log.d(TAG, " Iniciando observadores - Curso: $cursoId")
+        Log.d(TAG, "======================================")
+        Log.d(TAG, "INICIANDO OBSERVADORES EN TIEMPO REAL")
+        Log.d(TAG, "Curso ID: $cursoId")
+        if (temaId.isNotEmpty()) Log.d(TAG, "Tema ID: $temaId")
+        Log.d(TAG, "======================================")
 
         detenerObservadores()
 
         cursoIdActual = cursoId
         temaIdActual = temaId
 
-        // Observador de vidas
         listenerVidas = repository.observarVidasTiempoReal(
             cursoId = cursoId,
             onVidasActualizadas = { vidas ->
+                Log.d(TAG, "----------------------------------------")
+                Log.d(TAG, "ACTUALIZACION DE VIDAS DETECTADA")
+                Log.d(TAG, "Vidas actuales: ${vidas.vidasActuales}")
+
+                val estadoAnterior = _uiState.value
+                val vidasAnteriores = estadoAnterior.vidas?.vidasActuales ?: 5
+                val vidasNuevas = vidas.vidasActuales
+                val quizActivo = estadoAnterior.quizActivo
+                val yaInterrumpido = estadoAnterior.quizInterrumpidoPorVidas
+
+                Log.d(TAG, "Estado del sistema:")
+                Log.d(TAG, "  - Vidas anteriores: $vidasAnteriores")
+                Log.d(TAG, "  - Vidas nuevas: $vidasNuevas")
+                Log.d(TAG, "  - Quiz activo: ${quizActivo != null}")
+                Log.d(TAG, "  - Ya interrumpido: $yaInterrumpido")
+
+                // ⚠️ ACTUALIZAR ESTADO DE VIDAS PRIMERO
                 _uiState.value = _uiState.value.copy(
                     vidas = vidas,
                     sinVidas = vidas.vidasActuales <= 0
                 )
-                Log.d(TAG, " Vidas: ${vidas.vidasActuales}/${vidas.vidasMax}")
 
-                //  Si se acaban las vidas durante quiz activo
-                if (vidas.vidasActuales == 0 && _uiState.value.quizActivo != null) {
-                    _uiState.value = _uiState.value.copy(mostrarDialogoSinVidas = true)
+                // ⚠️ DETECCIÓN INMEDIATA: Vidas llegaron a 0 DURANTE el quiz
+                if (vidasNuevas == 0 &&
+                    vidasAnteriores > 0 &&
+                    quizActivo != null &&
+                    !yaInterrumpido) {
+
+                    Log.e(TAG, "========================================")
+                    Log.e(TAG, "🚨 ALERTA CRÍTICA: VIDAS AGOTADAS")
+                    Log.e(TAG, "========================================")
+                    Log.e(TAG, "Quiz ID: ${quizActivo.quizId}")
+                    Log.e(TAG, "Vidas: $vidasAnteriores → $vidasNuevas")
+                    Log.e(TAG, "ACCIÓN: Bloqueando quiz INMEDIATAMENTE")
+                    Log.e(TAG, "========================================")
+
+                    // BLOQUEO INMEDIATO
+                    _uiState.value = _uiState.value.copy(
+                        mostrarDialogoSinVidas = true,
+                        quizInterrumpidoPorVidas = true,
+                        finalizando = false
+                    )
                 }
+
+                Log.d(TAG, "Vidas: ${vidas.vidasActuales}/${vidas.vidasMax}")
+                Log.d(TAG, "----------------------------------------")
             },
             onError = { error ->
-                Log.e(TAG, " Error en observador de vidas: ${error.message}")
+                Log.e(TAG, "Error en observador de vidas: ${error.message}")
+                _uiState.value = _uiState.value.copy(
+                    sinVidas = true,
+                    vidas = VidasResponse(0, 5, 0)
+                )
             }
         )
 
-        // Observador de progreso
+
         listenerProgreso = repository.observarProgresoTiempoReal(
             cursoId = cursoId,
             onProgresoActualizado = { progreso ->
                 _uiState.value = _uiState.value.copy(progreso = progreso)
-                Log.d(TAG, " XP: ${progreso.experiencia}, Racha: ${progreso.rachaDias} días")
+                Log.d(TAG, "Progreso actualizado: XP=${progreso.experiencia}, Racha=${progreso.rachaDias}")
             },
             onError = { error ->
-                Log.e(TAG, " Error en observador de progreso: ${error.message}")
+                Log.e(TAG, "Error en observador de progreso: ${error.message}")
             }
         )
 
         iniciarTimerRegeneracion()
 
-        // Verificar si ya resolvió hoy (solo para temas normales)
-        if (temaId.isNotEmpty() && temaId != "quiz_final") {
+        if (temaId.isNotEmpty()) {
             verificarTemaAprobado(cursoId, temaId)
             verificarSiResolviHoy(cursoId, temaId)
+            cargarPorcentajeQuizOficial(cursoId, temaId)
+            iniciarTimerCooldown(cursoId, temaId)
+        }
+
+        if (temaId == "quiz_final") {
+            verificarQuizFinalCompletado(cursoId)
+        }
+
+        Log.d(TAG, "======================================")
+        Log.d(TAG, "OBSERVADORES INICIADOS CORRECTAMENTE")
+        Log.d(TAG, "======================================")
+    }
+    // Agregar esta función en QuizViewModel
+    fun cargarEstadoTema(cursoId: String, temaId: String) {
+        viewModelScope.launch {
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados/$temaId")
+
+                val snapshot = ref.get().await()
+
+                if (snapshot.exists()) {
+                    val aprobado = snapshot.child("aprobado").getValue(Boolean::class.java) ?: false
+                    val porcentaje = snapshot.child("porcentajeObtenido").getValue(Int::class.java) ?: 0
+                    val timestampUltimoQuiz = snapshot.child("timestampUltimoQuiz").getValue(Long::class.java) ?: 0L
+
+                    var horasRestantes = 0
+                    var minutosRestantes = 0
+                    var debeEsperar24h = false
+
+                    // Cooldown solo si aprobó con 80% o más
+                    if (porcentaje >= 80 && timestampUltimoQuiz > 0) {
+                        val ahora = System.currentTimeMillis()
+                        val tiempoTranscurrido = ahora - timestampUltimoQuiz
+                        val cooldown24h = 24 * 60 * 60 * 1000L
+
+                        if (tiempoTranscurrido < cooldown24h) {
+                            debeEsperar24h = true
+                            val tiempoRestante = cooldown24h - tiempoTranscurrido
+                            horasRestantes = (tiempoRestante / (1000 * 60 * 60)).toInt()
+                            minutosRestantes = ((tiempoRestante % (1000 * 60 * 60)) / (1000 * 60)).toInt()
+                        }
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        temaAprobado = aprobado,
+                        porcentajeQuizOficial = porcentaje,
+                        puedeHacerPractica = porcentaje >= 80,
+                        yaResolviHoy = debeEsperar24h,
+                        horasParaNuevoQuiz = horasRestantes,
+                        minutosParaNuevoQuiz = minutosRestantes
+                    )
+
+                    Log.d(TAG, "Estado tema $temaId: aprobado=$aprobado, porcentaje=$porcentaje%, cooldown=$debeEsperar24h")
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        temaAprobado = false,
+                        porcentajeQuizOficial = 0,
+                        puedeHacerPractica = false,
+                        yaResolviHoy = false,
+                        horasParaNuevoQuiz = 0,
+                        minutosParaNuevoQuiz = 0
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cargando estado del tema: ${e.message}")
+            }
+        }
+    }
+    /**
+     * VERIFICAR SI EL QUIZ FINAL YA FUE COMPLETADO
+     *
+     * REGLA CRITICA:
+     * El Quiz Final solo puede realizarse UNA VEZ por curso
+     * Se considera completado si: aprobado == true Y porcentajeObtenido >= 80
+     *
+     * Si ya se completo con 80% o mas, se activa el flag quizFinalYaCompletado
+     * que bloquea cualquier intento de volver a hacerlo
+     */
+    private fun verificarQuizFinalCompletado(cursoId: String) {
+        viewModelScope.launch {
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados/quiz_final")
+
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "VERIFICANDO ESTADO DEL QUIZ FINAL")
+                Log.d(TAG, "========================================")
+
+                val snapshot = ref.get().await()
+
+                if (snapshot.exists()) {
+                    val aprobado = snapshot.child("aprobado").getValue(Boolean::class.java) ?: false
+                    val porcentaje = snapshot.child("porcentajeObtenido").getValue(Int::class.java) ?: 0
+
+                    Log.d(TAG, "Quiz Final encontrado en Firebase:")
+                    Log.d(TAG, "  - Estado aprobado: $aprobado")
+                    Log.d(TAG, "  - Porcentaje obtenido: $porcentaje%")
+
+                    /**
+                     * VALIDACION CRITICA:
+                     * Si aprobo con 80% o mas, NO puede volver a hacerlo
+                     * Esto garantiza que cada usuario solo haga el Quiz Final UNA VEZ
+                     */
+                    if (aprobado && porcentaje >= 80) {
+                        _uiState.value = _uiState.value.copy(
+                            quizFinalYaCompletado = true
+                        )
+                        Log.w(TAG, "========================================")
+                        Log.w(TAG, "QUIZ FINAL YA COMPLETADO")
+                        Log.w(TAG, "Porcentaje: $porcentaje%")
+                        Log.w(TAG, "ACCESO BLOQUEADO")
+                        Log.w(TAG, "========================================")
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            quizFinalYaCompletado = false
+                        )
+                        if (porcentaje > 0 && porcentaje < 80) {
+                            Log.d(TAG, "Quiz Final puede reintentarse (obtuvo $porcentaje%)")
+                        } else {
+                            Log.d(TAG, "Quiz Final disponible para realizar")
+                        }
+                    }
+                } else {
+                    // Nunca se ha intentado
+                    _uiState.value = _uiState.value.copy(
+                        quizFinalYaCompletado = false
+                    )
+                    Log.d(TAG, "Quiz Final nunca intentado - Disponible")
+                }
+
+                Log.d(TAG, "========================================")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verificando Quiz Final: ${e.message}")
+            }
+        }
+    }
+
+    private fun iniciarTimerCooldown(cursoId: String, temaId: String) {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(60_000) // 1 minuto
+                if (_uiState.value.yaResolviHoy) {
+                    verificarSiResolviHoy(cursoId, temaId)
+                }
+            }
         }
     }
 
@@ -144,13 +367,15 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             while (isActive) {
                 delay(60_000) // 1 minuto
                 cursoIdActual?.let { cursoId ->
-                    repository.observarVidasTiempoReal(cursoId, { }, { })
+                    Log.d(TAG, "Timer: verificando regeneracion de vidas")
                 }
             }
         }
     }
 
     fun detenerObservadores() {
+        Log.d(TAG, "Deteniendo observadores")
+
         timerJob?.cancel()
         timerJob = null
 
@@ -167,9 +392,36 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             }
             listenerProgreso = null
         }
+
+        Log.d(TAG, "Observadores detenidos correctamente")
     }
 
-    //  VERIFICAR SI YA RESOLVIÓ EL QUIZ OFICIAL HOY
+    private fun cargarPorcentajeQuizOficial(cursoId: String, temaId: String) {
+        viewModelScope.launch {
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados/$temaId")
+
+                val snapshot = ref.get().await()
+
+                if (snapshot.exists()) {
+                    val porcentaje = snapshot.child("porcentajeObtenido").getValue(Int::class.java) ?: 0
+                    val aprobado = snapshot.child("aprobado").getValue(Boolean::class.java) ?: false
+
+                    _uiState.value = _uiState.value.copy(
+                        porcentajeQuizOficial = porcentaje,
+                        temaAprobado = aprobado
+                    )
+
+                    Log.d(TAG, "Tema cargado: Porcentaje=$porcentaje%, Aprobado=$aprobado")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cargando porcentaje: ${e.message}")
+            }
+        }
+    }
+
     private fun verificarSiResolviHoy(cursoId: String, temaId: String) {
         viewModelScope.launch {
             try {
@@ -180,82 +432,137 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 val snapshot = ref.get().await()
 
                 if (snapshot.exists()) {
-                    val ultimaFecha = snapshot.child("ultimaFechaQuiz").getValue(String::class.java)
+                    val timestampUltimoQuiz = snapshot.child("timestampUltimoQuiz").getValue(Long::class.java) ?: 0L
                     val aprobado = snapshot.child("aprobado").getValue(Boolean::class.java) ?: false
+                    val porcentajeObtenido = snapshot.child("porcentajeObtenido").getValue(Int::class.java) ?: 0
 
-                    val fechaHoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                    val yaResolviHoy = ultimaFecha == fechaHoy
-
-                    //  Calcular tiempo restante si ya resolvió
                     var horasRestantes = 0
                     var minutosRestantes = 0
+                    var debeEsperar24h = false
 
-                    if (yaResolviHoy && ultimaFecha != null) {
-                        val calendar = Calendar.getInstance()
-                        val horaActual = calendar.timeInMillis
+                    // Cooldown solo si aprobo con 80% o mas
+                    if (porcentajeObtenido >= 80 && timestampUltimoQuiz > 0) {
+                        val ahora = System.currentTimeMillis()
+                        val tiempoTranscurrido = ahora - timestampUltimoQuiz
+                        val cooldown24h = 24 * 60 * 60 * 1000L
 
-                        calendar.set(Calendar.HOUR_OF_DAY, 23)
-                        calendar.set(Calendar.MINUTE, 59)
-                        calendar.set(Calendar.SECOND, 59)
-                        val medianoche = calendar.timeInMillis
+                        if (tiempoTranscurrido < cooldown24h) {
+                            debeEsperar24h = true
+                            val tiempoRestante = cooldown24h - tiempoTranscurrido
+                            horasRestantes = (tiempoRestante / (1000 * 60 * 60)).toInt()
+                            minutosRestantes = ((tiempoRestante % (1000 * 60 * 60)) / (1000 * 60)).toInt()
 
-                        val diferenciaMilis = medianoche - horaActual
-                        horasRestantes = (diferenciaMilis / (1000 * 60 * 60)).toInt()
-                        minutosRestantes = ((diferenciaMilis % (1000 * 60 * 60)) / (1000 * 60)).toInt()
+                            Log.d(TAG, "Cooldown activo. Restante: ${horasRestantes}h ${minutosRestantes}m")
+                        } else {
+                            Log.d(TAG, "Cooldown completado")
+                        }
                     }
 
                     _uiState.value = _uiState.value.copy(
                         temaAprobado = aprobado,
-                        puedeHacerPractica = aprobado,
-                        yaResolviHoy = yaResolviHoy,
+                        puedeHacerPractica = porcentajeObtenido >= 80,
+                        yaResolviHoy = debeEsperar24h,
                         horasParaNuevoQuiz = horasRestantes,
                         minutosParaNuevoQuiz = minutosRestantes
                     )
-
-                    Log.d(TAG, " Ya resolvió hoy: $yaResolviHoy, Aprobado: $aprobado")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, " Error verificando si resolvió hoy: ${e.message}")
+                Log.e(TAG, "Error verificando cooldown: ${e.message}")
             }
         }
+    }
+
+    fun mostrarDialogoTemaAprobado() {
+        _uiState.value = _uiState.value.copy(mostrarDialogoTemaAprobado = true)
+    }
+
+    fun cerrarDialogoTemaAprobado() {
+        _uiState.value = _uiState.value.copy(mostrarDialogoTemaAprobado = false)
+    }
+
+    fun mostrarDialogoQuizFinalCompletado() {
+        _uiState.value = _uiState.value.copy(mostrarDialogoQuizFinalCompletado = true)
+    }
+
+    fun cerrarDialogoQuizFinalCompletado() {
+        _uiState.value = _uiState.value.copy(mostrarDialogoQuizFinalCompletado = false)
     }
 
     fun iniciarQuiz(cursoId: String, temaId: String, modo: String = "oficial") {
         viewModelScope.launch {
             iniciarMutex.withLock {
-                if (_uiState.value.isLoading) return@withLock
-
-                // ✅ VALIDACIÓN: No permitir quiz oficial si ya resolvió hoy
-                if (modo == "oficial" && _uiState.value.yaResolviHoy && temaId != "quiz_final") {
-                    mostrarMensaje(
-                        "Ya resolviste el quiz oficial hoy. Vuelve en ${_uiState.value.horasParaNuevoQuiz}h ${_uiState.value.minutosParaNuevoQuiz}m",
-                        TipoMensaje.ADVERTENCIA
-                    )
+                if (_uiState.value.isLoading) {
+                    Log.w(TAG, "Inicio ya en progreso, ignorando solicitud")
                     return@withLock
                 }
 
                 cursoIdActual = cursoId
                 temaIdActual = temaId
 
-                // ✅ MODO PRÁCTICA Y OFICIAL quitan vidas
-                if (modo == "oficial" || modo == "practica") {
-                    val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 5
-                    if (vidasActuales == 0) {
-                        mostrarMensaje("No tienes vidas disponibles", TipoMensaje.ADVERTENCIA)
-                        _uiState.value = _uiState.value.copy(mostrarDialogoSinVidas = true)
-                        return@withLock
-                    }
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "INICIANDO QUIZ")
+                Log.d(TAG, "Curso: $cursoId")
+                Log.d(TAG, "Tema: $temaId")
+                Log.d(TAG, "Modo: $modo")
+                Log.d(TAG, "========================================")
+
+                if (temaId == "quiz_final" && _uiState.value.quizFinalYaCompletado) {
+                    Log.w(TAG, "========================================")
+                    Log.w(TAG, "INICIO BLOQUEADO")
+                    Log.w(TAG, "Razon: Quiz Final ya completado")
+                    Log.w(TAG, "========================================")
+                    mostrarDialogoQuizFinalCompletado()
+                    return@withLock
                 }
 
-                if (_uiState.value.quizActivo != null) return@withLock
+                if (modo == "oficial" &&
+                    temaId != "quiz_final" &&
+                    _uiState.value.temaAprobado &&
+                    !_uiState.value.yaResolviHoy) {
+                    Log.w(TAG, "Tema ya aprobado, mostrando dialogo de confirmacion")
+                    mostrarDialogoTemaAprobado()
+                    return@withLock
+                }
+
+                // VALIDACION: VIDAS DISPONIBLES (aplica a TODOS los modos)
+                val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 5
+                if (vidasActuales == 0) {
+                    Log.w(TAG, "========================================")
+                    Log.w(TAG, "INICIO BLOQUEADO")
+                    Log.w(TAG, "Razon: Sin vidas disponibles")
+                    Log.w(TAG, "Modo: $modo")
+                    Log.w(TAG, "========================================")
+                    mostrarMensaje("No tienes vidas disponibles", TipoMensaje.ADVERTENCIA)
+                    _uiState.value = _uiState.value.copy(mostrarDialogoSinVidas = true)
+                    return@withLock
+                }
+
+                if (_uiState.value.quizActivo != null) {
+                    Log.w(TAG, "INICIO BLOQUEADO: Ya hay un quiz activo")
+                    return@withLock
+                }
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = true,
                     error = null,
-                    modoActual = modo
+                    modoActual = modo,
+                    quizInterrumpidoPorVidas = false,
+                    // Limpiar estados de error anteriores
+                    mostrarDialogoPeriodoFinalizado = false,
+                    mostrarDialogoErrorGeneral = false,
+                    mensajeErrorDetallado = "",
+                    tituloError = ""
                 )
 
-                repository.iniciarQuiz(cursoId, temaId, modo).fold(
+                val result = if (temaId == "quiz_final") {
+                    Log.d(TAG, "Llamando a iniciarQuizFinal()")
+                    repository.iniciarQuizFinal(cursoId)
+                } else {
+                    Log.d(TAG, "Llamando a iniciarQuiz()")
+                    repository.iniciarQuiz(cursoId, temaId, modo)
+                }
+
+                result.fold(
                     onSuccess = { response ->
                         _uiState.value = _uiState.value.copy(
                             quizActivo = response,
@@ -265,16 +572,208 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                             finalizando = false
                         )
 
-                        val modoTexto = when (modo) {
-                            "practica" -> "Modo Práctica 🎯"
-                            "final" -> "Quiz Final 🏆"
-                            else -> "Quiz Oficial ⭐"
+                        val modoTexto = when {
+                            temaId == "quiz_final" -> "Quiz Final"
+                            modo == "practica" -> "Modo Practica"
+                            else -> "Quiz Oficial"
                         }
-                        mostrarMensaje("¡$modoTexto iniciado!", TipoMensaje.EXITO)
+
+                        mostrarMensaje("$modoTexto iniciado correctamente", TipoMensaje.EXITO)
+
+                        Log.d(TAG, "========================================")
+                        Log.d(TAG, "QUIZ INICIADO EXITOSAMENTE")
+                        Log.d(TAG, "Quiz ID: ${response.quizId}")
+                        Log.d(TAG, "Preguntas: ${response.preguntas.size}")
+                        Log.d(TAG, "Modo: $modo")
+                        Log.d(TAG, "========================================")
                     },
                     onFailure = { error ->
-                        _uiState.value = _uiState.value.copy(isLoading = false)
-                        mostrarMensaje(parsearMensajeError(error.message), TipoMensaje.ERROR)
+                        Log.e(TAG, "========================================")
+                        Log.e(TAG, "ERROR AL INICIAR QUIZ")
+                        Log.e(TAG, "Mensaje: ${error.message}")
+                        Log.e(TAG, "========================================")
+
+                        // NUEVO: Analizar tipo de error y mostrar diálogo apropiado
+                        val mensajeError = error.message ?: "Error desconocido al iniciar el quiz"
+
+                        when {
+                            // Error: Período finalizado
+                            mensajeError.contains("período", ignoreCase = true) &&
+                                    mensajeError.contains("finalizó", ignoreCase = true) -> {
+                                Log.w(TAG, "Tipo de error detectado: PERIODO_FINALIZADO")
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoPeriodoFinalizado = true,
+                                    mensajeErrorDetallado = mensajeError,
+                                    tituloError = "Período Finalizado"
+                                )
+                            }
+
+                            // Error: Sin vidas
+                            mensajeError.contains("sin vidas", ignoreCase = true) ||
+                                    mensajeError.contains("vidas insuficientes", ignoreCase = true) -> {
+                                Log.w(TAG, "Tipo de error detectado: SIN_VIDAS")
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    sinVidas = true,
+                                    mostrarDialogoSinVidas = true
+                                )
+                            }
+
+                            // Error: Tema no disponible
+                            mensajeError.contains("no disponible", ignoreCase = true) ||
+                                    mensajeError.contains("no existe", ignoreCase = true) -> {
+                                Log.w(TAG, "Tipo de error detectado: TEMA_NO_DISPONIBLE")
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoErrorGeneral = true,
+                                    mensajeErrorDetallado = mensajeError,
+                                    tituloError = "Tema No Disponible"
+                                )
+                            }
+
+                            // Error: Conexión
+                            mensajeError.contains("conexión", ignoreCase = true) ||
+                                    mensajeError.contains("red", ignoreCase = true) ||
+                                    mensajeError.contains("timeout", ignoreCase = true) -> {
+                                Log.w(TAG, "Tipo de error detectado: ERROR_CONEXION")
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoErrorGeneral = true,
+                                    mensajeErrorDetallado = "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+                                    tituloError = "Error de Conexión"
+                                )
+                            }
+
+                            // Error genérico
+                            else -> {
+                                Log.w(TAG, "Tipo de error detectado: ERROR_GENERAL")
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoErrorGeneral = true,
+                                    mensajeErrorDetallado = mensajeError,
+                                    tituloError = "Error al Iniciar Quiz"
+                                )
+                            }
+                        }
+
+                        // También mostrar mensaje flotante para feedback inmediato
+                        mostrarMensaje(
+                            parsearMensajeErrorCorto(mensajeError),
+                            TipoMensaje.ERROR
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    // Función para parsear mensaje de error corto (para el toast/mensaje flotante)
+    private fun parsearMensajeErrorCorto(mensaje: String): String {
+        return when {
+            mensaje.contains("período", ignoreCase = true) &&
+                    mensaje.contains("finalizó", ignoreCase = true) -> "El período de este tema ya finalizó"
+
+            mensaje.contains("sin vidas", ignoreCase = true) -> "No tienes vidas disponibles"
+
+            mensaje.contains("no disponible", ignoreCase = true) -> "Tema no disponible"
+
+            mensaje.contains("conexión", ignoreCase = true) ||
+                    mensaje.contains("red", ignoreCase = true) -> "Error de conexión"
+
+            else -> "Error al iniciar quiz"
+        }
+    }
+
+    //Función para cerrar el diálogo de período finalizado
+    fun cerrarDialogoPeriodoFinalizado() {
+        _uiState.value = _uiState.value.copy(
+            mostrarDialogoPeriodoFinalizado = false,
+            mensajeErrorDetallado = "",
+            tituloError = ""
+        )
+    }
+
+    // Función para cerrar el diálogo de error general
+    fun cerrarDialogoErrorGeneral() {
+        _uiState.value = _uiState.value.copy(
+            mostrarDialogoErrorGeneral = false,
+            mensajeErrorDetallado = "",
+            tituloError = ""
+        )
+    }
+    /**
+     * FORZAR INICIO DE QUIZ
+     * Se usa cuando el usuario confirma que quiere seguir practicando
+     * a pesar de haber aprobado el tema
+     */
+    fun forzarInicioQuiz(cursoId: String, temaId: String, modo: String = "oficial") {
+        viewModelScope.launch {
+            iniciarMutex.withLock {
+                Log.d(TAG, "FORZANDO INICIO DE QUIZ (tema aprobado confirmado)")
+                cerrarDialogoTemaAprobado()
+
+                cursoIdActual = cursoId
+                temaIdActual = temaId
+
+                val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 5
+                if (vidasActuales == 0 && modo == "oficial") {
+                    mostrarMensaje("No tienes vidas disponibles", TipoMensaje.ADVERTENCIA)
+                    _uiState.value = _uiState.value.copy(mostrarDialogoSinVidas = true)
+                    return@withLock
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = true,
+                    error = null,
+                    modoActual = modo,
+                    // Limpiar estados de error
+                    mostrarDialogoPeriodoFinalizado = false,
+                    mostrarDialogoErrorGeneral = false,
+                    mensajeErrorDetallado = "",
+                    tituloError = ""
+                )
+
+                val result = repository.iniciarQuiz(cursoId, temaId, modo)
+
+                result.fold(
+                    onSuccess = { response ->
+                        _uiState.value = _uiState.value.copy(
+                            quizActivo = response,
+                            preguntaActual = 0,
+                            respuestas = emptyList(),
+                            isLoading = false,
+                            finalizando = false
+                        )
+                        mostrarMensaje("Modo Practica iniciado", TipoMensaje.EXITO)
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Error forzando inicio: ${error.message}")
+
+                        val mensajeError = error.message ?: "Error desconocido"
+
+                        // Detectar tipo de error
+                        when {
+                            mensajeError.contains("período", ignoreCase = true) &&
+                                    mensajeError.contains("finalizó", ignoreCase = true) -> {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoPeriodoFinalizado = true,
+                                    mensajeErrorDetallado = mensajeError,
+                                    tituloError = "Período Finalizado"
+                                )
+                            }
+                            else -> {
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    mostrarDialogoErrorGeneral = true,
+                                    mensajeErrorDetallado = mensajeError,
+                                    tituloError = "Error"
+                                )
+                            }
+                        }
+
+                        mostrarMensaje(parsearMensajeErrorCorto(mensajeError), TipoMensaje.ERROR)
                     }
                 )
             }
@@ -282,6 +781,25 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun responderPregunta(preguntaId: String, respuestaSeleccionada: Int) {
+        // VALIDACIÓN CRÍTICA: Verificar vidas ANTES de registrar respuesta
+        val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 0
+
+        if (vidasActuales == 0) {
+            Log.e(TAG, "========================================")
+            Log.e(TAG, "INTENTO DE RESPONDER SIN VIDAS - BLOQUEADO")
+            Log.e(TAG, "========================================")
+
+            // Activar interrupción INMEDIATA
+            _uiState.value = _uiState.value.copy(
+                mostrarDialogoSinVidas = true,
+                quizInterrumpidoPorVidas = true,
+                finalizando = false
+            )
+            return
+        }
+
+        Log.d(TAG, "Respuesta registrada: Pregunta=$preguntaId, Opcion=$respuestaSeleccionada")
+
         val respuesta = RespuestaUsuario(
             preguntaId = preguntaId,
             respuestaSeleccionada = respuestaSeleccionada,
@@ -290,19 +808,32 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.value = _uiState.value.copy(
             respuestas = _uiState.value.respuestas + respuesta,
-            preguntaActual = _uiState.value.preguntaActual + 1
+            preguntaActual = _uiState.value.preguntaActual + 1,
+            respuestaProcesada = true
         )
     }
-
     fun finalizarQuiz() {
         viewModelScope.launch {
             finalizarMutex.withLock {
-                if (_uiState.value.finalizando) return@withLock
+                if (_uiState.value.finalizando) {
+                    Log.w(TAG, "Quiz ya esta finalizando, ignorando solicitud")
+                    return@withLock
+                }
 
                 val quizId = _uiState.value.quizActivo?.quizId
                 val respuestas = _uiState.value.respuestas
 
-                if (quizId == null || respuestas.isEmpty()) return@withLock
+                if (quizId == null || respuestas.isEmpty()) {
+                    Log.e(TAG, "No se puede finalizar: datos incompletos")
+                    return@withLock
+                }
+
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "FINALIZANDO QUIZ")
+                Log.d(TAG, "Quiz ID: $quizId")
+                Log.d(TAG, "Respuestas enviadas: ${respuestas.size}")
+                Log.d(TAG, "Modo: ${_uiState.value.modoActual}")
+                Log.d(TAG, "========================================")
 
                 _uiState.value = _uiState.value.copy(
                     finalizando = true,
@@ -311,18 +842,28 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
                 repository.finalizarQuiz(quizId, respuestas).fold(
                     onSuccess = { resultado ->
+                        val porcentaje = if (respuestas.isNotEmpty()) {
+                            (resultado.preguntasCorrectas * 100) / respuestas.size
+                        } else 0
+
+                        Log.d(TAG, "========================================")
+                        Log.d(TAG, "QUIZ FINALIZADO EXITOSAMENTE")
+                        Log.d(TAG, "Correctas: ${resultado.preguntasCorrectas}/${respuestas.size}")
+                        Log.d(TAG, "Porcentaje: $porcentaje%")
+                        Log.d(TAG, "========================================")
+
                         _uiState.value = _uiState.value.copy(
                             resultadoQuiz = resultado,
                             finalizando = false,
                             isLoading = false
                         )
 
-                        val porcentaje = if (respuestas.isNotEmpty()) {
-                            (resultado.preguntasCorrectas * 100) / respuestas.size
-                        } else 0
+                        if (_uiState.value.modoActual == "oficial") {
+                            guardarPorcentajeQuizOficial(porcentaje)
+                        }
 
-                        // ✅ SOLO modo oficial cuenta para racha (práctica NO)
                         if (porcentaje >= 80 && _uiState.value.modoActual == "oficial") {
+                            _uiState.value = _uiState.value.copy(mostrarConfetti = true)
                             verificarYActualizarRacha()
                         }
 
@@ -331,18 +872,149 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     },
                     onFailure = { error ->
-                        _uiState.value = _uiState.value.copy(
-                            finalizando = false,
-                            isLoading = false
-                        )
-                        mostrarMensaje(parsearMensajeError(error.message), TipoMensaje.ERROR)
+                        Log.e(TAG, "========================================")
+                        Log.e(TAG, "ERROR FINALIZANDO QUIZ")
+                        Log.e(TAG, "Mensaje: ${error.message}")
+                        Log.e(TAG, "Modo: ${_uiState.value.modoActual}")
+                        Log.e(TAG, "========================================")
+
+                        val mensajeError = error.message ?: ""
+
+                        // VALIDACION CRITICA: Detectar error de vidas agotadas
+                        if (mensajeError.contains("sin vidas", ignoreCase = true) ||
+                            mensajeError.contains("quedado sin vidas", ignoreCase = true)) {
+
+                            Log.e(TAG, "========================================")
+                            Log.e(TAG, "BACKEND DETECTO: VIDAS AGOTADAS")
+                            Log.e(TAG, "Activando mecanismo de interrupcion")
+                            Log.e(TAG, "========================================")
+
+                            // Activar interrupción inmediata
+                            _uiState.value = _uiState.value.copy(
+                                mostrarDialogoSinVidas = true,
+                                quizInterrumpidoPorVidas = true,
+                                finalizando = false,
+                                isLoading = false
+                            )
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                finalizando = false,
+                                isLoading = false
+                            )
+                            mostrarMensaje(parsearMensajeError(error.message), TipoMensaje.ERROR)
+                        }
                     }
                 )
             }
         }
     }
 
-    // ✅ VERIFICAR Y ACTUALIZAR RACHA (solo modo oficial)
+    private fun guardarPorcentajeQuizOficial(porcentaje: Int) {
+        viewModelScope.launch {
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val cursoId = cursoIdActual ?: return@launch
+                val temaId = temaIdActual ?: return@launch
+
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados/$temaId")
+
+                val snapshotActual = ref.child("porcentajeObtenido").get().await()
+                val porcentajeActual = snapshotActual.getValue(Int::class.java) ?: 0
+
+                if (porcentaje > porcentajeActual) {
+                    ref.child("porcentajeObtenido").setValue(porcentaje).await()
+                    _uiState.value = _uiState.value.copy(porcentajeQuizOficial = porcentaje)
+                    Log.d(TAG, "Porcentaje guardado: $porcentaje%")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error guardando porcentaje: ${e.message}")
+            }
+        }
+    }
+
+    fun actualizarRacha(cursoId: String, temaId: String) {
+        viewModelScope.launch {
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId")
+
+                val fechaHoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val timestampActual = System.currentTimeMillis()
+
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "ACTUALIZANDO RACHA")
+                Log.d(TAG, "Fecha hoy: $fechaHoy")
+                Log.d(TAG, "========================================")
+
+                val progresoSnapshot = ref.child("progreso").get().await()
+                val ultimaRachaFecha = progresoSnapshot.child("ultimaRachaFecha").getValue(String::class.java)
+                val rachaActual = progresoSnapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
+
+                Log.d(TAG, "Ultima fecha racha: $ultimaRachaFecha")
+                Log.d(TAG, "Racha actual: $rachaActual dias")
+
+                val ayer = Calendar.getInstance()
+                ayer.add(Calendar.DAY_OF_YEAR, -1)
+                val fechaAyer = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(ayer.time)
+
+                var nuevaRacha = rachaActual
+                var rachaSubio = false
+
+                when {
+                    ultimaRachaFecha == null || ultimaRachaFecha.isEmpty() -> {
+                        nuevaRacha = 1
+                        rachaSubio = true
+                        Log.d(TAG, "Primera racha del usuario")
+                    }
+                    ultimaRachaFecha == fechaAyer -> {
+                        nuevaRacha = rachaActual + 1
+                        rachaSubio = true
+                        Log.d(TAG, "Racha consecutiva: $rachaActual -> $nuevaRacha")
+                    }
+                    ultimaRachaFecha == fechaHoy -> {
+                        rachaSubio = false
+                        Log.d(TAG, "Ya completo el quiz hoy")
+                    }
+                    else -> {
+                        nuevaRacha = 1
+                        rachaSubio = true
+                        Log.d(TAG, "Racha rota, reiniciando")
+                    }
+                }
+
+                if (rachaSubio) {
+                    Log.d(TAG, "Guardando nueva racha: $nuevaRacha dias")
+
+                    ref.child("progreso/diasConsecutivos").setValue(nuevaRacha).await()
+                    ref.child("progreso/rachaDias").setValue(nuevaRacha).await()
+                    ref.child("progreso/ultimaRachaFecha").setValue(fechaHoy).await()
+
+                    _uiState.value = _uiState.value.copy(
+                        mostrarCelebracionRacha = true,
+                        rachaSubio = true
+                    )
+
+                    Log.d(TAG, "Racha guardada exitosamente")
+                }
+
+                ref.child("temasCompletados/$temaId/ultimaFechaQuiz").setValue(fechaHoy).await()
+                ref.child("temasCompletados/$temaId/timestampUltimoQuiz").setValue(timestampActual).await()
+                ref.child("temasCompletados/$temaId/aprobado").setValue(true).await()
+
+                _uiState.value = _uiState.value.copy(yaResolviHoy = true)
+
+                delay(500)
+                verificarSiResolviHoy(cursoId, temaId)
+
+                Log.d(TAG, "========================================")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error actualizando racha: ${e.message}")
+            }
+        }
+    }
+
     private fun verificarYActualizarRacha() {
         viewModelScope.launch {
             try {
@@ -353,12 +1025,9 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 val database = FirebaseDatabase.getInstance()
                 val ref = database.getReference("usuarios/$userUid/cursos/$cursoId")
 
-                // Marcar que ya resolvió hoy
                 val fechaHoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                ref.child("temasCompletados/$temaId/ultimaFechaQuiz").setValue(fechaHoy).await()
-                ref.child("temasCompletados/$temaId/aprobado").setValue(true).await()
+                val timestampActual = System.currentTimeMillis()
 
-                // Actualizar racha
                 val progresoSnapshot = ref.child("progreso").get().await()
                 val ultimaRachaFecha = progresoSnapshot.child("ultimaRachaFecha").getValue(String::class.java)
                 val rachaActual = progresoSnapshot.child("diasConsecutivos").getValue(Int::class.java) ?: 0
@@ -371,22 +1040,18 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 var rachaSubio = false
 
                 when {
-                    ultimaRachaFecha == null || ultimaRachaFecha == "" -> {
-                        // Primera vez
+                    ultimaRachaFecha == null || ultimaRachaFecha.isEmpty() -> {
                         nuevaRacha = 1
                         rachaSubio = true
                     }
                     ultimaRachaFecha == fechaAyer -> {
-                        // Continúa la racha
                         nuevaRacha = rachaActual + 1
                         rachaSubio = true
                     }
                     ultimaRachaFecha == fechaHoy -> {
-                        // Ya había resuelto hoy
                         rachaSubio = false
                     }
                     else -> {
-                        // Se rompió la racha
                         nuevaRacha = 1
                         rachaSubio = true
                     }
@@ -394,24 +1059,36 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
                 if (rachaSubio) {
                     ref.child("progreso/diasConsecutivos").setValue(nuevaRacha).await()
+                    ref.child("progreso/rachaDias").setValue(nuevaRacha).await()
                     ref.child("progreso/ultimaRachaFecha").setValue(fechaHoy).await()
 
                     _uiState.value = _uiState.value.copy(
                         mostrarCelebracionRacha = true,
-                        rachaSubio = true,
-                        yaResolviHoy = true
+                        rachaSubio = true
                     )
-
-                    Log.d(TAG, "🔥 ¡Racha actualizada! Nueva racha: $nuevaRacha días")
                 }
+
+                ref.child("temasCompletados/$temaId/ultimaFechaQuiz").setValue(fechaHoy).await()
+                ref.child("temasCompletados/$temaId/timestampUltimoQuiz").setValue(timestampActual).await()
+                ref.child("temasCompletados/$temaId/aprobado").setValue(true).await()
+
+                _uiState.value = _uiState.value.copy(yaResolviHoy = true)
+
+                delay(500)
+                verificarSiResolviHoy(cursoId, temaId)
+
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error actualizando racha: ${e.message}")
+                Log.e(TAG, "Error: ${e.message}")
             }
         }
     }
 
     fun cerrarCelebracionRacha() {
         _uiState.value = _uiState.value.copy(mostrarCelebracionRacha = false)
+    }
+
+    fun cerrarConfetti() {
+        _uiState.value = _uiState.value.copy(mostrarConfetti = false)
     }
 
     fun obtenerRetroalimentacion(quizId: String) {
@@ -421,8 +1098,11 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             repository.obtenerRetroalimentacion(quizId).fold(
                 onSuccess = { retro ->
                     _uiState.value = _uiState.value.copy(retroalimentacion = retro)
+                    Log.d(TAG, "Retroalimentacion obtenida: ${retro.totalFallos} fallos")
                 },
-                onFailure = { }
+                onFailure = {
+                    Log.e(TAG, "Error obteniendo retroalimentacion")
+                }
             )
         }
     }
@@ -434,6 +1114,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             repository.marcarExplicacionVista(temaId).fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(isLoading = false)
+                    Log.d(TAG, "Explicacion marcada como vista")
                     onComplete()
                 },
                 onFailure = { error ->
@@ -456,6 +1137,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         isLoading = false,
                         cursosInscritos = cursos
                     )
+                    Log.d(TAG, "Cursos inscritos cargados: ${cursos.size}")
                 },
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(isLoading = false)
@@ -496,22 +1178,55 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun verificarTodosTemasAprobados(cursoId: String, totalTemas: Int) {
         viewModelScope.launch {
-            repository.verificarTodosTemasAprobados(cursoId, totalTemas).fold(
-                onSuccess = { todosAprobados ->
-                    _uiState.value = _uiState.value.copy(todosTemasAprobados = todosAprobados)
-                },
-                onFailure = { }
-            )
+            try {
+                val userUid = prefs.getString("user_uid", "") ?: return@launch
+                val database = FirebaseDatabase.getInstance()
+                val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados")
+
+                val snapshot = ref.get().await()
+
+                if (!snapshot.exists()) {
+                    _uiState.value = _uiState.value.copy(todosTemasAprobados = false)
+                    return@launch
+                }
+
+                var temasAprobados = 0
+
+                snapshot.children.forEach { temaSnapshot ->
+                    val temaId = temaSnapshot.key ?: ""
+
+                    // Ignorar quiz_final en el conteo de temas regulares
+                    if (temaId == "quiz_final") {
+                        return@forEach
+                    }
+
+                    val aprobado = temaSnapshot.child("aprobado").getValue(Boolean::class.java) ?: false
+                    val porcentaje = temaSnapshot.child("porcentajeObtenido").getValue(Int::class.java) ?: 0
+
+                    if (aprobado && porcentaje >= 80) {
+                        temasAprobados++
+                    }
+                }
+
+                val todosAprobados = temasAprobados >= totalTemas
+
+                _uiState.value = _uiState.value.copy(todosTemasAprobados = todosAprobados)
+
+                Log.d(TAG, "Temas aprobados: $temasAprobados/$totalTemas")
+                Log.d(TAG, "Quiz Final disponible: $todosAprobados")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verificando temas: ${e.message}")
+                _uiState.value = _uiState.value.copy(todosTemasAprobados = false)
+            }
         }
     }
 
     private fun parsearMensajeError(mensaje: String?): String {
         return when {
             mensaje == null -> "Error desconocido"
-            mensaje.contains("vidas", ignoreCase = true) ->
-                "No tienes vidas disponibles. Espera 30 minutos."
-            mensaje.contains("explicación", ignoreCase = true) ->
-                "Debes ver la explicación primero"
+            mensaje.contains("vidas", ignoreCase = true) -> "No tienes vidas disponibles"
+            mensaje.contains("explicacion", ignoreCase = true) -> "Debes ver la explicacion primero"
             else -> mensaje
         }
     }
@@ -544,7 +1259,10 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             retroalimentacion = null,
             error = null,
             finalizando = false,
-            modoActual = "oficial"
+            modoActual = "oficial",
+            respuestaProcesada = false,
+            mostrarConfetti = false,
+            quizInterrumpidoPorVidas = false
         )
     }
 
@@ -558,6 +1276,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        Log.d(TAG, "ViewModel destruido, limpiando recursos")
         detenerObservadores()
         cursoIdActual = null
         temaIdActual = null

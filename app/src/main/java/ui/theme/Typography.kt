@@ -7,24 +7,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// ============================================
-// FUENTES PERSONALIZADAS (Opcional)
-// ============================================
-// Si tienes fuentes personalizadas en res/font/, descomenta y ajusta:
-// 
-// private val InterFont = FontFamily(
-//     Font(R.font.inter_regular, FontWeight.Normal),
-//     Font(R.font.inter_medium, FontWeight.Medium),
-//     Font(R.font.inter_semibold, FontWeight.SemiBold),
-//     Font(R.font.inter_bold, FontWeight.Bold)
-// )
-//
-// private val PoppinsFont = FontFamily(
-//     Font(R.font.poppins_regular, FontWeight.Normal),
-//     Font(R.font.poppins_medium, FontWeight.Medium),
-//     Font(R.font.poppins_semibold, FontWeight.SemiBold),
-//     Font(R.font.poppins_bold, FontWeight.Bold)
-// )
+
 
 // Usando fuentes del sistema optimizadas
 private val SystemFontFamily = FontFamily.Default

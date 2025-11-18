@@ -1,14 +1,21 @@
 package com.stiven.sos
-
+import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import kotlinx.coroutines.tasks.await
+import com.google.firebase.database.FirebaseDatabase
+import android.util.Log
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.ui.draw.clip
 import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,7 +29,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -31,14 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.Tema
 import com.stiven.sos.services.DialogoSinVidasMejorado
-import com.stiven.sos.services.IndicadorVidasMejorado
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.QuizViewModel
-import com.google.firebase.database.FirebaseDatabase
-import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.delay
 
 class TemasDelCursoActivity : ComponentActivity() {
 
@@ -50,7 +55,6 @@ class TemasDelCursoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Obtener datos del intent
         cursoId = intent.getStringExtra("curso_id") ?: ""
         cursoNombre = intent.getStringExtra("curso_nombre") ?: "Curso"
 
@@ -61,7 +65,6 @@ class TemasDelCursoActivity : ComponentActivity() {
             intent.getParcelableArrayListExtra("curso_temas") ?: emptyList()
         }
 
-        // Guardar curso en preferencias
         val prefs = getSharedPreferences("EduRachaUserPrefs", MODE_PRIVATE)
         prefs.edit().apply {
             putString("last_curso_id", cursoId)
@@ -70,7 +73,11 @@ class TemasDelCursoActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
-                LaunchedEffect(cursoId) {
+                // Variable de estado para forzar recomposicion
+                var refreshKey by remember { mutableStateOf(0) }
+
+                // Iniciar observadores con el refreshKey
+                LaunchedEffect(cursoId, refreshKey) {
                     quizViewModel.iniciarObservadores(cursoId)
                     quizViewModel.verificarTodosTemasAprobados(cursoId, temas.size)
                 }
@@ -81,13 +88,20 @@ class TemasDelCursoActivity : ComponentActivity() {
                     }
                 }
 
+                // Forzar refresh cuando regresa del quiz
+                LaunchedEffect(Unit) {
+                    // Esperar un poco y refrescar
+                    delay(300)
+                    refreshKey++
+                }
+
                 TemasDelCursoScreen(
                     cursoNombre = cursoNombre,
                     cursoId = cursoId,
                     temas = temas,
                     quizViewModel = quizViewModel,
                     onNavigateBack = { finish() },
-                    onTemaClick = { tema, yaResolviHoy ->
+                    onTemaClick = { tema ->
                         prefs.edit().apply {
                             putString("last_tema_id", tema.id)
                             commit()
@@ -96,8 +110,6 @@ class TemasDelCursoActivity : ComponentActivity() {
                         val vidas = quizViewModel.uiState.value.vidas?.vidasActuales ?: 0
                         if (vidas == 0) {
                             quizViewModel.mostrarDialogoSinVidas()
-                        } else if (yaResolviHoy) {
-                            // Mostrar diálogo informativo (ya se maneja en el composable)
                         } else {
                             val intent = Intent(this, ExplicacionTemaActivity::class.java)
                             intent.putExtra("curso_id", cursoId)
@@ -122,11 +134,19 @@ class TemasDelCursoActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // CRITICO: Reiniciar observadores y recargar datos al volver
+        quizViewModel.iniciarObservadores(cursoId)
+        quizViewModel.verificarTodosTemasAprobados(cursoId, temas.size)
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        // CRITICO: Tambien refrescar al hacer restart
         quizViewModel.iniciarObservadores(cursoId)
         quizViewModel.verificarTodosTemasAprobados(cursoId, temas.size)
     }
 }
-
+// Pantalla principal que muestra los temas del curso
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemasDelCursoScreen(
@@ -135,20 +155,140 @@ fun TemasDelCursoScreen(
     temas: List<Tema>,
     quizViewModel: QuizViewModel,
     onNavigateBack: () -> Unit,
-    onTemaClick: (Tema, Boolean) -> Unit,
+    onTemaClick: (Tema) -> Unit,
     onQuizFinalClick: () -> Unit
 ) {
+    // Obtener el estado de la UI desde el ViewModel
     val uiState by quizViewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Estado para verificar qué temas ya fueron resueltos hoy
-    var temasResueltosHoy by remember { mutableStateOf<Map<String, TemaEstado>>(emptyMap()) }
+    // Variables de estado para el Quiz Final
+    var quizFinalAprobado by remember { mutableStateOf(false) }
+    var quizFinalPorcentaje by remember { mutableStateOf(0) }
+    var cargandoQuizFinal by remember { mutableStateOf(true) }
 
-    // Cargar estado de temas
+    // CARGAR ESTADO DEL QUIZ FINAL DESDE FIREBASE
     LaunchedEffect(cursoId) {
-        temasResueltosHoy = verificarTemasResueltosHoy(cursoId, temas)
+        val prefs = context.getSharedPreferences("EduRachaUserPrefs", android.content.Context.MODE_PRIVATE)
+        val userUid = prefs.getString("user_uid", "") ?: ""
+
+        Log.d("TemasDelCurso", "========================================")
+        Log.d("TemasDelCurso", "VERIFICANDO ESTADO DEL QUIZ FINAL")
+        Log.d("TemasDelCurso", "UserUid: $userUid")
+        Log.d("TemasDelCurso", "CursoId: $cursoId")
+        Log.d("TemasDelCurso", "========================================")
+
+        if (userUid.isNotEmpty() && cursoId.isNotEmpty()) {
+            try {
+                val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+
+                // Traer TODOS los quizzes y filtrar en cliente (sin índice)
+                val quizzesRef = database.getReference("quizzes")
+
+                Log.d("TemasDelCurso", "Consultando todos los quizzes...")
+
+                val snapshot = quizzesRef.get().await()
+
+                if (snapshot.exists()) {
+                    Log.d("TemasDelCurso", "Total quizzes en DB: ${snapshot.childrenCount}")
+
+                    var quizFinalEncontrado = false
+                    var quizzesDelEstudiante = 0
+
+                    // Iterar sobre TODOS los quizzes
+                    for (quizSnapshot in snapshot.children) {
+                        val quizId = quizSnapshot.key ?: continue
+                        val estudianteId = quizSnapshot.child("estudianteId").getValue(String::class.java)
+
+                        // Filtrar en cliente por estudianteId
+                        if (estudianteId == userUid) {
+                            quizzesDelEstudiante++
+
+                            val modo = quizSnapshot.child("modo").getValue(String::class.java)
+                            val quizCursoId = quizSnapshot.child("cursoId").getValue(String::class.java)
+                            val estado = quizSnapshot.child("estado").getValue(String::class.java)
+
+                            Log.d("TemasDelCurso", "Quiz del estudiante: $quizId")
+                            Log.d("TemasDelCurso", "  - modo: $modo")
+                            Log.d("TemasDelCurso", "  - cursoId: $quizCursoId")
+                            Log.d("TemasDelCurso", "  - estado: $estado")
+
+                            // Verificar si es el quiz final del curso actual
+                            if (modo == "final" && quizCursoId == cursoId) {
+                                quizFinalEncontrado = true
+
+                                val correctas = quizSnapshot.child("preguntasCorrectas").getValue(Int::class.java) ?: 0
+                                val incorrectas = quizSnapshot.child("preguntasIncorrectas").getValue(Int::class.java) ?: 0
+                                val totalPreguntas = correctas + incorrectas
+
+                                Log.d("TemasDelCurso", "========================================")
+                                Log.d("TemasDelCurso", "✅ QUIZ FINAL ENCONTRADO!")
+                                Log.d("TemasDelCurso", "Quiz ID: $quizId")
+                                Log.d("TemasDelCurso", "Estado: $estado")
+                                Log.d("TemasDelCurso", "Correctas: $correctas")
+                                Log.d("TemasDelCurso", "Incorrectas: $incorrectas")
+                                Log.d("TemasDelCurso", "Total: $totalPreguntas")
+
+                                // Solo calcular si está finalizado y tiene respuestas
+                                if (estado == "finalizado" && totalPreguntas > 0) {
+                                    val porcentaje = (correctas * 100) / totalPreguntas
+                                    quizFinalPorcentaje = porcentaje
+                                    quizFinalAprobado = (porcentaje >= 80)
+
+                                    Log.d("TemasDelCurso", "Porcentaje: $porcentaje%")
+                                    Log.d("TemasDelCurso", "Aprobado (>=80%): $quizFinalAprobado")
+
+                                    if (quizFinalAprobado) {
+                                        Log.d("TemasDelCurso", "🔒 BLOQUEANDO ACCESO AL QUIZ FINAL")
+                                    } else {
+                                        Log.d("TemasDelCurso", "⚠️ Quiz completado pero no aprobado (<80%)")
+                                    }
+                                } else {
+                                    Log.d("TemasDelCurso", "⚠️ Quiz iniciado pero no finalizado")
+                                    quizFinalAprobado = false
+                                    quizFinalPorcentaje = 0
+                                }
+
+                                Log.d("TemasDelCurso", "========================================")
+
+                                // Salir del loop
+                                break
+                            }
+                        }
+                    }
+
+                    Log.d("TemasDelCurso", "Quizzes del estudiante: $quizzesDelEstudiante")
+
+                    if (!quizFinalEncontrado) {
+                        Log.d("TemasDelCurso", "✅ No se encontró quiz final - DISPONIBLE")
+                        quizFinalAprobado = false
+                        quizFinalPorcentaje = 0
+                    }
+                } else {
+                    Log.d("TemasDelCurso", "❌ No hay quizzes en la base de datos")
+                    quizFinalAprobado = false
+                    quizFinalPorcentaje = 0
+                }
+            } catch (e: Exception) {
+                Log.e("TemasDelCurso", "========================================")
+                Log.e("TemasDelCurso", "❌ ERROR al cargar Quiz Final")
+                Log.e("TemasDelCurso", "Mensaje: ${e.message}")
+                Log.e("TemasDelCurso", "========================================")
+                e.printStackTrace()
+
+                // En caso de error, BLOQUEAR por seguridad
+                quizFinalAprobado = false
+                quizFinalPorcentaje = 0
+            } finally {
+                cargandoQuizFinal = false
+            }
+        } else {
+            Log.e("TemasDelCurso", "❌ UserUid o CursoId vacío")
+            cargandoQuizFinal = false
+        }
     }
 
-    // Diálogo sin vidas
+    // Mostrar diálogo si no hay vidas
     if (uiState.mostrarDialogoSinVidas) {
         DialogoSinVidasMejorado(
             minutosParaProxima = uiState.vidas?.minutosParaProximaVida ?: 30,
@@ -156,303 +296,981 @@ fun TemasDelCursoScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            cursoNombre,
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp
-                        )
-                        Text(
-                            "Selecciona un tema",
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
-                )
-            )
-        },
-        containerColor = Color(0xFFF5F7FA)
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Header con estadísticas
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
-                shadowElevation = 6.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Indicador de vidas
-                    IndicadorVidasMejorado(
-                        vidasActuales = uiState.vidas?.vidasActuales ?: 5,
-                        vidasMax = uiState.vidas?.vidasMax ?: 5,
-                        minutosParaProxima = uiState.vidas?.minutosParaProximaVida ?: 0,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Barra de progreso
-                    BarraProgresoMejorada(
-                        temasCompletados = temasResueltosHoy.count { it.value.aprobado },
-                        totalTemas = temas.size,
-                        xpActual = uiState.progreso?.experiencia ?: 0,
-                        rachaActual = uiState.progreso?.rachaDias ?: 0
-                    )
-                }
-            }
-
-            // Lista de temas
-            if (temas.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        modifier = Modifier.padding(40.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = EduRachaColors.TextSecondary.copy(alpha = 0.1f),
-                            modifier = Modifier.size(100.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.MenuBook,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(60.dp),
-                                    tint = EduRachaColors.TextSecondary.copy(alpha = 0.4f)
-                                )
-                            }
-                        }
-                        Text(
-                            text = "No hay temas disponibles",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.TextPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "El docente aun no ha creado temas para este curso",
-                            fontSize = 15.sp,
-                            color = EduRachaColors.TextSecondary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    itemsIndexed(temas.sortedBy { it.orden }) { index, tema ->
-                        val estadoTema = temasResueltosHoy[tema.id]
-                        val yaResolviHoy = estadoTema?.yaResolviHoy ?: false
-                        val aprobado = estadoTema?.aprobado ?: false
-
-                        TemaCardMejorada(
-                            tema = tema,
-                            numero = index + 1,
-                            onClick = { onTemaClick(tema, yaResolviHoy) },
-                            sinVidas = uiState.vidas?.vidasActuales == 0,
-                            yaResolviHoy = yaResolviHoy,
-                            aprobado = aprobado,
-                            horasRestantes = estadoTema?.horasRestantes ?: 0,
-                            minutosRestantes = estadoTema?.minutosRestantes ?: 0
-                        )
-                    }
-
-                    // Card de quiz final
-                    if (uiState.todosTemasAprobados) {
-                        item {
-                            Spacer(Modifier.height(8.dp))
-                            QuizFinalCard(
-                                onClick = onQuizFinalClick,
-                                sinVidas = uiState.vidas?.vidasActuales == 0
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Clase de estado del tema
-data class TemaEstado(
-    val aprobado: Boolean,
-    val yaResolviHoy: Boolean,
-    val horasRestantes: Int,
-    val minutosRestantes: Int
-)
-
-// Función para verificar estado de temas
-suspend fun verificarTemasResueltosHoy(cursoId: String, temas: List<Tema>): Map<String, TemaEstado> {
-    val resultado = mutableMapOf<String, TemaEstado>()
-
-    try {
-        val userUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return resultado
-        val database = FirebaseDatabase.getInstance()
-        val fechaHoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
-        for (tema in temas) {
-            val ref = database.getReference("usuarios/$userUid/cursos/$cursoId/temasCompletados/${tema.id}")
-            val snapshot = ref.get().await()
-
-            if (snapshot.exists()) {
-                val ultimaFecha = snapshot.child("ultimaFechaQuiz").getValue(String::class.java)
-                val aprobado = snapshot.child("aprobado").getValue(Boolean::class.java) ?: false
-                val yaResolviHoy = ultimaFecha == fechaHoy
-
-                // Calcular tiempo restante
-                var horasRestantes = 0
-                var minutosRestantes = 0
-
-                if (yaResolviHoy) {
-                    val calendar = Calendar.getInstance()
-                    val horaActual = calendar.timeInMillis
-
-                    calendar.set(Calendar.HOUR_OF_DAY, 23)
-                    calendar.set(Calendar.MINUTE, 59)
-                    calendar.set(Calendar.SECOND, 59)
-                    val medianoche = calendar.timeInMillis
-
-                    val diferenciaMilis = medianoche - horaActual
-                    horasRestantes = (diferenciaMilis / (1000 * 60 * 60)).toInt()
-                    minutosRestantes = ((diferenciaMilis % (1000 * 60 * 60)) / (1000 * 60)).toInt()
-                }
-
-                resultado[tema.id] = TemaEstado(
-                    aprobado = aprobado,
-                    yaResolviHoy = yaResolviHoy,
-                    horasRestantes = horasRestantes,
-                    minutosRestantes = minutosRestantes
-                )
-            }
-        }
-    } catch (e: Exception) {
-        // Log error
-    }
-
-    return resultado
-}
-
-// Barra de progreso mejorada
-@Composable
-fun BarraProgresoMejorada(
-    temasCompletados: Int,
-    totalTemas: Int,
-    xpActual: Int,
-    rachaActual: Int
-) {
-    val progreso = if (totalTemas > 0) temasCompletados.toFloat() / totalTemas.toFloat() else 0f
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Título y contador
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Progreso del Curso",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary
-            )
-            Text(
-                text = "$temasCompletados/$totalTemas temas",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = EduRachaColors.Primary
-            )
-        }
-
-        // Barra de progreso
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Fondo decorativo superior
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(16.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(EduRachaColors.Primary.copy(alpha = 0.15f))
+                .height(260.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            EduRachaColors.Primary,
+                            EduRachaColors.Primary.copy(alpha = 0.95f),
+                            EduRachaColors.PrimaryLight
+                        )
+                    )
+                )
+        )
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Barra superior con información del curso
+            TopBarPremiumCompacto(
+                cursoNombre = cursoNombre,
+                temasCompletados = 0,
+                totalTemas = temas.size,
+                onNavigateBack = onNavigateBack
+            )
+
+            // Lista de contenido con temas y quiz final
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Card con indicador de vidas
+                item {
+                    CardVidasIndividual(
+                        vidasActuales = uiState.vidas?.vidasActuales ?: 5,
+                        vidasMax = uiState.vidas?.vidasMax ?: 5,
+                        minutosParaProxima = uiState.vidas?.minutosParaProximaVida ?: 0
+                    )
+                }
+
+                // Cards de estadísticas (XP y Racha)
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CardStatIndividual(
+                            icon = Icons.Default.Star,
+                            valor = "${uiState.progreso?.experiencia ?: 0}",
+                            label = "XP Total",
+                            color = Color(0xFFFFC107),
+                            modifier = Modifier.weight(1f)
+                        )
+                        CardStatIndividual(
+                            icon = Icons.Default.Whatshot,
+                            valor = "${uiState.progreso?.rachaDias ?: 0}",
+                            label = "Días",
+                            color = Color(0xFFFF6B35),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Manejo de lista vacía de temas
+                if (temas.isEmpty()) {
+                    item { EmptyStateTemasModerno() }
+                } else {
+                    // TEMAS NORMALES DEL CURSO
+                    itemsIndexed(temas.sortedBy { it.orden }) { index, tema ->
+                        TemaCardInteractivaDuolingo(
+                            tema = tema,
+                            numero = index + 1,
+                            totalTemas = temas.size,
+                            onClick = { onTemaClick(tema) },
+                            sinVidas = uiState.vidas?.vidasActuales == 0
+                        )
+                    }
+
+                    // QUIZ FINAL - Solo mostrar si todos los temas están aprobados
+                    if (uiState.todosTemasAprobados) {
+                        item {
+                            Spacer(Modifier.height(8.dp))
+
+                            // Mostrar card del Quiz Final con validación de estado
+                            QuizFinalCardEpico(
+                                onClick = {
+                                    // VALIDACIONES ANTES DE PERMITIR ACCESO
+                                    when {
+                                        // 1. Si ya está aprobado con 80% o más, bloquear
+                                        quizFinalAprobado -> {
+                                            Log.w("TemasDelCurso", "========================================")
+                                            Log.w("TemasDelCurso", "ACCESO DENEGADO AL QUIZ FINAL")
+                                            Log.w("TemasDelCurso", "Razón: Ya aprobado con $quizFinalPorcentaje%")
+                                            Log.w("TemasDelCurso", "========================================")
+                                            // Opcional: Mostrar un Toast o SnackBar informando al usuario
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Ya aprobaste el Quiz Final con $quizFinalPorcentaje%",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        // 2. Si no hay vidas, mostrar diálogo
+                                        uiState.vidas?.vidasActuales == 0 -> {
+                                            quizViewModel.mostrarDialogoSinVidas()
+                                        }
+                                        // 3. Si pasa todas las validaciones, permitir acceso
+                                        else -> {
+                                            Log.d("TemasDelCurso", "Acceso permitido al Quiz Final")
+                                            onQuizFinalClick()
+                                        }
+                                    }
+                                },
+                                sinVidas = uiState.vidas?.vidasActuales == 0,
+                                yaCompletado = quizFinalAprobado,
+                                porcentajeObtenido = quizFinalPorcentaje
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+// Data class para el estado de cada tema
+data class EstadoTema(
+    val aprobado: Boolean = false,
+    val porcentaje: Int = 0,
+    val enCooldown: Boolean = false,
+    val horasRestantes: Int = 0,
+    val minutosRestantes: Int = 0
+)
+
+
+//  TOPBAR COMPACTO Y PROPORCIONADO
+@Composable
+fun TopBarPremiumCompacto(
+    cursoNombre: String,
+    temasCompletados: Int,
+    totalTemas: Int,
+    onNavigateBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+    ) {
+        // Header superior con botón back y badges
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Botón Back con glassmorphism
+            Surface(
+                onClick = onNavigateBack,
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.25f),
+                modifier = Modifier.size(46.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Badges superiores
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassBadgeCompacto(
+                    icon = Icons.Default.EmojiEvents,
+                    text = "$temasCompletados/$totalTemas"
+                )
+                GlassBadgeCompacto(
+                    icon = Icons.Default.School,
+                    text = "Curso"
+                )
+            }
+        }
+
+        // Título del curso más compacto
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp)
+        ) {
+            Text(
+                text = cursoNombre,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                lineHeight = 34.sp,
+                letterSpacing = (-0.3).sp
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color.White.copy(alpha = 0.2f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "Aprende jugando",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color.White.copy(alpha = 0.2f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "Progreso",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GlassBadgeCompacto(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White.copy(alpha = 0.25f),
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = text,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+// 💳 CARD DE VIDAS INDIVIDUAL
+@Composable
+fun CardVidasIndividual(
+    vidasActuales: Int,
+    vidasMax: Int,
+    minutosParaProxima: Int
+) {
+    val colorVida = Color(0xFFFF1744)
+    val colorCritico = Color(0xFFD50000)
+    val colorActual = if (vidasActuales <= 1) colorCritico else colorVida
+
+    val scale = remember { Animatable(1f) }
+    val heartbeat = rememberInfiniteTransition(label = "heartbeat")
+
+    val pulse by heartbeat.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    LaunchedEffect(vidasActuales) {
+        scale.animateTo(1.12f, tween(150))
+        scale.animateTo(1f, tween(150))
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Corazón compacto
+                Box(
+                    modifier = Modifier.size(52.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = colorActual.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .size(52.dp)
+                            .scale(if (vidasActuales > 0) pulse else 1f)
+                    ) {}
+
+                    Surface(
+                        shape = CircleShape,
+                        color = colorActual.copy(alpha = 0.25f),
+                        modifier = Modifier.size(40.dp)
+                    ) {}
+
+                    Icon(
+                        Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = colorActual,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .scale(scale.value)
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "ENERGÍA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextSecondary,
+                        letterSpacing = 0.8.sp
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "$vidasActuales",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Black,
+                            color = colorActual
+                        )
+                        Text(
+                            text = "/ $vidasMax",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextSecondary,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+
+                    // Barra de vidas compacta
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(vidasMax) { index ->
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 12.dp, height = 4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(
+                                        if (index < vidasActuales) colorActual
+                                        else Color.LightGray.copy(alpha = 0.3f)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Timer compacto
+            if (vidasActuales < vidasMax && minutosParaProxima > 0) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1976D2).copy(alpha = 0.1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = Color(0xFF1976D2),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "$minutosParaProxima",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF1976D2)
+                        )
+                        Text(
+                            text = "min",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1976D2)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 📊 CARD DE STAT INDIVIDUAL (XP o Racha)
+@Composable
+fun CardStatIndividual(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    valor: String,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val scale = remember { Animatable(1f) }
+
+    LaunchedEffect(valor) {
+        scale.animateTo(1.05f, tween(100))
+        scale.animateTo(1f, tween(100))
+    }
+
+    Card(
+        modifier = modifier.scale(scale.value),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = color.copy(alpha = 0.15f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = valor,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = color
+                )
+                Text(
+                    text = label,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaColors.TextSecondary
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+fun TemaCardInteractivaDuolingo(
+    tema: Tema,
+    numero: Int,
+    totalTemas: Int,
+    onClick: () -> Unit,
+    sinVidas: Boolean
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "scale"
+    )
+
+    val elevation by animateFloatAsState(
+        targetValue = if (isPressed) 4f else 12f,
+        label = "elevation"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clickable(enabled = !sinVidas) {
+                isPressed = true
+                onClick()
+            },
+        shape = RoundedCornerShape(26.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (sinVidas) Color.White.copy(alpha = 0.6f) else Color.White
+        )
+    ) {
+        Column {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(progreso)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(8.dp))
+                    .fillMaxWidth()
+                    .height(5.dp)
                     .background(
                         Brush.horizontalGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary,
-                                EduRachaColors.PrimaryLight
-                            )
+                            colors = if (sinVidas) {
+                                listOf(Color.LightGray, Color.Gray)
+                            } else {
+                                listOf(
+                                    Color(0xFF1976D2),
+                                    Color(0xFF2196F3),
+                                    Color(0xFF42A5F5)
+                                )
+                            }
                         )
                     )
             )
-        }
 
-        // Stats compactos
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                NumeroTema3D(
+                    numero = numero,
+                    sinVidas = sinVidas
+                )
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (sinVidas)
+                            Color.LightGray.copy(alpha = 0.3f)
+                        else
+                            Color(0xFF64B5F6).copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.MenuBook,
+                                contentDescription = null,
+                                tint = if (sinVidas) Color.Gray else Color(0xFF1976D2),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Lección $numero de $totalTemas",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (sinVidas) Color.Gray else Color(0xFF1976D2)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = tema.titulo,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (sinVidas) EduRachaColors.TextSecondary else EduRachaColors.TextPrimary,
+                        lineHeight = 26.sp
+                    )
+
+                    if (tema.descripcion.isNotBlank()) {
+                        Text(
+                            text = tema.descripcion,
+                            fontSize = 15.sp,
+                            color = EduRachaColors.TextSecondary,
+                            lineHeight = 22.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                IconoAccionInteractivo(sinVidas = sinVidas)
+            }
+        }
+    }
+}
+@Composable
+fun NumeroTema3D(numero: Int, sinVidas: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "numero_float")
+    val offsetY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(84.dp)
+            .offset(y = if (!sinVidas) offsetY.dp else 0.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Sombra
+        Surface(
+            shape = CircleShape,
+            color = if (sinVidas)
+                Color.LightGray.copy(alpha = 0.2f)
+            else
+                Color(0xFF1976D2).copy(alpha = 0.12f),
+            modifier = Modifier.size(84.dp)
+        ) {}
+
+        // Círculo medio con gradiente
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = if (sinVidas) {
+                            listOf(Color.LightGray, Color.Gray)
+                        } else {
+                            listOf(
+                                Color(0xFF2196F3),
+                                Color(0xFF1976D2)
+                            )
+                        }
+                    )
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            StatChipCompact(
-                icon = Icons.Default.Star,
-                valor = "$xpActual XP",
-                color = EduRachaColors.Warning,
-                modifier = Modifier.weight(1f)
-            )
-            StatChipCompact(
-                icon = Icons.Default.Whatshot,
-                valor = "$rachaActual dias",
-                color = Color(0xFFFF6B35),
-                modifier = Modifier.weight(1f)
+            Text(
+                text = "$numero",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White
             )
         }
     }
 }
 
 @Composable
-fun StatChipCompact(
+fun IconoAccionInteractivo(sinVidas: Boolean) {
+    val rotation = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        if (!sinVidas) {
+            rotation.animateTo(
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Círculo de fondo giratorio (solo si no está sin vidas)
+        if (!sinVidas) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFF1976D2).copy(alpha = 0.1f),
+                modifier = Modifier
+                    .size(56.dp)
+                    .rotate(rotation.value)
+            ) {}
+        }
+
+        Surface(
+            shape = CircleShape,
+            color = if (sinVidas)
+                Color(0xFFFF1744).copy(alpha = 0.15f)
+            else
+                Color(0xFF1976D2).copy(alpha = 0.15f),
+            modifier = Modifier.size(52.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    if (sinVidas) Icons.Default.Lock else Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = if (sinVidas) Color(0xFFFF1744) else Color(0xFF1976D2),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+}
+// Composable para mostrar la tarjeta del Quiz Final
+// Incluye parámetros para controlar si está bloqueado por falta de vidas,
+// si ya fue completado, y el porcentaje obtenido anteriormente
+@Composable
+fun QuizFinalCardEpico(
+    onClick: () -> Unit,
+    sinVidas: Boolean,
+    yaCompletado: Boolean = false,  // Indica si el quiz ya fue aprobado con 80% o más
+    porcentajeObtenido: Int = 0      // Porcentaje obtenido en el último intento
+) {
+    // Transición infinita para animaciones continuas
+    val infiniteTransition = rememberInfiniteTransition(label = "quiz_final")
+
+    // Animación de escala que hace que la tarjeta "respire"
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    // Animación de rotación sutil
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = -2f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rotation"
+    )
+
+    // Tarjeta principal del Quiz Final
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(if (!sinVidas && !yaCompletado) scale else 1f)  // Solo anima si está disponible
+            .clickable(
+                enabled = !sinVidas && !yaCompletado,  // Deshabilitado si no hay vidas o ya completó
+                onClick = onClick
+            ),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (sinVidas || yaCompletado) 2.dp else 16.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (sinVidas || yaCompletado) {
+                            // Colores desaturados cuando está bloqueado
+                            listOf(Color.LightGray, Color.White)
+                        } else {
+                            // Gradiente vibrante cuando está disponible
+                            listOf(
+                                EduRachaColors.Secondary,
+                                EduRachaColors.SecondaryLight,
+                                EduRachaColors.Warning
+                            )
+                        }
+                    )
+                )
+                .padding(32.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Trofeo animado en la parte superior
+                TrofeoEpicoAnimado(
+                    rotation = if (!sinVidas && !yaCompletado) rotation else 0f,
+                    sinVidas = sinVidas || yaCompletado
+                )
+
+                // Título del Quiz Final
+                Text(
+                    text = if (yaCompletado) "QUIZ COMPLETADO" else "QUIZ FINAL",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (sinVidas || yaCompletado) Color.Gray else Color.White,
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 1.sp
+                )
+
+                // Descripción del estado actual
+                Text(
+                    text = when {
+                        yaCompletado -> "Felicidades! Ya aprobaste con $porcentajeObtenido%\nNo puedes repetir el quiz final"
+                        sinVidas -> "Necesitas energía disponible"
+                        else -> "Completaste todos los temas!\nDemuestra tu conocimiento"
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (sinVidas || yaCompletado) Color.Gray else Color.White.copy(alpha = 0.95f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+
+                // Botón y recompensas (solo si está disponible)
+                if (!sinVidas && !yaCompletado) {
+                    // Botón para comenzar el examen
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White,
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = EduRachaColors.Secondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Comenzar Examen Final",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = EduRachaColors.Secondary
+                            )
+                        }
+                    }
+
+                    // Chips de recompensas
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        RecompensaChip(
+                            icon = Icons.Default.Star,
+                            texto = "+500 XP",
+                            color = EduRachaColors.Warning,
+                            modifier = Modifier.weight(1f)
+                        )
+                        RecompensaChip(
+                            icon = Icons.Default.EmojiEvents,
+                            texto = "Certificado",
+                            color = EduRachaColors.RankingGold,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else if (yaCompletado) {
+                    // Mostrar badge de completado
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Aprobado con $porcentajeObtenido%",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun TrofeoEpicoAnimado(rotation: Float, sinVidas: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "trofeo_epico")
+
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    Box(
+        modifier = Modifier.size(120.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = if (sinVidas) Color.Gray.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.3f),
+            modifier = Modifier
+                .size(120.dp)
+                .scale(if (!sinVidas) scale else 1f)
+        ) {}
+
+        Surface(
+            shape = CircleShape,
+            color = if (sinVidas) Color.Gray.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.size(90.dp)
+        ) {}
+
+        Icon(
+            Icons.Default.EmojiEvents,
+            contentDescription = null,
+            tint = if (sinVidas) Color.Gray else Color.White,
+            modifier = Modifier
+                .size(56.dp)
+                .rotate(if (!sinVidas) rotation else 0f)
+        )
+    }
+}
+
+@Composable
+fun RecompensaChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    valor: String,
+    texto: String,
     color: Color,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = color.copy(alpha = 0.12f)
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = 0.9f)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -466,8 +1284,8 @@ fun StatChipCompact(
                 modifier = Modifier.size(20.dp)
             )
             Text(
-                text = valor,
-                fontSize = 14.sp,
+                text = texto,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = color
             )
@@ -475,365 +1293,87 @@ fun StatChipCompact(
     }
 }
 
-// Card de tema mejorada con estado
 @Composable
-fun TemaCardMejorada(
-    tema: Tema,
-    numero: Int,
-    onClick: () -> Unit,
-    sinVidas: Boolean,
-    yaResolviHoy: Boolean,
-    aprobado: Boolean,
-    horasRestantes: Int,
-    minutosRestantes: Int
-) {
-    // Determinar si está deshabilitado
-    val deshabilitado = sinVidas || yaResolviHoy
-
-    // Estado para mostrar diálogo
-    var mostrarDialogoYaResolvi by remember { mutableStateOf(false) }
-
-    // Diálogo informativo
-    if (mostrarDialogoYaResolvi) {
-        AlertDialog(
-            onDismissRequest = { mostrarDialogoYaResolvi = false },
-            icon = {
-                Icon(
-                    Icons.Default.Schedule,
-                    contentDescription = null,
-                    tint = EduRachaColors.Warning,
-                    modifier = Modifier.size(48.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "Quiz completado hoy",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Ya resolviste el quiz oficial de este tema hoy.")
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = EduRachaColors.Info.copy(alpha = 0.12f)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "Nuevo quiz disponible en:",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Info
-                            )
-                            Text(
-                                text = "$horasRestantes horas y $minutosRestantes minutos",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black,
-                                color = EduRachaColors.Info
-                            )
-                        }
-                    }
-
-                    if (aprobado) {
-                        Text(
-                            text = "Puedes usar el modo practica desde la pantalla de explicacion",
-                            fontSize = 13.sp,
-                            color = EduRachaColors.Success,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { mostrarDialogoYaResolvi = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EduRachaColors.Primary
-                    )
-                ) {
-                    Text("Entendido")
-                }
-            }
-        )
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !deshabilitado) {
-                if (yaResolviHoy) {
-                    mostrarDialogoYaResolvi = true
-                } else {
-                    onClick()
-                }
-            },
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (deshabilitado) 2.dp else 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (deshabilitado)
-                Color.White.copy(alpha = 0.6f)
-            else
-                Color.White
-        )
+fun EmptyStateTemasModerno() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (deshabilitado) Modifier
-                    else Modifier.background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary.copy(alpha = 0.05f),
-                                Color.White
-                            )
-                        ),
-                        shape = RoundedCornerShape(0.dp)
-                    )
-                )
-                .padding(24.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            modifier = Modifier.padding(40.dp)
         ) {
-            // Número del tema
+            val infiniteTransition = rememberInfiniteTransition(label = "empty")
+            val offsetY by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = -20f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "offsetY"
+            )
+
+            Box(
+                modifier = Modifier.offset(y = offsetY.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = EduRachaColors.Primary.copy(alpha = 0.08f),
+                    modifier = Modifier.size(140.dp)
+                ) {}
+                Surface(
+                    shape = CircleShape,
+                    color = EduRachaColors.Primary.copy(alpha = 0.12f),
+                    modifier = Modifier.size(110.dp)
+                ) {}
+                Icon(
+                    Icons.Default.MenuBook,
+                    contentDescription = null,
+                    modifier = Modifier.size(70.dp),
+                    tint = EduRachaColors.Primary.copy(alpha = 0.6f)
+                )
+            }
+
+            Text(
+                text = "Aún no hay temas",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = EduRachaColors.TextPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "El docente está preparando contenido educativo de calidad para ti",
+                fontSize = 16.sp,
+                color = EduRachaColors.TextSecondary,
+                textAlign = TextAlign.Center,
+                lineHeight = 24.sp
+            )
+
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (deshabilitado)
-                    EduRachaColors.TextSecondary.copy(alpha = 0.2f)
-                else
-                    EduRachaColors.Primary.copy(alpha = 0.15f),
-                modifier = Modifier.size(56.dp)
+                color = EduRachaColors.Info.copy(alpha = 0.12f)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "$numero",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (deshabilitado)
-                            EduRachaColors.TextSecondary
-                        else
-                            EduRachaColors.Primary
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = EduRachaColors.Info,
+                        modifier = Modifier.size(24.dp)
                     )
-                }
-            }
-
-            Spacer(Modifier.width(20.dp))
-
-            // Información del tema
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = tema.titulo,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (deshabilitado)
-                        EduRachaColors.TextSecondary
-                    else
-                        EduRachaColors.TextPrimary
-                )
-                if (tema.descripcion.isNotBlank()) {
-                    Spacer(Modifier.height(6.dp))
                     Text(
-                        text = tema.descripcion,
+                        text = "Mantén tu racha activa mientras tanto",
                         fontSize = 14.sp,
-                        color = EduRachaColors.TextSecondary,
-                        lineHeight = 20.sp
+                        fontWeight = FontWeight.Medium,
+                        color = EduRachaColors.Info
                     )
-                }
-
-                // Indicador de estado
-                if (yaResolviHoy) {
-                    Spacer(Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = EduRachaColors.Warning.copy(alpha = 0.15f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Schedule,
-                                contentDescription = null,
-                                tint = EduRachaColors.Warning,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Disponible en ${horasRestantes}h ${minutosRestantes}m",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Warning
-                            )
-                        }
-                    }
-                } else if (aprobado) {
-                    Spacer(Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = EduRachaColors.Success.copy(alpha = 0.15f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = EduRachaColors.Success,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Aprobado",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Success
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Icono de estado
-            if (sinVidas) {
-                Icon(
-                    Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = EduRachaColors.Error,
-                    modifier = Modifier.size(28.dp)
-                )
-            } else if (yaResolviHoy) {
-                Icon(
-                    Icons.Default.Schedule,
-                    contentDescription = null,
-                    tint = EduRachaColors.Warning,
-                    modifier = Modifier.size(28.dp)
-                )
-            } else {
-                Surface(
-                    shape = CircleShape,
-                    color = EduRachaColors.Primary.copy(alpha = 0.15f),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = EduRachaColors.Primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Card de quiz final
-@Composable
-fun QuizFinalCard(
-    onClick: () -> Unit,
-    sinVidas: Boolean
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "quiz_final")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(if (!sinVidas) scale else 1f)
-            .clickable(enabled = !sinVidas, onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (sinVidas) 2.dp else 12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (sinVidas) Color.White.copy(alpha = 0.6f) else Color.White
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = if (sinVidas) listOf(Color.LightGray, Color.White) else listOf(
-                            EduRachaColors.Warning,
-                            EduRachaColors.WarningLight
-                        )
-                    )
-                )
-                .padding(28.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (sinVidas) Color.Gray.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(80.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = if (sinVidas) Color.Gray else Color.White,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Quiz Final del Curso",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
-                    color = if (sinVidas) Color.Gray else Color.White,
-                    textAlign = TextAlign.Center
-                )
-
-                Text(
-                    text = if (sinVidas)
-                        "Necesitas vidas disponibles"
-                    else
-                        "Has completado todos los temas. Demuestra todo lo aprendido",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (sinVidas) Color.Gray else Color.White.copy(alpha = 0.95f),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
-
-                if (!sinVidas) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = EduRachaColors.Warning,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                "Comenzar Examen Final",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Warning
-                            )
-                        }
-                    }
                 }
             }
         }

@@ -61,10 +61,10 @@ class MisSolicitudesActivity : ComponentActivity() {
 object InstitutionalColors {
     val PrimaryGradientStart = Color(0xFF1E3A8A) // Azul institucional profundo
     val PrimaryGradientEnd = Color(0xFF3B82F6) // Azul brillante
-    val SecondaryAccent = Color(0xFF8B5CF6) // Púrpura elegante
-    val SuccessGreen = Color(0xFF10B981) // Verde esmeralda
-    val WarningAmber = Color(0xFFF59E0B) // Ámbar cálido
-    val ErrorRed = Color(0xFFEF4444) // Rojo coral
+    val SecondaryAccent = Color(0xFF3F51B5) // Púrpura elegante
+    val SuccessGreen = Color(0xFF4CAF50) // Verde esmeralda
+    val WarningAmber = Color(0xFFF6A823) // Ámbar cálido
+    val ErrorRed = Color(0xFFEE0F0F) // Rojo coral
     val BackgroundLight = Color(0xFFF8FAFC) // Gris muy claro
     val CardBackground = Color(0xFFFFFFFF)
     val TextPrimary = Color(0xFF1E293B)

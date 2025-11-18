@@ -59,7 +59,7 @@ object EduRachaColors {
     val WarningDark = Color(0xFFE65100)
 
     // Error
-    val Error = Color(0xFFD32F2F)
+    val Error = Color(0xFFE80909)
     val ErrorLight = Color(0xFFEF5350)
     val ErrorContainer = Color(0xFFFFCDD2)
     val ErrorDark = Color(0xFFC62828)

@@ -25,6 +25,10 @@ import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import kotlinx.coroutines.launch
 
+/**
+ * Activity que muestra la retroalimentación de las preguntas incorrectas
+ * Ayuda al estudiante a aprender de sus errores
+ */
 class RetroalimentacionActivity : ComponentActivity() {
 
     private lateinit var quizId: String
@@ -48,6 +52,10 @@ class RetroalimentacionActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Pantalla principal de retroalimentación
+ * Muestra las preguntas falladas con sus explicaciones
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RetroalimentacionScreen(
@@ -60,7 +68,6 @@ fun RetroalimentacionScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    // ✅ Cargar retroalimentación al iniciar
     LaunchedEffect(quizId) {
         scope.launch {
             repository.obtenerRetroalimentacion(quizId).fold(
@@ -116,7 +123,7 @@ fun RetroalimentacionScreen(
                     ) {
                         CircularProgressIndicator(color = EduRachaColors.Primary)
                         Text(
-                            text = "Analizando tus respuestas...",
+                            text = "Analizando tus respuestas",
                             color = EduRachaColors.TextSecondary
                         )
                     }
@@ -159,7 +166,6 @@ fun RetroalimentacionScreen(
 
             retroalimentacion != null -> {
                 if (retroalimentacion!!.totalFallos == 0) {
-                    // ✅ Sin errores
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -178,7 +184,7 @@ fun RetroalimentacionScreen(
                                 tint = EduRachaColors.Success
                             )
                             Text(
-                                text = "¡Perfecto!",
+                                text = "Perfecto",
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = EduRachaColors.TextPrimary
@@ -201,7 +207,6 @@ fun RetroalimentacionScreen(
                         }
                     }
                 } else {
-                    // ❌ Hay errores - Mostrar retroalimentación interactiva
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -209,7 +214,6 @@ fun RetroalimentacionScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Header
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -248,7 +252,6 @@ fun RetroalimentacionScreen(
                             }
                         }
 
-                        // Preguntas falladas
                         itemsIndexed(retroalimentacion!!.preguntasFalladas) { index, pregunta ->
                             PreguntaFalladaCard(
                                 numero = index + 1,
@@ -256,7 +259,6 @@ fun RetroalimentacionScreen(
                             )
                         }
 
-                        // Botón de cerrar
                         item {
                             Spacer(Modifier.height(16.dp))
                             Button(
@@ -283,12 +285,15 @@ fun RetroalimentacionScreen(
     }
 }
 
+/**
+ * Card de pregunta fallada con animación expandible
+ * Muestra la pregunta, respuesta del usuario, respuesta correcta y explicación
+ */
 @Composable
 fun PreguntaFalladaCard(
     numero: Int,
     pregunta: com.stiven.sos.models.RetroalimentacionPregunta
 ) {
-    // Estado para expandir/colapsar
     var expandido by remember { mutableStateOf(false) }
 
     Card(
@@ -303,7 +308,6 @@ fun PreguntaFalladaCard(
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            // Header de la pregunta
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -347,7 +351,6 @@ fun PreguntaFalladaCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // Texto de la pregunta
             Text(
                 text = pregunta.texto,
                 fontSize = 16.sp,
@@ -356,7 +359,6 @@ fun PreguntaFalladaCard(
                 lineHeight = 24.sp
             )
 
-            // Contenido expandible con animación
             AnimatedVisibility(
                 visible = expandido,
                 enter = expandVertically() + fadeIn(),
@@ -368,7 +370,6 @@ fun PreguntaFalladaCard(
                 ) {
                     Divider(color = EduRachaColors.TextSecondary.copy(alpha = 0.2f))
 
-                    // Tu respuesta (incorrecta)
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = EduRachaColors.Error.copy(alpha = 0.1f),
@@ -403,7 +404,6 @@ fun PreguntaFalladaCard(
                         }
                     }
 
-                    // Respuesta correcta
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = EduRachaColors.Success.copy(alpha = 0.1f),
@@ -438,7 +438,6 @@ fun PreguntaFalladaCard(
                         }
                     }
 
-                    // Explicación
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = EduRachaColors.Info.copy(alpha = 0.1f),

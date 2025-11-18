@@ -578,7 +578,7 @@ fun FilterChips(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         FilterChip(
