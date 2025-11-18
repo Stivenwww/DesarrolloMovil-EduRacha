@@ -31,13 +31,13 @@ class ReporteRepository(
 
             if (!response.isSuccessful) {
                 val errorMsg = "Error ${response.code()}: ${response.message()}"
-                Log.e(TAG, "❌ $errorMsg")
+                Log.e(TAG, " $errorMsg")
                 return@withContext Result.failure(Exception(errorMsg))
             }
 
             val body = response.body()
             if (body == null) {
-                Log.e(TAG, "❌ Body vacío en respuesta")
+                Log.e(TAG, " Body vacío en respuesta")
                 return@withContext Result.failure(Exception("Respuesta vacía del servidor"))
             }
 
@@ -47,49 +47,49 @@ class ReporteRepository(
             val resultado = guardarArchivo(body, nombreArchivo)
 
             if (resultado) {
-                Log.d(TAG, "✅ Reporte guardado exitosamente: $nombreArchivo")
+                Log.d(TAG, " Reporte guardado exitosamente: $nombreArchivo")
                 Result.success(nombreArchivo)
             } else {
                 Result.failure(Exception("Error al guardar el archivo"))
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error descargando reporte diario", e)
+            Log.e(TAG, " Error descargando reporte diario", e)
             Result.failure(e)
         }
     }
 
     suspend fun descargarReporteTema(cursoId: String, temaId: String): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "📥 Descargando reporte por tema: cursoId=$cursoId, temaId=$temaId")
+            Log.d(TAG, " Descargando reporte por tema: cursoId=$cursoId, temaId=$temaId")
             val response = apiService.descargarReporteTema(cursoId, temaId)
 
             if (!response.isSuccessful) {
                 val errorMsg = "Error ${response.code()}: ${response.message()}"
-                Log.e(TAG, "❌ $errorMsg")
+                Log.e(TAG, " $errorMsg")
                 return@withContext Result.failure(Exception(errorMsg))
             }
 
             val body = response.body()
             if (body == null) {
-                Log.e(TAG, "❌ Body vacío en respuesta")
+                Log.e(TAG, " Body vacío en respuesta")
                 return@withContext Result.failure(Exception("Respuesta vacía del servidor"))
             }
 
             val nombreArchivo = "reporte_tema_${temaId}_${System.currentTimeMillis()}.xlsx"
-            Log.d(TAG, "💾 Guardando archivo: $nombreArchivo")
+            Log.d(TAG, " Guardando archivo: $nombreArchivo")
 
             val resultado = guardarArchivo(body, nombreArchivo)
 
             if (resultado) {
-                Log.d(TAG, "✅ Reporte guardado exitosamente: $nombreArchivo")
+                Log.d(TAG, " Reporte guardado exitosamente: $nombreArchivo")
                 Result.success(nombreArchivo)
             } else {
                 Result.failure(Exception("Error al guardar el archivo"))
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error descargando reporte por tema", e)
+            Log.e(TAG, " Error descargando reporte por tema", e)
             Result.failure(e)
         }
     }
@@ -102,7 +102,7 @@ class ReporteRepository(
                 guardarEnDownloads(body, nombreArchivo)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error guardando archivo", e)
+            Log.e(TAG, " Error guardando archivo", e)
             false
         }
     }
@@ -126,11 +126,11 @@ class ReporteRepository(
             contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
             resolver.update(uri, contentValues, null, null)
 
-            Log.d(TAG, "✅ Archivo guardado en MediaStore: $uri")
+            Log.d(TAG, " Archivo guardado en MediaStore: $uri")
             true
         } catch (e: Exception) {
             resolver.delete(uri, null, null)
-            Log.e(TAG, "❌ Error en MediaStore", e)
+            Log.e(TAG, " Error en MediaStore", e)
             false
         }
     }
@@ -148,10 +148,10 @@ class ReporteRepository(
             FileOutputStream(file).use { outputStream ->
                 copiarArchivo(body, outputStream)
             }
-            Log.d(TAG, "✅ Archivo guardado en: ${file.absolutePath}")
+            Log.d(TAG, " Archivo guardado en: ${file.absolutePath}")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error guardando en Downloads", e)
+            Log.e(TAG, " Error guardando en Downloads", e)
             false
         }
     }
@@ -168,6 +168,6 @@ class ReporteRepository(
             }
         }
 
-        Log.d(TAG, "📊 Total bytes escritos: $totalBytes")
+        Log.d(TAG, " Total bytes escritos: $totalBytes")
     }
 }

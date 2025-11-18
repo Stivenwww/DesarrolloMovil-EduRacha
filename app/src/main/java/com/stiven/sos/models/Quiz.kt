@@ -27,7 +27,7 @@ data class Quiz(
     val bonificacionTodoCorrecto: Int = 0,
     val respuestas: List<RespuestaQuiz> = emptyList(),
 
-    // ✅ NUEVOS CAMPOS
+
     val modo: String = "oficial", // "oficial" | "practica" | "final"
     val vidasIniciales: Int = 5,
     val vidasFinales: Int = 5

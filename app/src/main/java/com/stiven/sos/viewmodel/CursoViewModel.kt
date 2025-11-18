@@ -43,7 +43,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     fun obtenerCursos() {
         // Prevenir llamadas duplicadas
         if (isLoadingCursos) {
-            Log.w("CursoViewModel", "⚠️ Ya se están cargando cursos, ignorando llamada duplicada")
+            Log.w("CursoViewModel", " Ya se están cargando cursos, ignorando llamada duplicada")
             return
         }
 
@@ -53,12 +53,12 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
 
             repository.obtenerCursos()
                 .onSuccess { listaCursos ->
-                    Log.d("CursoViewModel", "✅ Cursos obtenidos: ${listaCursos.size}")
+                    Log.d("CursoViewModel", " Cursos obtenidos: ${listaCursos.size}")
                     _uiState.update { it.copy(isLoading = false, cursos = listaCursos) }
                     cargarSolicitudesPendientes()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "❌ Error obteniendo cursos", exception)
+                    Log.e("CursoViewModel", " Error obteniendo cursos", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -80,7 +80,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 val cursosIds = _uiState.value.cursos.mapNotNull { it.id }
 
                 if (cursosIds.isEmpty()) {
-                    Log.w("CursoViewModel", "⚠️ No hay cursos para cargar estudiantes")
+                    Log.w("CursoViewModel", " No hay cursos para cargar estudiantes")
                     _uiState.update {
                         it.copy(
                             isLoadingEstudiantes = false,
@@ -90,7 +90,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                Log.d("CursoViewModel", "🔍 Cargando estudiantes de ${cursosIds.size} cursos")
+                Log.d("CursoViewModel", " Cargando estudiantes de ${cursosIds.size} cursos")
 
                 val estudiantesPorCurso = mutableMapOf<String, List<UsuarioAsignado>>()
 
@@ -103,13 +103,13 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                             val estudiantes = response.body() ?: emptyList()
                             estudiantesPorCurso[cursoId] = estudiantes
 
-                            Log.d("CursoViewModel", "✅ Curso $cursoId: ${estudiantes.size} estudiantes")
+                            Log.d("CursoViewModel", " Curso $cursoId: ${estudiantes.size} estudiantes")
                         } else {
-                            Log.w("CursoViewModel", "⚠️ Error al cargar estudiantes del curso $cursoId: ${response.code()}")
+                            Log.w("CursoViewModel", " Error al cargar estudiantes del curso $cursoId: ${response.code()}")
                             estudiantesPorCurso[cursoId] = emptyList()
                         }
                     } catch (e: Exception) {
-                        Log.e("CursoViewModel", "❌ Error cargando estudiantes del curso $cursoId", e)
+                        Log.e("CursoViewModel", " Error cargando estudiantes del curso $cursoId", e)
                         estudiantesPorCurso[cursoId] = emptyList()
                     }
                 }
@@ -118,7 +118,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 val totalEstudiantes = estudiantesPorCurso.values.flatten()
                 val estudiantesUnicos = totalEstudiantes.map { it.uid }.toSet()
 
-                Log.d("CursoViewModel", "📊 RESUMEN DE ESTUDIANTES:")
+                Log.d("CursoViewModel", " RESUMEN DE ESTUDIANTES:")
                 Log.d("CursoViewModel", "   - Total asignaciones: ${totalEstudiantes.size}")
                 Log.d("CursoViewModel", "   - Estudiantes únicos: ${estudiantesUnicos.size}")
                 Log.d("CursoViewModel", "   - Cursos con estudiantes: ${estudiantesPorCurso.filter { it.value.isNotEmpty() }.size}")
@@ -131,7 +131,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
             } catch (e: Exception) {
-                Log.e("CursoViewModel", "❌ Error general al cargar estudiantes", e)
+                Log.e("CursoViewModel", " Error general al cargar estudiantes", e)
                 _uiState.update {
                     it.copy(
                         isLoadingEstudiantes = false,
@@ -145,7 +145,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
     private fun cargarSolicitudesPendientes() {
         // Prevenir llamadas duplicadas
         if (isLoadingSolicitudes) {
-            Log.w("CursoViewModel", "⚠️ Ya se están cargando solicitudes, ignorando")
+            Log.w("CursoViewModel", " Ya se están cargando solicitudes, ignorando")
             return
         }
 
@@ -154,20 +154,20 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 isLoadingSolicitudes = true
 
                 val docenteId = obtenerDocenteId()
-                Log.d("CursoViewModel", "🔍 Cargando solicitudes para docente: $docenteId")
+                Log.d("CursoViewModel", " Cargando solicitudes para docente: $docenteId")
 
                 val response = ApiClient.apiService.obtenerSolicitudesDocente(docenteId)
 
                 if (response.isSuccessful) {
                     val solicitudes = response.body() ?: emptyList()
-                    Log.d("CursoViewModel", "📨 Total solicitudes recibidas: ${solicitudes.size}")
+                    Log.d("CursoViewModel", " Total solicitudes recibidas: ${solicitudes.size}")
 
                     // Filtrar solicitudes pendientes
                     val solicitudesPendientes = solicitudes.filter {
                         it.estado == EstadoSolicitud.PENDIENTE
                     }
 
-                    Log.d("CursoViewModel", "📊 Solicitudes PENDIENTES: ${solicitudesPendientes.size}")
+                    Log.d("CursoViewModel", " Solicitudes PENDIENTES: ${solicitudesPendientes.size}")
 
                     val solicitudesPorCurso = solicitudesPendientes
                         .groupBy { it.cursoId }
@@ -177,18 +177,18 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                             count
                         }
 
-                    Log.d("CursoViewModel", "✅ Total cursos con solicitudes: ${solicitudesPorCurso.size}")
+                    Log.d("CursoViewModel", " Total cursos con solicitudes: ${solicitudesPorCurso.size}")
                     _uiState.update { it.copy(solicitudesPorCurso = solicitudesPorCurso) }
 
                 } else if (response.code() == 404) {
-                    Log.i("CursoViewModel", "ℹ️ No hay solicitudes pendientes (404)")
+                    Log.i("CursoViewModel", " No hay solicitudes pendientes (404)")
                     _uiState.update { it.copy(solicitudesPorCurso = emptyMap()) }
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("CursoViewModel", "❌ Error ${response.code()}: $errorBody")
+                    Log.e("CursoViewModel", " Error ${response.code()}: $errorBody")
                 }
             } catch (e: Exception) {
-                Log.e("CursoViewModel", "❌ Excepción al cargar solicitudes", e)
+                Log.e("CursoViewModel", " Excepción al cargar solicitudes", e)
             } finally {
                 isLoadingSolicitudes = false
             }
@@ -208,7 +208,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.crearCurso(curso)
                 .onSuccess { response ->
-                    Log.d("CursoViewModel", "✅ Curso creado exitosamente")
+                    Log.d("CursoViewModel", " Curso creado exitosamente")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -218,7 +218,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "❌ Error creando curso", exception)
+                    Log.e("CursoViewModel", " Error creando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -247,7 +247,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
 
             // Validar que el curso tenga las fechas necesarias
             if (curso.fechaInicio == 0L || curso.fechaFin == 0L) {
-                Log.w("CursoViewModel", "⚠️ Curso sin fechas, se guardará pero sin distribución temporal")
+                Log.w("CursoViewModel", " Curso sin fechas, se guardará pero sin distribución temporal")
             }
 
             // Si el curso tiene programación, validar su consistencia
@@ -256,17 +256,17 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                 val temasOrdenados = prog.temasOrdenados.toSet()
 
                 if (temasOrdenados != temasIds) {
-                    Log.w("CursoViewModel", "⚠️ La programación no coincide con los temas del curso")
+                    Log.w("CursoViewModel", " La programación no coincide con los temas del curso")
                 }
 
-                Log.d("CursoViewModel", "📅 Programación incluida:")
+                Log.d("CursoViewModel", " Programación incluida:")
                 Log.d("CursoViewModel", "   - Temas ordenados: ${prog.temasOrdenados.size}")
                 Log.d("CursoViewModel", "   - Distribución temporal: ${prog.distribucionTemporal.size}")
             }
 
             repository.actualizarCurso(id, curso)
                 .onSuccess {
-                    Log.d("CursoViewModel", "✅ Curso '${curso.titulo}' actualizado con éxito")
+                    Log.d("CursoViewModel", " Curso '${curso.titulo}' actualizado con éxito")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -276,7 +276,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "❌ Error actualizando curso", exception)
+                    Log.e("CursoViewModel", " Error actualizando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -293,7 +293,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
 
         // Validar que el curso tenga fechas
         if (curso.fechaInicio == 0L || curso.fechaFin == 0L) {
-            Log.e("CursoViewModel", "❌ No se puede generar programación sin fechas de inicio/fin")
+            Log.e("CursoViewModel", " No se puede generar programación sin fechas de inicio/fin")
             return null
         }
 
@@ -303,7 +303,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         val diasPorTema = TimeUnit.MILLISECONDS.toDays(duracionTotal).toInt() / cantidadTemas
 
         if (diasPorTema <= 0) {
-            Log.e("CursoViewModel", "❌ Duración inválida para generar programación")
+            Log.e("CursoViewModel", " Duración inválida para generar programación")
             return null
         }
 
@@ -334,7 +334,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             fechaActual = fechaFinalTema
         }
 
-        Log.d("CursoViewModel", "✅ Programación generada automáticamente:")
+        Log.d("CursoViewModel", " Programación generada automáticamente:")
         Log.d("CursoViewModel", "   - ${temasOrdenados.size} temas")
         Log.d("CursoViewModel", "   - $diasPorTema días por tema")
 
@@ -349,7 +349,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true, error = null, operationSuccess = null) }
             repository.eliminarCurso(id)
                 .onSuccess {
-                    Log.d("CursoViewModel", "✅ Curso eliminado")
+                    Log.d("CursoViewModel", " Curso eliminado")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -359,7 +359,7 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
                     obtenerCursos()
                 }
                 .onFailure { exception ->
-                    Log.e("CursoViewModel", "❌ Error eliminando curso", exception)
+                    Log.e("CursoViewModel", " Error eliminando curso", exception)
                     _uiState.update {
                         it.copy(
                             isLoading = false,

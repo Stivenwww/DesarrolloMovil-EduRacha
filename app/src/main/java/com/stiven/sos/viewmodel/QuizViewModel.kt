@@ -166,7 +166,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     !yaInterrumpido) {
 
                     Log.e(TAG, "========================================")
-                    Log.e(TAG, "🚨 ALERTA CRÍTICA: VIDAS AGOTADAS")
+                    Log.e(TAG, " ALERTA CRÍTICA: VIDAS AGOTADAS")
                     Log.e(TAG, "========================================")
                     Log.e(TAG, "Quiz ID: ${quizActivo.quizId}")
                     Log.e(TAG, "Vidas: $vidasAnteriores → $vidasNuevas")

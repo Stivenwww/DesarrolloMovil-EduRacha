@@ -92,7 +92,7 @@ class CursoRepository {
 
     suspend fun actualizarCurso(id: String, curso: Curso): Result<ApiResponse> {
         return try {
-            // ✅ Convertir Curso a CursoRequest
+            // Convertir Curso a CursoRequest
             val cursoRequest = curso.toRequest()
 
             Log.d("CursoRepository", "Actualizando curso $id:")
@@ -104,7 +104,7 @@ class CursoRepository {
 
             // Validar que tiene fechas
             if (cursoRequest.fechaInicio == 0L || cursoRequest.fechaFin == 0L) {
-                Log.w("CursoRepository", "⚠️ Curso sin fechas de inicio/fin definidas")
+                Log.w("CursoRepository", " Curso sin fechas de inicio/fin definidas")
             }
 
             // Validar programación
@@ -116,15 +116,15 @@ class CursoRepository {
             val response = api.actualizarCurso(id, cursoRequest)
 
             if (response.isSuccessful && response.body() != null) {
-                Log.d("CursoRepository", "✅ Curso actualizado exitosamente")
+                Log.d("CursoRepository", "Curso actualizado exitosamente")
                 Result.success(response.body()!!)
             } else {
                 val errorBody = response.errorBody()?.string()
-                Log.e("CursoRepository", "❌ Error al actualizar curso: ${response.code()}: $errorBody")
+                Log.e("CursoRepository", "Error al actualizar curso: ${response.code()}: $errorBody")
                 Result.failure(Exception("Error al actualizar curso: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
-            Log.e("CursoRepository", "❌ Excepción al actualizar curso", e)
+            Log.e("CursoRepository", "Excepción al actualizar curso", e)
             Result.failure(e)
         }
     }
@@ -133,14 +133,14 @@ class CursoRepository {
         return try {
             val response = api.eliminarCurso(id)
             if (response.isSuccessful && response.body() != null) {
-                Log.d("CursoRepository", "✅ Curso eliminado exitosamente")
+                Log.d("CursoRepository", "Curso eliminado exitosamente")
                 Result.success(response.body()!!)
             } else {
-                Log.e("CursoRepository", "❌ Error al eliminar curso: ${response.code()}")
+                Log.e("CursoRepository", "Error al eliminar curso: ${response.code()}")
                 Result.failure(Exception("Error al eliminar curso: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e("CursoRepository", "❌ Excepción al eliminar curso", e)
+            Log.e("CursoRepository", " Excepción al eliminar curso", e)
             Result.failure(e)
         }
     }

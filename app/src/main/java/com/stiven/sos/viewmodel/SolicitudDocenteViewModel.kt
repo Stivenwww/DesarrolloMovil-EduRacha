@@ -26,14 +26,14 @@ class SolicitudDocenteViewModel : ViewModel() {
     fun cargarSolicitudesDocente(docenteId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            Log.d("SolicitudDocenteVM", "🔍 Cargando solicitudes del docente: $docenteId")
+            Log.d("SolicitudDocenteVM", " Cargando solicitudes del docente: $docenteId")
 
             try {
                 val response = ApiClient.apiService.obtenerSolicitudesDocente(docenteId)
 
                 if (response.isSuccessful) {
                     val solicitudes = response.body() ?: emptyList()
-                    Log.d("SolicitudDocenteVM", "✅ Solicitudes cargadas: ${solicitudes.size}")
+                    Log.d("SolicitudDocenteVM", " Solicitudes cargadas: ${solicitudes.size}")
                     solicitudes.forEach {
                         Log.d("SolicitudDocenteVM", "  - ${it.estudianteNombre} → Curso ${it.cursoId} (${it.estado})")
                     }
@@ -45,7 +45,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                         )
                     }
                 } else if (response.code() == 404) {
-                    Log.i("SolicitudDocenteVM", "ℹ️ No hay solicitudes (404)")
+                    Log.i("SolicitudDocenteVM", " No hay solicitudes (404)")
                     _uiState.update {
                         it.copy(
                             solicitudes = emptyList(),
@@ -53,7 +53,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                         )
                     }
                 } else {
-                    Log.e("SolicitudDocenteVM", "❌ Error ${response.code()}")
+                    Log.e("SolicitudDocenteVM", " Error ${response.code()}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -62,7 +62,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocenteVM", "❌ Excepción", e)
+                Log.e("SolicitudDocenteVM", " Excepción", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -116,7 +116,7 @@ class SolicitudDocenteViewModel : ViewModel() {
     fun aceptarSolicitud(solicitudId: String, mensaje: String?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, mensajeExito = null) }
-            Log.d("SolicitudDocenteVM", "✅ Aceptando solicitud $solicitudId")
+            Log.d("SolicitudDocenteVM", " Aceptando solicitud $solicitudId")
 
             try {
                 val respuesta = RespuestaSolicitudRequest(
@@ -127,9 +127,9 @@ class SolicitudDocenteViewModel : ViewModel() {
                 val response = ApiClient.apiService.responderSolicitud(solicitudId, respuesta)
 
                 if (response.isSuccessful) {
-                    Log.d("SolicitudDocenteVM", "✅ Solicitud aceptada correctamente")
+                    Log.d("SolicitudDocenteVM", " Solicitud aceptada correctamente")
 
-                    // ✅ Actualizar lista localmente removiendo la solicitud procesada
+                    // Actualizar lista localmente removiendo la solicitud procesada
                     _uiState.update { state ->
                         state.copy(
                             solicitudes = state.solicitudes.map {
@@ -142,7 +142,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                         )
                     }
                 } else {
-                    Log.e("SolicitudDocenteVM", "❌ Error al aceptar: ${response.code()}")
+                    Log.e("SolicitudDocenteVM", " Error al aceptar: ${response.code()}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -151,7 +151,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocenteVM", "❌ Excepción al aceptar", e)
+                Log.e("SolicitudDocenteVM", " Excepción al aceptar", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -168,7 +168,7 @@ class SolicitudDocenteViewModel : ViewModel() {
     fun rechazarSolicitud(solicitudId: String, mensaje: String?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, mensajeExito = null) }
-            Log.d("SolicitudDocenteVM", "🚫 Rechazando solicitud $solicitudId")
+            Log.d("SolicitudDocenteVM", " Rechazando solicitud $solicitudId")
 
             try {
                 val respuesta = RespuestaSolicitudRequest(
@@ -179,9 +179,9 @@ class SolicitudDocenteViewModel : ViewModel() {
                 val response = ApiClient.apiService.responderSolicitud(solicitudId, respuesta)
 
                 if (response.isSuccessful) {
-                    Log.d("SolicitudDocenteVM", "✅ Solicitud rechazada correctamente")
+                    Log.d("SolicitudDocenteVM", " Solicitud rechazada correctamente")
 
-                    // ✅ Actualizar lista localmente
+                    //  Actualizar lista localmente
                     _uiState.update { state ->
                         state.copy(
                             solicitudes = state.solicitudes.map {
@@ -194,7 +194,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                         )
                     }
                 } else {
-                    Log.e("SolicitudDocenteVM", "❌ Error al rechazar: ${response.code()}")
+                    Log.e("SolicitudDocenteVM", " Error al rechazar: ${response.code()}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -203,7 +203,7 @@ class SolicitudDocenteViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SolicitudDocenteVM", "❌ Excepción al rechazar", e)
+                Log.e("SolicitudDocenteVM", " Excepción al rechazar", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,

@@ -27,18 +27,18 @@ class UsuarioViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, cursoTitulo = cursoTitulo) }
 
-            Log.d("UsuarioViewModel", "🔍 Cargando estudiantes del curso: $cursoId")
+            Log.d("UsuarioViewModel", " Cargando estudiantes del curso: $cursoId")
 
             try {
                 val response = ApiClient.apiService.obtenerEstudiantesPorCurso(cursoId)
 
-                Log.d("UsuarioViewModel", "📡 Response code: ${response.code()}")
-                Log.d("UsuarioViewModel", "📡 Response successful: ${response.isSuccessful}")
+                Log.d("UsuarioViewModel", " Response code: ${response.code()}")
+                Log.d("UsuarioViewModel", " Response successful: ${response.isSuccessful}")
 
                 if (response.isSuccessful) {
                     val estudiantes = response.body() ?: emptyList()
 
-                    Log.d("UsuarioViewModel", "✅ Total estudiantes recibidos: ${estudiantes.size}")
+                    Log.d("UsuarioViewModel", " Total estudiantes recibidos: ${estudiantes.size}")
                     estudiantes.forEachIndexed { index, estudiante ->
                         Log.d("UsuarioViewModel", """
                             📋 Estudiante #${index + 1}:
@@ -58,8 +58,8 @@ class UsuarioViewModel : ViewModel() {
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("UsuarioViewModel", "❌ Error HTTP: ${response.code()}")
-                    Log.e("UsuarioViewModel", "❌ Error body: $errorBody")
+                    Log.e("UsuarioViewModel", " Error HTTP: ${response.code()}")
+                    Log.e("UsuarioViewModel", " Error body: $errorBody")
 
                     _uiState.update {
                         it.copy(
@@ -69,7 +69,7 @@ class UsuarioViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e("UsuarioViewModel", "❌ Exception al cargar estudiantes", e)
+                Log.e("UsuarioViewModel", " Exception al cargar estudiantes", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,

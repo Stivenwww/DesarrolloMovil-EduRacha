@@ -18,21 +18,21 @@ class RankingRepository {
      */
     suspend fun obtenerRankingPorExperiencia(cursoId: String): Result<List<RankingEstudiante>> {
         return try {
-            Log.d("RankingRepository", "📊 Obteniendo ranking por experiencia: $cursoId")
+            Log.d("RankingRepository", "Obteniendo ranking por experiencia: $cursoId")
 
             val response = apiService.obtenerRankingPorExperiencia(cursoId)
 
             if (response.isSuccessful && response.body() != null) {
                 val ranking = response.body()!!.map { it.toUIModel() }
-                Log.d("RankingRepository", "✅ Ranking obtenido: ${ranking.size} estudiantes")
+                Log.d("RankingRepository", "Ranking obtenido: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
                 val error = "Error ${response.code()}: ${response.message()}"
-                Log.e("RankingRepository", "❌ $error")
+                Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e("RankingRepository", "❌ Error al obtener ranking: ${e.message}", e)
+            Log.e("RankingRepository", " Error al obtener ranking: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -42,21 +42,21 @@ class RankingRepository {
      */
     suspend fun obtenerRankingPorRacha(cursoId: String): Result<List<RankingEstudiante>> {
         return try {
-            Log.d("RankingRepository", "🔥 Obteniendo ranking por racha: $cursoId")
+            Log.d("RankingRepository", " Obteniendo ranking por racha: $cursoId")
 
             val response = apiService.obtenerRankingPorRacha(cursoId)
 
             if (response.isSuccessful && response.body() != null) {
                 val ranking = response.body()!!.map { it.toUIModel() }
-                Log.d("RankingRepository", "✅ Ranking por racha: ${ranking.size} estudiantes")
+                Log.d("RankingRepository", " Ranking por racha: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
                 val error = "Error ${response.code()}: ${response.message()}"
-                Log.e("RankingRepository", "❌ $error")
+                Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e("RankingRepository", "❌ Error al obtener ranking por racha: ${e.message}", e)
+            Log.e("RankingRepository", "Error al obtener ranking por racha: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -66,21 +66,21 @@ class RankingRepository {
      */
     suspend fun obtenerRankingPorVidas(cursoId: String): Result<List<RankingEstudiante>> {
         return try {
-            Log.d("RankingRepository", "❤️ Obteniendo ranking por vidas: $cursoId")
+            Log.d("RankingRepository", " Obteniendo ranking por vidas: $cursoId")
 
             val response = apiService.obtenerRankingPorVidas(cursoId)
 
             if (response.isSuccessful && response.body() != null) {
                 val ranking = response.body()!!.map { it.toUIModel() }
-                Log.d("RankingRepository", "✅ Ranking por vidas: ${ranking.size} estudiantes")
+                Log.d("RankingRepository", " Ranking por vidas: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
                 val error = "Error ${response.code()}: ${response.message()}"
-                Log.e("RankingRepository", "❌ $error")
+                Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e("RankingRepository", "❌ Error al obtener ranking por vidas: ${e.message}", e)
+            Log.e("RankingRepository", " Error al obtener ranking por vidas: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -90,7 +90,7 @@ class RankingRepository {
      */
     suspend fun obtenerRankingGeneral(filtro: String = "experiencia"): Result<List<RankingEstudiante>> {
         return try {
-            Log.d("RankingRepository", "🌐 Obteniendo ranking general: $filtro")
+            Log.d("RankingRepository", " Obteniendo ranking general: $filtro")
 
             val response = if (filtro == "experiencia") {
                 apiService.obtenerRankingGeneral()
@@ -100,15 +100,15 @@ class RankingRepository {
 
             if (response.isSuccessful && response.body() != null) {
                 val ranking = response.body()!!.map { it.toUIModel() }
-                Log.d("RankingRepository", "✅ Ranking general: ${ranking.size} estudiantes")
+                Log.d("RankingRepository", " Ranking general: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
                 val error = "Error ${response.code()}: ${response.message()}"
-                Log.e("RankingRepository", "❌ $error")
+                Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
         } catch (e: Exception) {
-            Log.e("RankingRepository", "❌ Error al obtener ranking general: ${e.message}", e)
+            Log.e("RankingRepository", " Error al obtener ranking general: ${e.message}", e)
             Result.failure(e)
         }
     }

@@ -122,7 +122,7 @@ class RankingViewModel : ViewModel() {
             )
 
             try {
-                Log.d("RankingViewModel", "🔍 Cargando ranking: $tipo para curso: $cursoId")
+                Log.d("RankingViewModel", " Cargando ranking: $tipo para curso: $cursoId")
 
                 val result = when (tipo) {
                     TipoRanking.EXPERIENCIA -> rankingRepository.obtenerRankingPorExperiencia(cursoId)
@@ -132,7 +132,7 @@ class RankingViewModel : ViewModel() {
 
                 result.fold(
                     onSuccess = { ranking ->
-                        Log.d("RankingViewModel", "✅ Ranking cargado: ${ranking.size} estudiantes")
+                        Log.d("RankingViewModel", " Ranking cargado: ${ranking.size} estudiantes")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             rankingEstudiantes = ranking,
@@ -140,7 +140,7 @@ class RankingViewModel : ViewModel() {
                         )
                     },
                     onFailure = { error ->
-                        Log.e("RankingViewModel", "❌ Error: ${error.message}")
+                        Log.e("RankingViewModel", " Error: ${error.message}")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = "Error al cargar ranking: ${error.message}"
@@ -149,7 +149,7 @@ class RankingViewModel : ViewModel() {
                 )
 
             } catch (e: Exception) {
-                Log.e("RankingViewModel", "❌ Excepción: ${e.message}", e)
+                Log.e("RankingViewModel", " Excepción: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Error inesperado: ${e.message}"
@@ -170,7 +170,7 @@ class RankingViewModel : ViewModel() {
             )
 
             try {
-                Log.d("RankingViewModel", "🌐 Cargando ranking general: $tipo")
+                Log.d("RankingViewModel", " Cargando ranking general: $tipo")
 
                 val filtro = when (tipo) {
                     TipoRanking.EXPERIENCIA -> "experiencia"
@@ -182,7 +182,7 @@ class RankingViewModel : ViewModel() {
 
                 result.fold(
                     onSuccess = { ranking ->
-                        Log.d("RankingViewModel", "✅ Ranking general: ${ranking.size} estudiantes")
+                        Log.d("RankingViewModel", " Ranking general: ${ranking.size} estudiantes")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             rankingEstudiantes = ranking,
@@ -190,7 +190,7 @@ class RankingViewModel : ViewModel() {
                         )
                     },
                     onFailure = { error ->
-                        Log.e("RankingViewModel", "❌ Error ranking general: ${error.message}")
+                        Log.e("RankingViewModel", " Error ranking general: ${error.message}")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             error = "Error al cargar ranking general: ${error.message}"
@@ -199,7 +199,7 @@ class RankingViewModel : ViewModel() {
                 )
 
             } catch (e: Exception) {
-                Log.e("RankingViewModel", "❌ Excepción ranking general: ${e.message}", e)
+                Log.e("RankingViewModel", " Excepción ranking general: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Error inesperado: ${e.message}"

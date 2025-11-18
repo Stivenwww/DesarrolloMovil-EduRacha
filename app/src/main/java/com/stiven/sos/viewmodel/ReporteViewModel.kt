@@ -48,7 +48,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     fun obtenerDatosPreviewDiario(cursoId: String, fecha: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔍 Obteniendo vista previa - Diario")
+                Log.d(TAG, " Obteniendo vista previa - Diario")
                 _cargandoPreview.value = true
                 _errorPreview.value = null
 
@@ -61,7 +61,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     manejarErrorRespuesta(response)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Excepción: ${e.message}", e)
+                Log.e(TAG, " Excepción: ${e.message}", e)
                 _errorPreview.value = e.message ?: "Error al obtener datos"
             } finally {
                 _cargandoPreview.value = false
@@ -72,7 +72,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     fun obtenerDatosPreviewTema(cursoId: String, temaId: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔍 Obteniendo vista previa - Tema")
+                Log.d(TAG, " Obteniendo vista previa - Tema")
                 _cargandoPreview.value = true
                 _errorPreview.value = null
 
@@ -85,7 +85,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     manejarErrorRespuesta(response)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Excepción: ${e.message}", e)
+                Log.e(TAG, " Excepción: ${e.message}", e)
                 _errorPreview.value = e.message ?: "Error al obtener datos"
             } finally {
                 _cargandoPreview.value = false
@@ -96,7 +96,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     fun obtenerDatosPreviewGeneral(cursoId: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔍 Obteniendo vista previa - General")
+                Log.d(TAG, " Obteniendo vista previa - General")
                 _cargandoPreview.value = true
                 _errorPreview.value = null
 
@@ -109,7 +109,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     manejarErrorRespuesta(response)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Excepción: ${e.message}", e)
+                Log.e(TAG, " Excepción: ${e.message}", e)
                 _errorPreview.value = e.message ?: "Error al obtener datos"
             } finally {
                 _cargandoPreview.value = false
@@ -120,7 +120,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     fun obtenerDatosPreviewRango(cursoId: String, desde: String, hasta: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔍 Obteniendo vista previa - Rango")
+                Log.d(TAG, " Obteniendo vista previa - Rango")
                 _cargandoPreview.value = true
                 _errorPreview.value = null
 
@@ -133,7 +133,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     manejarErrorRespuesta(response)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Excepción: ${e.message}", e)
+                Log.e(TAG, " Excepción: ${e.message}", e)
                 _errorPreview.value = e.message ?: "Error al obtener datos"
             } finally {
                 _cargandoPreview.value = false
@@ -233,7 +233,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "📥 Iniciando descarga - Tipo: $tipo")
+                Log.d(TAG, " Iniciando descarga - Tipo: $tipo")
                 estadoFlow.value = ReporteEstado.Descargando
 
                 val response = apiCall()
@@ -279,7 +279,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     estadoFlow.value = ReporteEstado.Error(mensajeError)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Excepción al descargar reporte", e)
+                Log.e(TAG, " Excepción al descargar reporte", e)
                 estadoFlow.value = ReporteEstado.Error(e.message ?: "Error de conexión")
             }
         }

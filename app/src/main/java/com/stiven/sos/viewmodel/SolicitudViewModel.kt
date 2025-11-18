@@ -56,7 +56,7 @@ class SolicitudViewModel : ViewModel() {
                     // Recargar solicitudes
                     cargarSolicitudesEstudiante(estudianteId)
                 } else {
-                    // ✅ Manejo específico de error 409 (Conflict)
+                    // Manejo específico de error 409 (Conflict)
                     val errorMsg = when (response.code()) {
                         409 -> "Ya has enviado una solicitud para este curso. Espera la respuesta del docente."
                         404 -> "Curso no encontrado. Verifica el código."
