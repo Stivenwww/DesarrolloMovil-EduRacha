@@ -90,10 +90,6 @@ class CursoRepository {
         }
     }
 
-    /**
-     * Actualizar curso existente
-     * ✅ ACTUALIZADO - Ahora convierte a CursoRequest
-     */
     suspend fun actualizarCurso(id: String, curso: Curso): Result<ApiResponse> {
         return try {
             // ✅ Convertir Curso a CursoRequest
@@ -133,9 +129,6 @@ class CursoRepository {
         }
     }
 
-    /**
-     * Eliminar curso
-     */
     suspend fun eliminarCurso(id: String): Result<ApiResponse> {
         return try {
             val response = api.eliminarCurso(id)

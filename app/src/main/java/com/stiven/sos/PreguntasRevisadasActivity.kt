@@ -159,8 +159,8 @@ fun PreguntasRevisadasScreen(
                             label = {
                                 Text(
                                     when(estado) {
-                                        EstadoPregunta.APROBADA -> "✅ Aprobadas"
-                                        EstadoPregunta.RECHAZADA -> "❌ Rechazadas"
+                                        EstadoPregunta.APROBADA -> " Aprobadas"
+                                        EstadoPregunta.RECHAZADA -> " Rechazadas"
                                         else -> estado
                                     }
                                 )
@@ -519,7 +519,7 @@ fun FilterDialog(
                                 else EstadoPregunta.APROBADA
                             )
                         },
-                        label = { Text("✅ Aprobadas") }
+                        label = { Text(" Aprobadas") }
                     )
 
                     FilterChip(
@@ -530,7 +530,7 @@ fun FilterDialog(
                                 else EstadoPregunta.RECHAZADA
                             )
                         },
-                        label = { Text("❌ Rechazadas") }
+                        label = { Text(" Rechazadas") }
                     )
                 }
 
@@ -594,7 +594,7 @@ fun PreguntaDetailDialog(
                         EduRachaColors.Error.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = if (pregunta.estado == EstadoPregunta.APROBADA) "✅ Aprobada" else "❌ Rechazada",
+                        text = if (pregunta.estado == EstadoPregunta.APROBADA) " Aprobada" else " Rechazada",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (pregunta.estado == EstadoPregunta.APROBADA)

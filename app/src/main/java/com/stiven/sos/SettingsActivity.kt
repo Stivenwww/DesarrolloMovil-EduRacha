@@ -230,7 +230,7 @@ private fun updateUserProfile(
 
     CoroutineScope(Dispatchers.IO).launch {
         try {
-            // 1️⃣ Guarda localmente en SharedPreferences
+            // 1️Guarda localmente en SharedPreferences
             withContext(Dispatchers.Main) {
                 UserPreferences.saveUserData(
                     context = context,
@@ -242,7 +242,7 @@ private fun updateUserProfile(
                 )
             }
 
-            // 2️⃣ Sincroniza con la API del backend
+            //  Sincroniza con la API del backend
             val apiService = ApiClient.instance.create(ApiService::class.java)
 
             val perfilUpdate = ActualizarPerfilRequest(

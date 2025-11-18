@@ -334,7 +334,6 @@ fun AlertaCooldownActivo(horas: Int, minutos: Int, porcentajeObtenido: Int) {
     }
 }
 
-// NUEVA ALERTA: Intentar nuevamente
 @Composable
 fun AlertaIntentarNuevamente(porcentajeObtenido: Int) {
     Card(
@@ -384,7 +383,7 @@ fun AlertaIntentarNuevamente(porcentajeObtenido: Int) {
     }
 }
 
-// CARD EXPLICACIÓN MEJORADA
+// CARD EXPLICACIÓN
 @Composable
 fun CardExplicacionMejorada(
     explicacion: String,

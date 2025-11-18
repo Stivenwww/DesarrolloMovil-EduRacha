@@ -48,7 +48,7 @@ android {
 
     packaging {
         resources {
-            // Se mantienen tus exclusiones para evitar conflictos
+            
             excludes += setOf(
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",
@@ -77,7 +77,7 @@ dependencies {
     // JETPACK COMPOSE
     // -------------------
     // BOM (Bill of Materials) para gestionar versiones de Compose de forma consistente
-    implementation(platform("androidx.compose:compose-bom:2024.05.00")) // Versión más reciente
+    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -97,7 +97,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // Dependencias específicas de Firebase (no es necesario añadir -ktx por separado)
+    // Dependencias específicas de Firebase
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-database-ktx") //  Para Realtime Database
@@ -115,10 +115,10 @@ dependencies {
     // Retrofit (Cliente HTTP)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // El interceptor de logging es muy útil
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Ktor (Alternativa a Retrofit, ya lo tenías)
-    implementation("io.ktor:ktor-client-core:2.3.11") // Versiones actualizadas
+
+    implementation("io.ktor:ktor-client-core:2.3.11")
     implementation("io.ktor:ktor-client-cio:2.3.11")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
     // Serialización para Ktor

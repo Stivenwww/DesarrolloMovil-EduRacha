@@ -60,7 +60,6 @@ class PreguntaViewModel : ViewModel() {
         }
     }
 
-    // Método auxiliar para recargar con los mismos filtros
     private fun recargarConFiltrosActuales() {
         val currentState = _uiState.value
         cargarPreguntas(

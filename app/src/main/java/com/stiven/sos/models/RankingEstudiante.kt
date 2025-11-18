@@ -40,9 +40,6 @@ data class RankingEstudiante(
     val cursoId: String? = null
 )
 
-/**
- * Función de conversión mejorada
- */
 fun RankingEstudianteAPI.toUIModel() = RankingEstudiante(
     id = estudianteId,
     nombre = nombre ?: "Estudiante",

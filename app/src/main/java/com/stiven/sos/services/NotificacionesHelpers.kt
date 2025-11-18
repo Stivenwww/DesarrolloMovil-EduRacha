@@ -18,7 +18,6 @@ object NotificacionesHelper {
 
     /**
      * Notificación automática cuando un estudiante inicia un quiz
-     * Se llama desde el backend pero podemos agregarlo también en el frontend
      */
     fun notificarQuizIniciado(
         estudianteId: String,

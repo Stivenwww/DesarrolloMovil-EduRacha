@@ -16,7 +16,7 @@ data class TemasUiState(
     val temaSeleccionado: Tema? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val operationSuccess: String? = null // ✅ AGREGAR
+    val operationSuccess: String? = null
 )
 
 class TemaViewModel : ViewModel() {

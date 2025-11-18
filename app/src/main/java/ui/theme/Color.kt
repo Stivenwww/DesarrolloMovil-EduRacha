@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Color
 
 
 object Uniautonoma {
-    val Primary = Color(0xFFD32F2F) // Tonalidad roja, puedes ajustarla
-    val Secondary = Color(0xFFFFC107) // Tonalidad ámbar, puedes ajustarla
+    val Primary = Color(0xFFD32F2F) // Tonalidad roja
+    val Secondary = Color(0xFFFFC107) // Tonalidad ámbar
     val Background = Color(0xFFFAFAFA) // Gris muy claro
     val Surface = Color.White
     val TextPrimary = Color.Black
@@ -217,11 +217,11 @@ private val DarkColorScheme = darkColorScheme(
     error = EduRachaColors.ErrorLight,
     onError = Color(0xFF690005)
 )
-// En el archivo Color.kt    // ... (otros colores como Purple80, Pink80, etc.)
+
 
 // Colores semánticos de la App
 val Success = Color(0xFF28A745)
-val SuccessContainer = Color(0xFFD1FADF) // <-- AÑADE ESTA LÍNEA (verde claro)
+val SuccessContainer = Color(0xFFD1FADF)
 val Warning = Color(0xFFFFA901)
 val Error = Color(0xFFD92D20)
 // ...etc

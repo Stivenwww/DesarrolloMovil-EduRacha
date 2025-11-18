@@ -43,27 +43,6 @@ import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * ACTIVITY PRINCIPAL DEL QUIZ
- *
- * RESPONSABILIDADES:
- * 1. Gestionar el ciclo de vida del quiz
- * 2. Validar las vidas del estudiante antes y durante el quiz
- * 3. Bloquear salida durante el quiz activo
- * 4. Detectar intentos de trampa (salir de la app)
- * 5. Notificar al sistema cuando el quiz inicia
- * 6. Redirigir segun el resultado del quiz
- *
- * VALIDACIONES CRITICAS IMPLEMENTADAS:
- * - Deteccion INMEDIATA de perdida de vidas y bloqueo del quiz
- * - Navegacion forzada a TemasDelCursoActivity al perder vidas
- * - Dialogo de confirmacion para temas ya aprobados
- * - Bloqueo de Quiz Final si ya fue completado con 80 por ciento o mas
- * - Validacion en tiempo real de vidas durante el quiz
- * - Overlay visual de bloqueo cuando no hay vidas
- * - Dialogos de error para periodo finalizado y otros errores
- * - Dialogo informativo sobre estrellas al inicio del quiz
- */
 class QuizActivity : ComponentActivity() {
 
     // ViewModel que maneja toda la logica de negocio del quiz
@@ -113,8 +92,6 @@ class QuizActivity : ComponentActivity() {
                  * y redirige INMEDIATAMENTE al usuario
                  * Es la primera linea de defensa contra usuarios sin vidas
                  *
-                 * CAMBIO IMPORTANTE: Delay aumentado de 50ms a 2000ms (2 segundos)
-                 * para que el usuario tenga tiempo de ver el dialogo antes de ser redirigido
                  */
                 LaunchedEffect(uiState.quizInterrumpidoPorVidas) {
                     if (uiState.quizInterrumpidoPorVidas) {
@@ -237,7 +214,7 @@ class QuizActivity : ComponentActivity() {
 }
 
 /**
- * CARD DE PREGUNTA MEJORADA
+ * CARD DE PREGUNTA
  *
  * Muestra la pregunta actual en un diseño destacado y legible
  * Incluye un badge con el numero de pregunta y separador visual
@@ -321,7 +298,7 @@ fun CardPreguntaMejorada(
 }
 
 /**
- * OPCION DE RESPUESTA MEJORADA
+ * OPCION DE RESPUESTA
  *
  * Card clickeable para cada opcion de respuesta
  * Incluye animaciones de seleccion y estado visual claro
@@ -421,7 +398,7 @@ fun OpcionRespuestaMejorada(
 }
 
 /**
- * BOTON DE CONFIRMACION MEJORADO
+ * BOTON DE CONFIRMACION
  *
  * Boton para confirmar la respuesta seleccionada y avanzar a la siguiente pregunta
  * Se deshabilita automaticamente cuando no hay respuesta seleccionada o no hay vidas
@@ -659,7 +636,7 @@ fun DialogoAbandonarQuizConBloqueo(
 }
 
 /**
- * PANTALLA DE PREGUNTA CON VALIDACIONES MEJORADAS
+ * PANTALLA DE PREGUNTA CON VALIDACIONES
  *
  * Pantalla que muestra una pregunta individual con todas sus opciones
  * Incluye validaciones de vidas y overlay de bloqueo
@@ -1085,7 +1062,7 @@ fun formatearTiempo(segundos: Int): String {
 }
 
 /**
- * HEADER DEL QUIZ MEJORADO
+ * HEADER DEL QUIZ
  *
  * Muestra informacion clave en la parte superior:
  * - Titulo del tema
@@ -1390,10 +1367,7 @@ fun QuizScreen(
     var yaCargoRetroalimentacion by remember { mutableStateOf(false) }
     var mostrarDialogoSalir by remember { mutableStateOf(false) }
 
-    /**
-     * CAMBIO CLAVE: El dialogo de estrellas ahora comienza en TRUE siempre
-     * Esto asegura que se muestre al inicio de CUALQUIER quiz
-     */
+
     var mostrarDialogoInfoEstrellas by remember { mutableStateOf(true) }
 
     // Temporizador global del quiz
@@ -1428,7 +1402,6 @@ fun QuizScreen(
     /**
      * VALIDACION CRITICA 1: Redireccion inmediata por vidas agotadas
      *
-     * CAMBIO IMPORTANTE: Delay aumentado de 50ms a 2000ms (2 segundos)
      * para dar tiempo suficiente al usuario de ver el dialogo de sin vidas
      */
     LaunchedEffect(uiState.quizInterrumpidoPorVidas) {

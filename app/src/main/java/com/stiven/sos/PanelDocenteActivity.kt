@@ -154,21 +154,21 @@ fun PanelDocenteScreen(
         preguntasUiState.preguntas.count { it.estado == EstadoPregunta.RECHAZADA }
     }
 
-    // ✅ Cargar estudiantes totales cuando haya cursos disponibles
+    // Cargar estudiantes totales cuando haya cursos disponibles
     LaunchedEffect(cursoUiState.cursos) {
         if (cursoUiState.cursos.isNotEmpty()) {
-            android.util.Log.d("PanelDocente", "🔄 Cargando estudiantes de ${cursoUiState.cursos.size} cursos")
+            android.util.Log.d("PanelDocente", " Cargando estudiantes de ${cursoUiState.cursos.size} cursos")
             cursoViewModel.cargarEstudiantesTotales()
         }
     }
 
-    // ✅ Calcular el total de estudiantes únicos
+    //  Calcular el total de estudiantes únicos
     val totalEstudiantes = remember(cursoUiState.estudiantesPorCurso) {
         val todosEstudiantes = cursoUiState.estudiantesPorCurso.values.flatten()
         val estudiantesUnicos = todosEstudiantes.map { it.uid }.toSet()
 
-        android.util.Log.d("PanelDocente", "📊 Total estudiantes únicos: ${estudiantesUnicos.size}")
-        android.util.Log.d("PanelDocente", "📊 Total asignaciones: ${todosEstudiantes.size}")
+        android.util.Log.d("PanelDocente", " Total estudiantes únicos: ${estudiantesUnicos.size}")
+        android.util.Log.d("PanelDocente", " Total asignaciones: ${todosEstudiantes.size}")
 
         estudiantesUnicos.size
     }
@@ -355,7 +355,7 @@ fun UserHeader(
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Text(
-                        text = if (userRole == "docente") "👨‍🏫 Docente" else "👨‍🎓 Estudiante",
+                        text = if (userRole == "docente") " Docente" else " Estudiante",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (userRole == "docente") EduRachaColors.Primary else EduRachaColors.Success,

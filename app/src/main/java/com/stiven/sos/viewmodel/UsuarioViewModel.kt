@@ -23,10 +23,6 @@ class UsuarioViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(UsuarioUiState())
     val uiState: StateFlow<UsuarioUiState> = _uiState.asStateFlow()
 
-    /**
-     * ✅ Carga los estudiantes asignados a un curso
-     * Compatible con el nuevo formato del backend que incluye "userId"
-     */
     fun cargarEstudiantesPorCurso(cursoId: String, cursoTitulo: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, cursoTitulo = cursoTitulo) }
@@ -84,9 +80,6 @@ class UsuarioViewModel : ViewModel() {
         }
     }
 
-    /**
-     * ✅ Cambia el estado de un estudiante (activo, inactivo, eliminado)
-     */
     fun cambiarEstadoEstudiante(
         cursoId: String,
         estudianteId: String,
@@ -96,7 +89,7 @@ class UsuarioViewModel : ViewModel() {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             Log.d("UsuarioViewModel", """
-                🔄 Cambiando estado:
+                 Cambiando estado:
                 - Curso: $cursoId
                 - Estudiante: $estudianteId
                 - Nuevo estado: $nuevoEstado
@@ -110,14 +103,14 @@ class UsuarioViewModel : ViewModel() {
                 )
 
                 if (response.isSuccessful) {
-                    Log.d("UsuarioViewModel", "✅ Estado cambiado exitosamente")
+                    Log.d("UsuarioViewModel", " Estado cambiado exitosamente")
                     // Recargar la lista de estudiantes después de cambiar el estado
                     val cursoTitulo = _uiState.value.cursoTitulo
                     cargarEstudiantesPorCurso(cursoId, cursoTitulo)
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("UsuarioViewModel", "❌ Error al cambiar estado: ${response.code()}")
-                    Log.e("UsuarioViewModel", "❌ Error body: $errorBody")
+                    Log.e("UsuarioViewModel", " Error al cambiar estado: ${response.code()}")
+                    Log.e("UsuarioViewModel", " Error body: $errorBody")
 
                     _uiState.update {
                         it.copy(
@@ -127,7 +120,7 @@ class UsuarioViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e("UsuarioViewModel", "❌ Exception al cambiar estado", e)
+                Log.e("UsuarioViewModel", " Exception al cambiar estado", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,

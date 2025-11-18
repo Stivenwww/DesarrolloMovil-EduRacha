@@ -72,9 +72,6 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * ✅ NUEVA FUNCIÓN: Carga estudiantes de todos los cursos del docente
-     */
     fun cargarEstudiantesTotales() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingEstudiantes = true) }
@@ -232,9 +229,6 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * ✅ ACTUALIZADO - Con soporte completo para programación
-     */
     fun actualizarCurso(curso: Curso) {
         val id = curso.id
 
@@ -293,9 +287,6 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * ✅ HELPER - Generar programación automática basada en fechas del curso
-     */
     fun generarProgramacionAutomatica(curso: Curso): ProgramacionCurso? {
         val temas = curso.temas ?: return null
         if (temas.isEmpty()) return null

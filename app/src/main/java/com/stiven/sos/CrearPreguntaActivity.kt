@@ -61,7 +61,7 @@ class CrearPreguntaActivity : ComponentActivity() {
                     preguntaViewModel = preguntaViewModel,
                     onBack = { finish() },
                     onSuccess = {
-                        Toast.makeText(this, "✅ Pregunta creada exitosamente", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, " Pregunta creada exitosamente", Toast.LENGTH_LONG).show()
                         finish()
                     }
                 )
@@ -332,7 +332,7 @@ fun CrearPreguntaScreen(
                                         if (!preguntaError &&
                                             opciones.any { it.esCorrecta } &&
                                             opciones.all { it.texto.isNotEmpty() } &&
-                                            explicacionCorrecta.isNotBlank()) { // ✅ VALIDAR EXPLICACIÓN
+                                            explicacionCorrecta.isNotBlank()) { // VALIDAR EXPLICACIÓN
                                             crearPreguntaManual(
                                                 context = context,
                                                 preguntaViewModel = preguntaViewModel,
@@ -345,11 +345,11 @@ fun CrearPreguntaScreen(
                                             )
                                         } else {
                                             val mensaje = when {
-                                                preguntaError -> "⚠️ El texto de la pregunta es obligatorio"
-                                                !opciones.any { it.esCorrecta } -> "⚠️ Debes marcar una respuesta correcta"
-                                                !opciones.all { it.texto.isNotEmpty() } -> "⚠️ Todas las opciones deben tener texto"
-                                                explicacionCorrecta.isBlank() -> "⚠️ La explicación de la respuesta es obligatoria"
-                                                else -> "⚠️ Completa todos los campos obligatorios"
+                                                preguntaError -> " El texto de la pregunta es obligatorio"
+                                                !opciones.any { it.esCorrecta } -> " Debes marcar una respuesta correcta"
+                                                !opciones.all { it.texto.isNotEmpty() } -> " Todas las opciones deben tener texto"
+                                                explicacionCorrecta.isBlank() -> " La explicación de la respuesta es obligatoria"
+                                                else -> " Completa todos los campos obligatorios"
                                             }
                                             Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
                                         }
@@ -1215,7 +1215,7 @@ fun LoadingOverlay(modo: ModoCreacion?) {
     }
 }
 
-// ✅ DIÁLOGO DE CURSOS CON SCROLL
+// DIÁLOGO DE CURSOS
 @Composable
 fun SelectorCursoDialogSimple(
     cursos: List<Curso>,
@@ -1232,8 +1232,8 @@ fun SelectorCursoDialogSimple(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 400.dp) // ✅ Altura máxima
-                        .verticalScroll(rememberScrollState()), // ✅ SCROLL AGREGADO
+                        .heightIn(max = 400.dp) // Altura máxima
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     cursos.forEach { curso ->
@@ -1270,7 +1270,7 @@ fun SelectorCursoDialogSimple(
     )
 }
 
-// ✅ DIÁLOGO DE TEMAS CON SCROLL
+// DIÁLOGO DE TEMAS CON SCROLL
 @Composable
 fun SelectorTemaDialogSimple(
     temas: List<Tema>,
@@ -1287,8 +1287,8 @@ fun SelectorTemaDialogSimple(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 400.dp) // ✅ Altura máxima
-                        .verticalScroll(rememberScrollState()), // ✅ SCROLL AGREGADO
+                        .heightIn(max = 400.dp) // Altura máxima
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     temas.forEach { tema ->
@@ -1330,12 +1330,12 @@ private fun crearPreguntaManual(
     explicacion: String
 ) {
     val cursoId = curso.id ?: run {
-        Toast.makeText(context, "❌ Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
         return
     }
 
     val temaId = tema.id.takeIf { it.isNotEmpty() } ?: run {
-        Toast.makeText(context, "❌ Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
         return
     }
 
@@ -1378,12 +1378,12 @@ private fun generarPreguntasIA(
     cantidad: Int
 ) {
     val cursoId = curso.id ?: run {
-        Toast.makeText(context, "❌ Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
         return
     }
 
     val temaId = tema.id.takeIf { it.isNotEmpty() } ?: run {
-        Toast.makeText(context, "❌ Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
         return
     }
 
@@ -1399,7 +1399,7 @@ private fun generarPreguntasIA(
         onSuccess = { response ->
             Toast.makeText(
                 context,
-                "✅ ${response.total} preguntas generadas correctamente",
+                " ${response.total} preguntas generadas correctamente",
                 Toast.LENGTH_LONG
             ).show()
         }

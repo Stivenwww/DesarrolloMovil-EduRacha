@@ -1,5 +1,3 @@
-// Archivo: app/src/main/java/com/stiven/desarrollomovil/VisualizarGruposActivity.kt
-
 package com.stiven.sos
 
 import android.content.Intent
@@ -214,7 +212,6 @@ fun VisualizarGruposHeader(
     }
 }
 
-//  La tarjeta ahora recibe un objeto Curso completo ---
 @Composable
 fun GrupoExpandibleCard(
     curso: Curso,
@@ -268,7 +265,6 @@ fun GrupoExpandibleCard(
                 }
             }
 
-            // --- CORRECCIÓN 3: La sección expandida ahora muestra la lista de Temas ---
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeIn(),
@@ -292,7 +288,6 @@ fun GrupoExpandibleCard(
     }
 }
 
-// --- NUEVO COMPOSABLE para mostrar un item de Tema ---
 @Composable
 fun TemaItem(tema: Tema) {
     Surface(
@@ -318,7 +313,6 @@ fun TemaItem(tema: Tema) {
 }
 
 
-// --- El resto de Composables (Loading, Error, Empty) están bien y se mantienen ---
 @Composable
 fun LoadingVisualizarGrupos() {
     Box(Modifier

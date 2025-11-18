@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Botón Primario (como el de Login)
+// Botón Primario
 @Composable
 fun EduRachaPrimaryButton(
     text: String,

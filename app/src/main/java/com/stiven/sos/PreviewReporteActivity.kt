@@ -112,7 +112,7 @@ fun PreviewReporteScreenPremium(
     LaunchedEffect(estadoDescarga) {
         when (val estado = estadoDescarga) {
             is ReporteEstado.Exito -> {
-                Toast.makeText(context, "✅ Reporte descargado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, " Reporte descargado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
                 when (tipoReporte) {
                     TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
                     TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
@@ -121,7 +121,7 @@ fun PreviewReporteScreenPremium(
                 }
             }
             is ReporteEstado.Error -> {
-                Toast.makeText(context, "❌ Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, " Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
                 when (tipoReporte) {
                     TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
                     TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
@@ -485,7 +485,7 @@ fun DataTableCardPremium(datos: DatosReporte) {
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(16.dp)
         ) {
             Text(
-                text = "📋 Datos del Reporte",
+                text = " Datos del Reporte",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = EduRachaColors.TextPrimary,

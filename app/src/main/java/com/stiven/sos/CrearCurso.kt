@@ -128,9 +128,6 @@ private fun obtenerNombreArchivo(context: Context, uri: Uri): String {
     } ?: uri.lastPathSegment ?: "archivo.pdf"
 }
 
-/**
- * ✅ NUEVA FUNCIÓN: Genera programación automática para el curso
- */
 fun generarProgramacionAutomatica(
     temas: List<TemaTemp>,
     fechaInicio: Long,
@@ -203,7 +200,7 @@ fun CrearCursoConTemasScreen(
     var duracionDias by remember { mutableStateOf("") }
     var estado by remember { mutableStateOf("activo") }
 
-    // ✅ NUEVOS ESTADOS: Fechas
+    // Estados de fechas
     var fechaInicio by remember { mutableStateOf(obtenerTimestampActual()) }
     var fechaFin by remember { mutableStateOf(0L) }
 
@@ -228,7 +225,7 @@ fun CrearCursoConTemasScreen(
 
     val fechaActual = remember { obtenerFechaActual() }
 
-    // ✅ Calcular fecha fin cuando cambia la duración
+    // Calcular fecha fin cuando cambia la duración
     LaunchedEffect(duracionDias) {
         val dias = duracionDias.toIntOrNull()
         if (dias != null && dias > 0) {
@@ -472,7 +469,7 @@ fun CrearCursoConTemasScreen(
                             )
                         }
 
-                        // ✅ MOSTRAR FECHAS CALCULADAS
+                        // MOSTRAR FECHAS CALCULADAS
                         if (duracionDias.isNotEmpty() && duracionDias.toIntOrNull() != null) {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
@@ -743,7 +740,7 @@ fun CrearCursoConTemasScreen(
                         if (docenteId.isNullOrBlank()) {
                             Toast.makeText(
                                 context,
-                                "❌ Error: No se pudo obtener tu ID. Cierra sesión y vuelve a iniciar.",
+                                " Error: No se pudo obtener tu ID. Cierra sesión y vuelve a iniciar.",
                                 Toast.LENGTH_LONG
                             ).show()
                             return@Button
@@ -831,7 +828,7 @@ fun CrearCursoConTemasScreen(
                 if (docenteId.isNullOrBlank()) {
                     Toast.makeText(
                         context,
-                        "❌ Error: ID de docente no encontrado. Cierra sesión y vuelve a iniciar.",
+                        " Error: ID de docente no encontrado. Cierra sesión y vuelve a iniciar.",
                         Toast.LENGTH_LONG
                     ).show()
                     return@AdvertenciaIADialog
@@ -2224,7 +2221,7 @@ private fun crearCursoDirectamente(
             withContext(Dispatchers.Main) {
                 onLoadingChange(false)
                 if (response.isSuccessful) {
-                    Toast.makeText(context, "✅ Curso creado exitosamente", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Curso creado exitosamente", Toast.LENGTH_LONG).show()
                     onCursoCreado()
                 } else {
                     Toast.makeText(context, "Error: ${response.code()}", Toast.LENGTH_LONG).show()
@@ -2312,7 +2309,7 @@ private fun crearCursoConIA(
 
                 withContext(Dispatchers.Main) {
                     onLoadingChange(false)
-                    Toast.makeText(context, "✅ Curso creado con explicaciones generadas", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Curso creado con explicaciones generadas", Toast.LENGTH_LONG).show()
                     onFinished()
                 }
             } else {
@@ -2354,7 +2351,7 @@ private suspend fun generarExplicacionesConReintentos(
 
             try {
                 val temaId = tema.id
-                Log.d("CREAR_CURSO", "🔄 Procesando: $temaId - ${tema.titulo} (intento $intentoActual)")
+                Log.d("CREAR_CURSO", "Procesando: $temaId - ${tema.titulo} (intento $intentoActual)")
 
                 withTimeout(120_000L) {
                     val request = GenerarExplicacionRequest(
@@ -2374,7 +2371,7 @@ private suspend fun generarExplicacionesConReintentos(
                         explicacionResponse.isSuccessful -> {
                             exitosas++
                             exito = true
-                            Log.d("CREAR_CURSO", "✅ Explicación generada para $temaId")
+                            Log.d("CREAR_CURSO", " Explicación generada para $temaId")
                         }
                         else -> {
                             if (intentoActual >= intentosMaximos) {
@@ -2389,7 +2386,7 @@ private suspend fun generarExplicacionesConReintentos(
             } catch (e: TimeoutCancellationException) {
                 if (intentoActual >= intentosMaximos) {
                     timeouts++
-                    Log.e("CREAR_CURSO", "⏱️ Timeout definitivo para ${tema.id}")
+                    Log.e("CREAR_CURSO", " Timeout definitivo para ${tema.id}")
                 } else {
                     delay(5000)
                 }
@@ -2397,7 +2394,7 @@ private suspend fun generarExplicacionesConReintentos(
                 if (intentoActual >= intentosMaximos) {
                     fallidas++
                 }
-                Log.e("CREAR_CURSO", "❌ Error para ${tema.id}: ${e.message}")
+                Log.e("CREAR_CURSO", " Error para ${tema.id}: ${e.message}")
             }
         }
 
@@ -2406,5 +2403,5 @@ private suspend fun generarExplicacionesConReintentos(
         }
     }
 
-    Log.d("CREAR_CURSO", "📊 Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
+    Log.d("CREAR_CURSO", " Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
 }

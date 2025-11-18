@@ -52,7 +52,7 @@ class ReportesActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (!isGranted) {
-            Toast.makeText(this, "⚠️ Permiso necesario para guardar reportes", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "️ Permiso necesario para guardar reportes", Toast.LENGTH_LONG).show()
         }
     }
 

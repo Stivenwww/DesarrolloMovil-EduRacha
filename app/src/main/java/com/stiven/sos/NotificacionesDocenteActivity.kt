@@ -57,10 +57,7 @@ class NotificacionesDocenteActivity : ComponentActivity() {
                                     "Solicitud de: ${notificacion.estudianteId ?: "Estudiante"}",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                                // TODO: Navegar a AsignarEstudiantesActivity cuando esté disponible
-                                // val intent = Intent(this, AsignarEstudiantesActivity::class.java)
-                                // intent.putExtra("CURSO_ID", notificacion.cursoId)
-                                // startActivity(intent)
+
                             }
                             "reporte" -> {
                                 Toast.makeText(
@@ -68,7 +65,7 @@ class NotificacionesDocenteActivity : ComponentActivity() {
                                     "Reporte disponible para descarga",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                                // TODO: Abrir reporte o navegar a pantalla de reportes
+
                             }
                             "curso_creado" -> {
                                 Toast.makeText(
@@ -76,10 +73,7 @@ class NotificacionesDocenteActivity : ComponentActivity() {
                                     "Ver detalles del curso: ${notificacion.cursoId}",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                                // TODO: Navegar a DetalleCursoActivity cuando esté disponible
-                                // val intent = Intent(this, DetalleCursoActivity::class.java)
-                                // intent.putExtra("CURSO_ID", notificacion.cursoId)
-                                // startActivity(intent)
+
                             }
                             else -> {
                                 Toast.makeText(

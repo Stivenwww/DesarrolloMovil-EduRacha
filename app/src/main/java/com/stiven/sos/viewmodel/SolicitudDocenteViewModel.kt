@@ -23,9 +23,6 @@ class SolicitudDocenteViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(SolicitudDocenteUiState())
     val uiState: StateFlow<SolicitudDocenteUiState> = _uiState.asStateFlow()
 
-    /**
-     * ✅ NUEVO: Cargar todas las solicitudes del docente
-     */
     fun cargarSolicitudesDocente(docenteId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -77,7 +74,7 @@ class SolicitudDocenteViewModel : ViewModel() {
     }
 
     /**
-     * Cargar solicitudes de un curso específico (mantener por compatibilidad)
+     * Cargar solicitudes de un curso específico
      */
     fun cargarSolicitudesPorCurso(cursoId: String) {
         viewModelScope.launch {

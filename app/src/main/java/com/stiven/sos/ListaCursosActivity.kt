@@ -329,7 +329,7 @@ fun ListaCursosScreen(
                     putExtra("CURSO_ID", cursoId)
                     putExtra("CURSO_TITULO", cursoParaDialogoTemas?.titulo ?: "")
                     putExtra("TEMA_ID", temaId)
-                    putExtra("TEMA_TITULO", temaTitulo) // ✅ AGREGADO
+                    putExtra("TEMA_TITULO", temaTitulo)
                 }
                 context.startActivity(intent)
                 cursoParaDialogoTemas = null

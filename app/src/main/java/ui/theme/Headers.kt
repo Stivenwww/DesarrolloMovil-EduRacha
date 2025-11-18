@@ -1,9 +1,3 @@
-// ============================================
-// 📁 ARCHIVO: Headers.kt
-// 📂 Ubicación: app/src/main/java/com/stiven/desarrollomovil/ui/theme/components/Headers.kt
-// 📱 Cabeceras, AppBars y Componentes de Navegación
-// ============================================
-
 package com.stiven.sos.ui.theme.components
 
 import androidx.compose.foundation.background
@@ -234,7 +228,7 @@ fun EduRachaGradientTopAppBar(
 }
 
 // ============================================
-// HEADER DE SALUDO (Como en tu imagen)
+// HEADER DE SALUDO
 // ============================================
 @Composable
 fun EduRachaGreetingHeader(

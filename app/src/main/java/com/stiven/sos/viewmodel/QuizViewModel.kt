@@ -26,7 +26,7 @@ import java.util.*
 /**
  * ESTADO DE LA UI DEL QUIZ
  *
- * Contiene todo el estado necesario para la interfaz del quiz incluyendo:
+ * Contiene el estado necesario para la interfaz del quiz incluyendo:
  * - Estado del quiz activo
  * - Progreso del usuario
  * - Vidas disponibles
@@ -153,13 +153,13 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 Log.d(TAG, "  - Quiz activo: ${quizActivo != null}")
                 Log.d(TAG, "  - Ya interrumpido: $yaInterrumpido")
 
-                // ⚠️ ACTUALIZAR ESTADO DE VIDAS PRIMERO
+                //  ACTUALIZAR ESTADO DE VIDAS PRIMERO
                 _uiState.value = _uiState.value.copy(
                     vidas = vidas,
                     sinVidas = vidas.vidasActuales <= 0
                 )
 
-                // ⚠️ DETECCIÓN INMEDIATA: Vidas llegaron a 0 DURANTE el quiz
+                // DETECCIÓN INMEDIATA: Vidas llegaron a 0 DURANTE el quiz
                 if (vidasNuevas == 0 &&
                     vidasAnteriores > 0 &&
                     quizActivo != null &&

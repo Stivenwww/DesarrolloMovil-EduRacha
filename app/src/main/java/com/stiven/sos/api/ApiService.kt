@@ -65,12 +65,6 @@ interface ApiService {
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
 
 
-    /**
-     * Obtener estudiantes asignados a un curso específico.
-     * Endpoint: GET /api/solicitudes/curso/{id}/estudiantes
-     */
-
-
     @GET("api/cursos/{id}/estudiantes")
     suspend fun obtenerEstudiantesPorCurso(
         @Path("id") cursoId: String

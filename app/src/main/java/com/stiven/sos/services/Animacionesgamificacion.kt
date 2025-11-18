@@ -32,20 +32,6 @@ import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.random.Random
 
-/**
- * ========================================
- * VENTANA DE RACHA EXITOSA - ESTILO DUOLINGO
- * ========================================
- * Diseño espectacular que celebra cuando el usuario
- * mantiene o incrementa su racha de días consecutivos
- *
- * PSICOLOGÍA DEL COLOR:
- * - Naranja (#FF9600): Energía, continuidad, compromiso
- * - Efectos de fuego: Intensidad y logro constante
- *
- * Esta ventana debe ser el momento más emocionante
- * para el usuario después de completar un quiz exitosamente
- */
 @Composable
 fun VentanaRachaDuolingo(
     diasRacha: Int,
@@ -649,18 +635,6 @@ fun VentanaRachaPerdida(
     }
 }
 
-/**
- * ========================================
- * DIÁLOGO SIN VIDAS - ESTILO DUOLINGO
- * ========================================
- * Se muestra cuando el usuario intenta hacer un quiz
- * sin tener vidas disponibles
- *
- * PSICOLOGÍA DEL COLOR:
- * - Rojo suave (#FF4B4B): Indica restricción sin alarmar
- * - Azul (#1CB0F6): Para información del sistema
- * - Verde (#58CC02): Para el tiempo de espera (positivo)
- */
 @Composable
 fun DialogoSinVidasMejorado(
     minutosParaProxima: Int,
