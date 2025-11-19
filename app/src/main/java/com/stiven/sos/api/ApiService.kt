@@ -4,48 +4,30 @@ import com.stiven.sos.models.*
 import retrofit2.Response
 import retrofit2.http.*
 import okhttp3.ResponseBody
-import retrofit2.http.Streaming
-/**
- * Interfaz que define todos los endpoints de la API de EduRacha usando Retrofit.
- */
+
 interface ApiService {
 
     // ============================================
-    // ENDPOINT DE REGISTRO
+    // ENDPOINTS EXISTENTES (SIN CAMBIOS)
     // ============================================
 
-    /**
-     * Registra un nuevo usuario (estudiante o docente) en el sistema.
-     */
     @POST("registro")
-    suspend fun registrarUsuario(
-        @Body registro: RegistroRequest
-    ): Response<Map<String, String>>
+    suspend fun registrarUsuario(@Body registro: RegistroRequest): Response<Map<String, String>>
 
     @PUT("api/usuarios/{uid}")
-
     suspend fun actualizarPerfil(
         @Path("uid") uid: String,
         @Body perfilUpdate: ActualizarPerfilRequest
     ): Response<Map<String, String>>
 
-
     @GET("api/usuarios/{uid}")
-    suspend fun obtenerUsuarioPorUid(
-        @Path("uid") uid: String
-    ): Response<Map<String, Any>>
+    suspend fun obtenerUsuarioPorUid(@Path("uid") uid: String): Response<Map<String, Any>>
 
     @PUT("usuario/me")
     suspend fun actualizarUsuario(
         @Header("Authorization") token: String,
         @Body request: Map<String, Any>
     ): Response<Map<String, Any>>
-
-
-// ============================================
-    // ENDPOINTS DE CURSOS
-    // ============================================
-
 
     @POST("api/cursos")
     suspend fun crearCurso(@Body curso: CursoRequest): Response<ApiResponse>
@@ -61,14 +43,12 @@ interface ApiService {
         @Path("id") id: String,
         @Body curso: CursoRequest
     ): Response<ApiResponse>
+
     @DELETE("api/cursos/{id}")
     suspend fun eliminarCurso(@Path("id") id: String): Response<ApiResponse>
 
-
     @GET("api/cursos/{id}/estudiantes")
-    suspend fun obtenerEstudiantesPorCurso(
-        @Path("id") cursoId: String
-    ): Response<List<UsuarioAsignado>>
+    suspend fun obtenerEstudiantesPorCurso(@Path("id") cursoId: String): Response<List<UsuarioAsignado>>
 
     @POST("api/solicitudes/curso/{cursoId}/estudiante/{estudianteId}/estado")
     suspend fun cambiarEstadoEstudiante(
@@ -77,11 +57,6 @@ interface ApiService {
         @Body estado: Map<String, String>
     ): Response<Map<String, String>>
 
-
-    // ============================================
-    // ENDPOINTS DE PREGUNTAS - CRUD
-    // ============================================
-
     @GET("api/preguntas")
     suspend fun obtenerPreguntas(
         @Query("cursoId") cursoId: String? = null,
@@ -89,14 +64,10 @@ interface ApiService {
     ): Response<List<Pregunta>>
 
     @GET("api/preguntas/{id}")
-    suspend fun obtenerPreguntaPorId(
-        @Path("id") id: String
-    ): Response<Pregunta>
+    suspend fun obtenerPreguntaPorId(@Path("id") id: String): Response<Pregunta>
 
     @POST("api/preguntas")
-    suspend fun crearPregunta(
-        @Body pregunta: Pregunta
-    ): Response<ApiResponse>
+    suspend fun crearPregunta(@Body pregunta: Pregunta): Response<ApiResponse>
 
     @PUT("api/preguntas/{id}")
     suspend fun actualizarPregunta(
@@ -105,9 +76,7 @@ interface ApiService {
     ): Response<ApiResponse>
 
     @DELETE("api/preguntas/{id}")
-    suspend fun eliminarPregunta(
-        @Path("id") id: String
-    ): Response<ApiResponse>
+    suspend fun eliminarPregunta(@Path("id") id: String): Response<ApiResponse>
 
     @PUT("api/preguntas/{id}/estado")
     suspend fun actualizarEstadoPregunta(
@@ -118,54 +87,21 @@ interface ApiService {
     @DELETE("api/preguntas/cache")
     suspend fun limpiarCachePreguntas(): Response<ApiResponse>
 
-    // ============================================
-    // ENDPOINTS DE IA - GENERACIÓN DE PREGUNTAS
-    // ============================================
-
     @POST("api/preguntas/ia/generar")
-    suspend fun generarPreguntasIA(
-        @Body request: GenerarPreguntasRequest
-    ): Response<PreguntasIAResponse>
+    suspend fun generarPreguntasIA(@Body request: GenerarPreguntasRequest): Response<PreguntasIAResponse>
 
-    // ============================================
-    // ENDPOINTS DE SOLICITUDES
-    // ============================================
-
-    /**
-     * Crear una solicitud para unirse a un curso
-     */
     @POST("api/solicitudes/unirse")
-    suspend fun crearSolicitudCurso(
-        @Body solicitud: SolicitudRequest
-    ): Response<ApiResponse>
+    suspend fun crearSolicitudCurso(@Body solicitud: SolicitudRequest): Response<ApiResponse>
 
-    /**
-     * Obtener solicitudes de un estudiante específico
-     */
     @GET("api/solicitudes/estudiante/{estudianteId}")
-    suspend fun obtenerSolicitudesEstudiante(
-        @Path("estudianteId") estudianteId: String
-    ): Response<List<SolicitudCurso>>
+    suspend fun obtenerSolicitudesEstudiante(@Path("estudianteId") estudianteId: String): Response<List<SolicitudCurso>>
 
-    /**
-     * Obtener solicitudes pendientes para un docente
-     */
     @GET("api/solicitudes/docente/{docenteId}")
-    suspend fun obtenerSolicitudesDocente(
-        @Path("docenteId") docenteId: String
-    ): Response<List<SolicitudCurso>>
+    suspend fun obtenerSolicitudesDocente(@Path("docenteId") docenteId: String): Response<List<SolicitudCurso>>
 
-    /**
-     * Obtener solicitudes por curso
-     */
     @GET("api/solicitudes/curso/{cursoId}")
-    suspend fun obtenerSolicitudesPorCurso(
-        @Path("cursoId") cursoId: String
-    ): Response<List<SolicitudCurso>>
+    suspend fun obtenerSolicitudesPorCurso(@Path("cursoId") cursoId: String): Response<List<SolicitudCurso>>
 
-    /**
-     *  Responder a una solicitud (aceptar o rechazar)
-     */
     @POST("api/solicitudes/responder/{solicitudId}")
     suspend fun responderSolicitud(
         @Path("solicitudId") solicitudId: String,
@@ -173,114 +109,64 @@ interface ApiService {
     ): Response<Unit>
 
     // ============================================
-    // ENDPOINTS DE QUIZ
+    // ENDPOINTS DE QUIZ EXISTENTES
     // ============================================
 
-    /**
-     * Iniciar un nuevo quiz
-     */
     @POST("quiz/iniciar")
-    suspend fun iniciarQuiz(
-        @Body request: IniciarQuizRequest
-    ): Response<IniciarQuizResponse>
+    suspend fun iniciarQuiz(@Body request: IniciarQuizRequest): Response<IniciarQuizResponse>
 
-    /**
-     * Finalizar un quiz y obtener resultados
-     */
     @POST("quiz/finalizar")
-    suspend fun finalizarQuiz(
-        @Body request: FinalizarQuizRequest
-    ): Response<FinalizarQuizResponse>
+    suspend fun finalizarQuiz(@Body request: FinalizarQuizRequest): Response<FinalizarQuizResponse>
 
-    /**
-     * Obtener revisión del quiz
-     */
     @GET("quiz/{quizId}/revision")
-    suspend fun obtenerRevisionQuiz(
-        @Path("quizId") quizId: String
-    ): Response<RevisionQuizResponse>
+    suspend fun obtenerRevisionQuiz(@Path("quizId") quizId: String): Response<RevisionQuizResponse>
 
-    /**
-     * Marcar explicación como vista
-     */
     @POST("quiz/explicacion-vista")
-    suspend fun marcarExplicacionVista(
-        @Body request: Map<String, String>
-    ): Response<Map<String, String>>
+    suspend fun marcarExplicacionVista(@Body request: Map<String, String>): Response<Map<String, String>>
 
-    /**
-     * Obtener retroalimentación de errores
-     */
     @GET("quiz/{quizId}/retroalimentacion")
-    suspend fun obtenerRetroalimentacion(
-        @Path("quizId") quizId: String
-    ): Response<RetroalimentacionFallosResponse>
+    suspend fun obtenerRetroalimentacion(@Path("quizId") quizId: String): Response<RetroalimentacionFallosResponse>
 
-    /**
-     * Obtener vidas actuales con regeneración automática
-     */
     @GET("quiz/vidas/{cursoId}")
-    suspend fun obtenerVidas(
-        @Path("cursoId") cursoId: String
-    ): Response<Map<String, Any>>
+    suspend fun obtenerVidas(@Path("cursoId") cursoId: String): Response<Map<String, Any>>
 
-    //  ENDPOINTS PARA MODOS DE QUIZ
-
-    /**
-     * Verificar modos disponibles para un tema
-     */
     @GET("api/quiz/modos-disponibles")
     suspend fun verificarModosDisponibles(
         @Query("cursoId") cursoId: String,
         @Query("temaId") temaId: String
     ): Response<ModoQuizDisponibleResponse>
 
-    /**
-     * Verificar disponibilidad del quiz final
-     */
     @GET("api/quiz/final/disponible")
-    suspend fun verificarQuizFinalDisponible(
-        @Query("cursoId") cursoId: String
-    ): Response<QuizFinalDisponibleResponse>
+    suspend fun verificarQuizFinalDisponible(@Query("cursoId") cursoId: String): Response<QuizFinalDisponibleResponse>
 
-    /**
-     * Iniciar quiz final
-     */
     @POST("api/quiz/final/iniciar")
-    suspend fun iniciarQuizFinal(
-        @Body request: Map<String, String>
-    ): Response<IniciarQuizResponse>
+    suspend fun iniciarQuizFinal(@Body request: Map<String, String>): Response<IniciarQuizResponse>
 
     // ============================================
-    // ENDPOINTS DE PROGRESO Y RACHA
+    // 🔥 NUEVO ENDPOINT: PROCESAR RESPUESTA INDIVIDUAL
     // ============================================
 
     /**
-     * Obtener racha del estudiante autenticado
+     * Procesa una respuesta individual en tiempo real
+     * Retorna si es correcta y cuántas vidas quedan
      */
+    @POST("quiz/procesar-respuesta")
+    suspend fun procesarRespuestaIndividual(
+        @Body request: ProcesarRespuestaRequest
+    ): Response<ProcesarRespuestaResponse>
+
+    // ============================================
+    // OTROS ENDPOINTS (SIN CAMBIOS)
+    // ============================================
+
     @GET("api/solicitudes/curso/{cursoId}/racha")
-    suspend fun obtenerRacha(
-        @Path("cursoId") cursoId: String
-    ): Response<RachaResponse>
+    suspend fun obtenerRacha(@Path("cursoId") cursoId: String): Response<RachaResponse>
 
-    /**
-     * Obtener experiencia del estudiante autenticado
-     */
     @GET("api/solicitudes/curso/{cursoId}/experiencia")
-    suspend fun obtenerExperiencia(
-        @Path("cursoId") cursoId: String
-    ): Response<Map<String, Any>>
+    suspend fun obtenerExperiencia(@Path("cursoId") cursoId: String): Response<Map<String, Any>>
 
-    /**
-     * Regenerar vidas
-     */
     @POST("api/solicitudes/curso/{cursoId}/regenerar-vidas")
-    suspend fun regenerarVidas(
-        @Path("cursoId") cursoId: String
-    ): Response<Map<String, Any>>
-    // ============================================
-// ENDPOINTS DE TEMAS
-// ============================================
+    suspend fun regenerarVidas(@Path("cursoId") cursoId: String): Response<Map<String, Any>>
 
     @GET("api/cursos/{id}/temas")
     suspend fun obtenerTemasPorCurso(
@@ -294,19 +180,11 @@ interface ApiService {
         @Path("temaId") temaId: String
     ): Response<Tema>
 
-    /**
-     * Obtener ranking completo de un curso con toda la información de Firebase
-     * Endpoint: GET /api/solicitudes/curso/{cursoId}/ranking
-     */
     @GET("api/cursos/{cursoId}/progreso/{estudianteId}")
     suspend fun obtenerRacha(
         @Path("cursoId") cursoId: String,
         @Path("estudianteId") estudianteId: String
     ): Response<Map<String, Any>>
-
-    // ============================================
-// ENDPOINTS DE EXPLICACIONES CON IA
-// ============================================
 
     @POST("api/cursos/{cursoId}/temas/{temaId}/generar-explicacion")
     suspend fun generarExplicacionIA(
@@ -315,7 +193,6 @@ interface ApiService {
         @Body request: GenerarExplicacionRequest
     ): Response<Map<String, Any>>
 
-    //  AGREGAR ESTE ENDPOINT
     @PUT("api/cursos/{cursoId}/temas/{temaId}/validar-explicacion")
     suspend fun actualizarEstadoExplicacion(
         @Path("cursoId") cursoId: String,
@@ -323,49 +200,20 @@ interface ApiService {
         @Body estado: Map<String, String>
     ): Response<Map<String, Any>>
 
-
-    // ============================================
-    // ENDPOINTS DE RANKING (COMPLETOS)
-    // ============================================
-
-    /**
-     * Obtener ranking por experiencia
-     */
     @GET("api/cursos/ranking/{cursoId}")
-    suspend fun obtenerRankingPorExperiencia(
-        @Path("cursoId") cursoId: String
-    ): Response<List<RankingEstudianteAPI>>
+    suspend fun obtenerRankingPorExperiencia(@Path("cursoId") cursoId: String): Response<List<RankingEstudianteAPI>>
 
-    /**
-     * Obtener ranking por racha
-     */
     @GET("api/cursos/ranking/{cursoId}/racha")
-    suspend fun obtenerRankingPorRacha(
-        @Path("cursoId") cursoId: String
-    ): Response<List<RankingEstudianteAPI>>
+    suspend fun obtenerRankingPorRacha(@Path("cursoId") cursoId: String): Response<List<RankingEstudianteAPI>>
 
-    /**
-     * Obtener ranking por vidas
-     */
     @GET("api/cursos/ranking/{cursoId}/vidas")
-    suspend fun obtenerRankingPorVidas(
-        @Path("cursoId") cursoId: String
-    ): Response<List<RankingEstudianteAPI>>
+    suspend fun obtenerRankingPorVidas(@Path("cursoId") cursoId: String): Response<List<RankingEstudianteAPI>>
 
-    /**
-     * Ranking general (todos los cursos)
-     */
     @GET("api/cursos/ranking/general")
     suspend fun obtenerRankingGeneral(): Response<List<RankingEstudianteAPI>>
 
     @GET("api/cursos/ranking/general/{filtro}")
-    suspend fun obtenerRankingGeneralConFiltro(
-        @Path("filtro") filtro: String
-    ): Response<List<RankingEstudianteAPI>>
-
-// ============================================
-    // ENDPOINTS DE REPORTES EXCEL - VISTA PREVIA (JSON)
-    // ============================================
+    suspend fun obtenerRankingGeneralConFiltro(@Path("filtro") filtro: String): Response<List<RankingEstudianteAPI>>
 
     @GET("reportes/debug/cursos/{cursoId}/diario/fecha/{fecha}")
     suspend fun obtenerVistaPreviewReporteDiario(
@@ -380,9 +228,7 @@ interface ApiService {
     ): Response<DatosReporteTemaResponse>
 
     @GET("reportes/debug/cursos/{cursoId}/general")
-    suspend fun obtenerVistaPreviewReporteGeneral(
-        @Path("cursoId") cursoId: String
-    ): Response<DatosReporteGeneralResponse>
+    suspend fun obtenerVistaPreviewReporteGeneral(@Path("cursoId") cursoId: String): Response<DatosReporteGeneralResponse>
 
     @GET("reportes/debug/cursos/{cursoId}/rango")
     suspend fun obtenerVistaPreviewReporteRango(
@@ -390,10 +236,6 @@ interface ApiService {
         @Query("desde") desde: String,
         @Query("hasta") hasta: String
     ): Response<DatosReporteRangoResponse>
-
-    // ============================================
-    // ENDPOINTS DE REPORTES EXCEL - DESCARGA
-    // ============================================
 
     @GET("reportes/cursos/{cursoId}/diario/fecha/{fecha}")
     @Streaming
@@ -411,9 +253,7 @@ interface ApiService {
 
     @GET("reportes/cursos/{cursoId}/general")
     @Streaming
-    suspend fun descargarReporteGeneral(
-        @Path("cursoId") cursoId: String
-    ): Response<ResponseBody>
+    suspend fun descargarReporteGeneral(@Path("cursoId") cursoId: String): Response<ResponseBody>
 
     @GET("reportes/cursos/{cursoId}/rango")
     @Streaming

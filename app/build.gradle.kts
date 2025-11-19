@@ -7,7 +7,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-
 android {
     namespace = "com.stiven.sos"
     compileSdk = 36
@@ -48,7 +47,6 @@ android {
 
     packaging {
         resources {
-            
             excludes += setOf(
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",
@@ -60,7 +58,6 @@ android {
 
 dependencies {
 
-
     // -------------------
     // CORE Y ANDROIDX
     // -------------------
@@ -70,13 +67,11 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
-    // Desugarización para usar APIs modernas de Java en versiones antiguas de Android
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // -------------------
     // JETPACK COMPOSE
     // -------------------
-    // BOM (Bill of Materials) para gestionar versiones de Compose de forma consistente
     implementation(platform("androidx.compose:compose-bom:2024.05.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -84,7 +79,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Componentes de Arquitectura para Compose
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
@@ -93,35 +87,30 @@ dependencies {
     // -------------------
     // FIREBASE
     // -------------------
-    // BOM de Firebase para gestionar versiones
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // Dependencias específicas de Firebase
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-database-ktx") //  Para Realtime Database
+    implementation("com.google.firebase:firebase-database-ktx")
 
     // -------------------
-    // GOOGLE SIGN-IN & CREDENTIALS
+    // SIGN-IN
     // -------------------
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
 
     // -------------------
-    // RED (NETWORKING)
+    // NETWORKING
     // -------------------
-    // Retrofit (Cliente HTTP)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-
     implementation("io.ktor:ktor-client-core:2.3.11")
     implementation("io.ktor:ktor-client-cio:2.3.11")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
-    // Serialización para Ktor
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
 
     // -------------------
@@ -129,17 +118,14 @@ dependencies {
     // -------------------
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0") //  Para integrar con Firebase/Play Services
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
 
     // -------------------
-    // OTRAS LIBRERÍAS
+    // OTRAS
     // -------------------
-    implementation("io.coil-kt:coil-compose:2.6.0") // Carga de imágenes en Compose
-    implementation("com.google.code.gson:gson:2.10.1") // Conversor JSON, útil para Retrofit y otros
-
-    // App Distribution (no es una dependencia de la app, sino del plugin de Gradle)
-
-    implementation("com.squareup.okhttp3:okhttp:4.12.0") // nueva si algo la borro stiven
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // -------------------
     // TESTING
@@ -147,7 +133,10 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    // ⭐ CORRECCIÓN IMPORTANTE (con versión)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.7")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.7")
 }
