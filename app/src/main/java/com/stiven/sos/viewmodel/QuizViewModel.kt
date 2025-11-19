@@ -23,15 +23,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 
-/**
- * ESTADO DE LA UI DEL QUIZ
- *
- * Contiene el estado necesario para la interfaz del quiz incluyendo:
- * - Estado del quiz activo
- * - Progreso del usuario
- * - Vidas disponibles
- * - Flags de validacion criticos
- */
+
 data class QuizUiState(
     val isLoading: Boolean = false,
     val quizActivo: IniciarQuizResponse? = null,
@@ -781,36 +773,121 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun responderPregunta(preguntaId: String, respuestaSeleccionada: Int) {
-        // VALIDACIÓN CRÍTICA: Verificar vidas ANTES de registrar respuesta
-        val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 0
+        viewModelScope.launch {
+            val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 0
 
-        if (vidasActuales == 0) {
-            Log.e(TAG, "========================================")
-            Log.e(TAG, "INTENTO DE RESPONDER SIN VIDAS - BLOQUEADO")
-            Log.e(TAG, "========================================")
+            if (vidasActuales == 0) {
+                Log.e(TAG, "========================================")
+                Log.e(TAG, "INTENTO DE RESPONDER SIN VIDAS - BLOQUEADO LOCALMENTE")
+                Log.e(TAG, "========================================")
 
-            // Activar interrupción INMEDIATA
-            _uiState.value = _uiState.value.copy(
-                mostrarDialogoSinVidas = true,
-                quizInterrumpidoPorVidas = true,
-                finalizando = false
+                _uiState.value = _uiState.value.copy(
+                    mostrarDialogoSinVidas = true,
+                    quizInterrumpidoPorVidas = true,
+                    finalizando = false
+                )
+                return@launch
+            }
+
+            val quizId = _uiState.value.quizActivo?.quizId ?: return@launch
+
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "PROCESANDO RESPUESTA EN TIEMPO REAL")
+            Log.d(TAG, "Quiz: $quizId")
+            Log.d(TAG, "Pregunta: $preguntaId")
+            Log.d(TAG, "Opción: $respuestaSeleccionada")
+            Log.d(TAG, "Vidas actuales (local): $vidasActuales")
+            Log.d(TAG, "========================================")
+
+            // Mostrar loading mientras procesa
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            // ENVIAR AL BACKEND INMEDIATAMENTE
+            val result = repository.procesarRespuestaIndividual(
+                quizId = quizId,
+                preguntaId = preguntaId,
+                respuestaSeleccionada = respuestaSeleccionada,
+                tiempoSeg = 0
             )
-            return
+
+            result.fold(
+                onSuccess = { respuesta ->
+                    Log.d(TAG, " Respuesta procesada por backend")
+                    Log.d(TAG, "   Es correcta: ${respuesta.esCorrecta}")
+                    Log.d(TAG, "   Vidas restantes: ${respuesta.vidasRestantes}")
+                    Log.d(TAG, "   Quiz activo: ${respuesta.quizActivo}")
+
+                    // CTUALIZAR VIDAS LOCALMENTE CON VALOR DEL BACKEND
+                    _uiState.value = _uiState.value.copy(
+                        vidas = VidasResponse(
+                            vidasActuales = respuesta.vidasRestantes,
+                            vidasMax = 5,
+                            minutosParaProximaVida = 0
+                        ),
+                        isLoading = false
+                    )
+
+                    //  SI BACKEND DICE VIDAS = 0 → INTERRUMPIR
+                    if (respuesta.vidasRestantes == 0 || !respuesta.quizActivo) {
+                        Log.e(TAG, "========================================")
+                        Log.e(TAG, "BACKEND REPORTÓ: VIDAS AGOTADAS")
+                        Log.e(TAG, "Activando interrupción inmediata")
+                        Log.e(TAG, "========================================")
+
+                        _uiState.value = _uiState.value.copy(
+                            mostrarDialogoSinVidas = true,
+                            quizInterrumpidoPorVidas = true,
+                            sinVidas = true
+                        )
+                        return@fold
+                    }
+
+                    val respuestaLocal = RespuestaUsuario(
+                        preguntaId = preguntaId,
+                        respuestaSeleccionada = respuestaSeleccionada,
+                        tiempoSeg = 0
+                    )
+
+                    // Avanzar a siguiente pregunta
+                    _uiState.value = _uiState.value.copy(
+                        respuestas = _uiState.value.respuestas + respuestaLocal,
+                        preguntaActual = _uiState.value.preguntaActual + 1,
+                        respuestaProcesada = true
+                    )
+
+                    Log.d(TAG, " Pregunta ${_uiState.value.preguntaActual} completada")
+                    Log.d(TAG, "   Total respondidas: ${respuesta.preguntasRespondidas}")
+                    Log.d(TAG, "   Correctas: ${respuesta.preguntasCorrectas}")
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "========================================")
+                    Log.e(TAG, " ERROR AL PROCESAR RESPUESTA")
+                    Log.e(TAG, "Mensaje: ${error.message}")
+                    Log.e(TAG, "========================================")
+
+                    //  DETECTAR SI ES ERROR DE VIDAS AGOTADAS
+                    if (error is QuizAbandonadoPorVidasException) {
+                        Log.e(TAG, " TIPO: Quiz abandonado por vidas")
+
+                        _uiState.value = _uiState.value.copy(
+                            mostrarDialogoSinVidas = true,
+                            quizInterrumpidoPorVidas = true,
+                            sinVidas = true,
+                            isLoading = false
+                        )
+                    } else {
+                        // Error genérico
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false
+                        )
+                        mostrarMensaje(
+                            error.message ?: "Error al procesar respuesta",
+                            TipoMensaje.ERROR
+                        )
+                    }
+                }
+            )
         }
-
-        Log.d(TAG, "Respuesta registrada: Pregunta=$preguntaId, Opcion=$respuestaSeleccionada")
-
-        val respuesta = RespuestaUsuario(
-            preguntaId = preguntaId,
-            respuestaSeleccionada = respuestaSeleccionada,
-            tiempoSeg = 0
-        )
-
-        _uiState.value = _uiState.value.copy(
-            respuestas = _uiState.value.respuestas + respuesta,
-            preguntaActual = _uiState.value.preguntaActual + 1,
-            respuestaProcesada = true
-        )
     }
     fun finalizarQuiz() {
         viewModelScope.launch {

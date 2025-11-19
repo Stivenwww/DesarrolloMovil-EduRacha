@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
 
     private const val BASE_URL = "http://10.0.2.2:8080/"
+    //private const val BASE_URL = "https://backend-eduracha-kotlin-35lqe.sevalla.app/"
 
     // Logger para ver las peticiones en Logcat
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -17,15 +18,16 @@ object ApiClient {
 
     private val authInterceptor = AuthInterceptor()
 
-    // Se configura el cliente OkHttp para usar ambos interceptores
+
     private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(authInterceptor)      //  PRIMERO: Agregar token
-        .addInterceptor(loggingInterceptor)   //  SEGUNDO: Loggear petición autenticada
+        .addInterceptor(loggingInterceptor)
+        .addInterceptor(authInterceptor)
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
+
 
     val instance: Retrofit by lazy {
         Retrofit.Builder()

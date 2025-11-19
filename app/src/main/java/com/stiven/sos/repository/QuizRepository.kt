@@ -793,6 +793,92 @@ class QuizRepository(private val application: Application) {
             Result.failure(e)
         }
     }
+
+
+    suspend fun procesarRespuestaIndividual(
+        quizId: String,
+        preguntaId: String,
+        respuestaSeleccionada: Int,
+        tiempoSeg: Int
+    ): Result<ProcesarRespuestaResponse> = withContext(NonCancellable) {
+        return@withContext try {
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "PROCESANDO RESPUESTA EN TIEMPO REAL")
+            Log.d(TAG, "Quiz: $quizId")
+            Log.d(TAG, "Pregunta: $preguntaId")
+            Log.d(TAG, "Respuesta seleccionada: $respuestaSeleccionada")
+            Log.d(TAG, "========================================")
+
+            val request = ProcesarRespuestaRequest(
+                quizId = quizId,
+                preguntaId = preguntaId,
+                respuestaSeleccionada = respuestaSeleccionada,
+                tiempoSeg = tiempoSeg
+            )
+
+            val response = ApiClient.apiService.procesarRespuestaIndividual(request)
+
+            when (response.code()) {
+                200 -> {
+                    response.body()?.let { resultado ->
+                        Log.d(TAG, " Respuesta procesada exitosamente")
+                        Log.d(TAG, "   Es correcta: ${resultado.esCorrecta}")
+                        Log.d(TAG, "   Vidas restantes: ${resultado.vidasRestantes}")
+                        Log.d(TAG, "   Quiz activo: ${resultado.quizActivo}")
+                        Log.d(TAG, "   Preguntas respondidas: ${resultado.preguntasRespondidas}")
+                        Log.d(TAG, "   Correctas: ${resultado.preguntasCorrectas}")
+
+                        Result.success(resultado)
+                    } ?: Result.failure(Exception("Respuesta vacía del servidor"))
+                }
+
+                400 -> {
+                    // Parsear el error del backend
+                    val errorBody = try {
+                        response.errorBody()?.string()
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    Log.e(TAG, "========================================")
+                    Log.e(TAG, " ERROR 400 AL PROCESAR RESPUESTA")
+                    Log.e(TAG, "Error body: $errorBody")
+                    Log.e(TAG, "========================================")
+
+                    // Detectar si es error de vidas agotadas
+                    if (errorBody?.contains("QUIZ_ABANDONADO_POR_VIDAS", ignoreCase = true) == true ||
+                        errorBody?.contains("sin vidas", ignoreCase = true) == true ||
+                        errorBody?.contains("quedado sin vidas", ignoreCase = true) == true) {
+
+                        Log.e(TAG, " TIPO DE ERROR: QUIZ ABANDONADO POR VIDAS")
+
+                        // Lanzar excepción custom
+                        Result.failure(
+                            QuizAbandonadoPorVidasException(
+                                errorBody ?: "Te has quedado sin vidas. El quiz se ha detenido."
+                            )
+                        )
+                    } else {
+                        Result.failure(Exception(errorBody ?: "Error al procesar respuesta"))
+                    }
+                }
+
+                401 -> {
+                    Log.e(TAG, "Token inválido")
+                    Result.failure(Exception("Sesión expirada. Por favor, vuelve a iniciar sesión."))
+                }
+
+                else -> {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e(TAG, "Error ${response.code()}: $errorBody")
+                    Result.failure(Exception(errorBody ?: "Error al procesar respuesta: ${response.code()}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception al procesar respuesta: ${e.message}", e)
+            Result.failure(Exception("Error de conexión. Verifica tu internet."))
+        }
+    }
 }
 
 data class ProgresoCurso(
