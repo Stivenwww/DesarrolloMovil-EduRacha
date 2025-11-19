@@ -1,6 +1,7 @@
 package com.stiven.sos
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,6 +72,9 @@ fun PreguntasRevisadasScreen(
     val preguntasUiState by preguntasViewModel.uiState.collectAsState()
     val cursoUiState by cursoViewModel.uiState.collectAsState()
 
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
     // Estados para filtros
     var selectedEstado by remember { mutableStateOf<String?>(null) }
     var selectedCurso by remember { mutableStateOf<String?>(null) }
@@ -94,15 +99,22 @@ fun PreguntasRevisadasScreen(
     val totalAprobadas = preguntasFiltradas.count { it.estado == EstadoPregunta.APROBADA }
     val totalRechazadas = preguntasFiltradas.count { it.estado == EstadoPregunta.RECHAZADA }
 
+    val titleSize = (screenWidth * 0.045f).coerceIn(16.dp, 20.dp).value.sp
+    val subtitleSize = (screenWidth * 0.03f).coerceIn(11.dp, 14.dp).value.sp
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Preguntas Revisadas")
+                        Text(
+                            "Preguntas Revisadas",
+                            fontSize = titleSize,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(
                             text = "$totalAprobadas aprobadas · $totalRechazadas rechazadas",
-                            fontSize = 12.sp,
+                            fontSize = subtitleSize,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                     }
@@ -112,7 +124,8 @@ fun PreguntasRevisadasScreen(
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "Volver",
-                            tint = Color.White
+                            tint = Color.White,
+                            modifier = Modifier.size((screenWidth * 0.06f).coerceIn(20.dp, 28.dp))
                         )
                     }
                 },
@@ -125,7 +138,8 @@ fun PreguntasRevisadasScreen(
                             Icon(
                                 Icons.Default.FilterList,
                                 contentDescription = "Filtros",
-                                tint = Color.White
+                                tint = Color.White,
+                                modifier = Modifier.size((screenWidth * 0.06f).coerceIn(20.dp, 28.dp))
                             )
                         }
                     }
@@ -145,11 +159,14 @@ fun PreguntasRevisadasScreen(
         ) {
             // Chips de filtro activo
             if (selectedEstado != null || selectedCurso != null) {
+                val chipPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+                val chipSpacing = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(chipPadding),
+                    horizontalArrangement = Arrangement.spacedBy(chipSpacing)
                 ) {
                     if (selectedEstado != null) {
                         val estado = selectedEstado!!
@@ -162,14 +179,15 @@ fun PreguntasRevisadasScreen(
                                         EstadoPregunta.APROBADA -> " Aprobadas"
                                         EstadoPregunta.RECHAZADA -> " Rechazadas"
                                         else -> estado
-                                    }
+                                    },
+                                    fontSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
                                 )
                             },
                             trailingIcon = {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Quitar filtro",
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size((screenWidth * 0.045f).coerceIn(16.dp, 20.dp))
                                 )
                             }
                         )
@@ -178,19 +196,31 @@ fun PreguntasRevisadasScreen(
                     if (selectedCurso != null) {
                         val cursoId = selectedCurso!!
                         val curso = cursoUiState.cursos.find { it.id == cursoId }
+
+                        // Usamos la misma lógica que en el diálogo para obtener el nombre
+                        val nombreMostrado = curso?.let {
+                            it.nombre.ifEmpty { it.titulo }
+                        } ?: "Curso"
+
                         FilterChip(
                             selected = true,
                             onClick = { selectedCurso = null },
-                            label = { Text(curso?.nombre ?: "Curso") },
+                            label = {
+                                Text(
+                                    nombreMostrado, // <-- SOLUCIÓN AQUÍ
+                                    fontSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
+                                )
+                            },
                             trailingIcon = {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Quitar filtro",
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size((screenWidth * 0.045f).coerceIn(16.dp, 20.dp))
                                 )
                             }
                         )
                     }
+
                 }
             }
 
@@ -201,7 +231,10 @@ fun PreguntasRevisadasScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = EduRachaColors.Primary)
+                        CircularProgressIndicator(
+                            color = EduRachaColors.Primary,
+                            modifier = Modifier.size((screenWidth * 0.12f).coerceIn(40.dp, 60.dp))
+                        )
                     }
                 }
 
@@ -216,10 +249,13 @@ fun PreguntasRevisadasScreen(
                 }
 
                 else -> {
+                    val listPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+                    val listSpacing = (screenWidth * 0.03f).coerceIn(10.dp, 16.dp)
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(listPadding),
+                        verticalArrangement = Arrangement.spacedBy(listSpacing)
                     ) {
                         items(preguntasFiltradas) { pregunta ->
                             PreguntaCard(
@@ -265,16 +301,32 @@ fun PreguntaCard(
     cursoNombre: String?,
     onClick: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val cardPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+    val cardRadius = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+    val badgeRadius = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+
+    val badgeTextSize = (screenWidth * 0.03f).coerceIn(11.dp, 13.dp).value.sp
+    val cursoTextSize = (screenWidth * 0.028f).coerceIn(10.dp, 12.dp).value.sp
+    val preguntaTextSize = (screenWidth * 0.038f).coerceIn(14.dp, 17.dp).value.sp
+    val infoTextSize = (screenWidth * 0.028f).coerceIn(10.dp, 12.dp).value.sp
+    val notasTextSize = (screenWidth * 0.03f).coerceIn(11.dp, 13.dp).value.sp
+
+    val iconSize = (screenWidth * 0.04f).coerceIn(14.dp, 18.dp)
+    val spacing = (screenWidth * 0.03f).coerceIn(10.dp, 16.dp)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(cardRadius),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(cardPadding)
         ) {
             // Header con estado y curso
             Row(
@@ -283,16 +335,19 @@ fun PreguntaCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(badgeRadius),
                     color = if (pregunta.estado == EstadoPregunta.APROBADA)
                         EduRachaColors.Success.copy(alpha = 0.15f)
                     else
                         EduRachaColors.Error.copy(alpha = 0.15f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(
+                            horizontal = (screenWidth * 0.025f).coerceIn(8.dp, 12.dp),
+                            vertical = (screenWidth * 0.015f).coerceIn(4.dp, 8.dp)
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.01f).coerceIn(3.dp, 6.dp))
                     ) {
                         Icon(
                             imageVector = if (pregunta.estado == EstadoPregunta.APROBADA)
@@ -300,7 +355,7 @@ fun PreguntaCard(
                             else
                                 Icons.Default.Cancel,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(iconSize),
                             tint = if (pregunta.estado == EstadoPregunta.APROBADA)
                                 EduRachaColors.Success
                             else
@@ -311,7 +366,7 @@ fun PreguntaCard(
                                 "Aprobada"
                             else
                                 "Rechazada",
-                            fontSize = 12.sp,
+                            fontSize = badgeTextSize,
                             fontWeight = FontWeight.Bold,
                             color = if (pregunta.estado == EstadoPregunta.APROBADA)
                                 EduRachaColors.Success
@@ -323,14 +378,17 @@ fun PreguntaCard(
 
                 if (cursoNombre != null) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(badgeRadius),
                         color = EduRachaColors.Primary.copy(alpha = 0.1f)
                     ) {
                         Text(
                             text = cursoNombre,
-                            fontSize = 11.sp,
+                            fontSize = cursoTextSize,
                             color = EduRachaColors.Primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(
+                                horizontal = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp),
+                                vertical = (screenWidth * 0.01f).coerceIn(3.dp, 6.dp)
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -338,28 +396,31 @@ fun PreguntaCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(spacing))
 
             // Texto de la pregunta
             Text(
                 text = pregunta.texto,
-                fontSize = 15.sp,
+                fontSize = preguntaTextSize,
                 fontWeight = FontWeight.Medium,
                 color = EduRachaColors.TextPrimary,
                 maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = preguntaTextSize * 1.3f
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(spacing))
 
             // Info adicional
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.04f).coerceIn(12.dp, 20.dp))
             ) {
                 PreguntaInfoChip(
                     icon = Icons.Outlined.ListAlt,
-                    text = "${pregunta.opciones.size} opciones"
+                    text = "${pregunta.opciones.size} opciones",
+                    textSize = infoTextSize,
+                    iconSize = (screenWidth * 0.035f).coerceIn(12.dp, 16.dp)
                 )
 
                 if (pregunta.dificultad != null) {
@@ -367,7 +428,9 @@ fun PreguntaCard(
                         icon = Icons.Outlined.Speed,
                         text = pregunta.dificultad.replaceFirstChar {
                             if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                        }
+                        },
+                        textSize = infoTextSize,
+                        iconSize = (screenWidth * 0.035f).coerceIn(12.dp, 16.dp)
                     )
                 }
 
@@ -376,35 +439,38 @@ fun PreguntaCard(
                         icon = if (pregunta.fuente == "ia") Icons.Outlined.AutoAwesome else Icons.Outlined.Person,
                         text = if (pregunta.fuente == "ia") "IA" else pregunta.fuente.replaceFirstChar {
                             if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                        }
+                        },
+                        textSize = infoTextSize,
+                        iconSize = (screenWidth * 0.035f).coerceIn(12.dp, 16.dp)
                     )
                 }
             }
 
             // Notas de revisión (si existen)
             if (pregunta.notasRevision != null && pregunta.notasRevision.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(spacing * 0.67f))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(badgeRadius),
                     color = EduRachaColors.Warning.copy(alpha = 0.1f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
+                        horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                     ) {
                         Icon(
                             Icons.Outlined.Notes,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(iconSize),
                             tint = EduRachaColors.Warning
                         )
                         Text(
                             text = pregunta.notasRevision,
-                            fontSize = 12.sp,
+                            fontSize = notasTextSize,
                             color = EduRachaColors.TextSecondary,
                             maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = notasTextSize * 1.3f
                         )
                     }
                 }
@@ -414,7 +480,12 @@ fun PreguntaCard(
 }
 
 @Composable
-fun PreguntaInfoChip(icon: ImageVector, text: String) {
+fun PreguntaInfoChip(
+    icon: ImageVector,
+    text: String,
+    textSize: androidx.compose.ui.unit.TextUnit,
+    iconSize: androidx.compose.ui.unit.Dp
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -422,12 +493,12 @@ fun PreguntaInfoChip(icon: ImageVector, text: String) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(iconSize),
             tint = EduRachaColors.TextSecondary
         )
         Text(
             text = text,
-            fontSize = 11.sp,
+            fontSize = textSize,
             color = EduRachaColors.TextSecondary
         )
     }
@@ -435,50 +506,65 @@ fun PreguntaInfoChip(icon: ImageVector, text: String) {
 
 @Composable
 fun EmptyState(hasFilters: Boolean, onClearFilters: () -> Unit) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val iconSize = (screenWidth * 0.2f).coerceIn(60.dp, 100.dp)
+    val titleSize = (screenWidth * 0.045f).coerceIn(16.dp, 22.dp).value.sp
+    val bodySize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+    val buttonTextSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+
+    val padding = (screenWidth * 0.08f).coerceIn(24.dp, 40.dp)
+    val spacing = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(padding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = if (hasFilters) Icons.Outlined.FilterAltOff else Icons.Outlined.QuestionAnswer,
             contentDescription = null,
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier.size(iconSize),
             tint = EduRachaColors.TextSecondary.copy(alpha = 0.4f)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(spacing))
         Text(
             text = if (hasFilters)
                 "No hay preguntas con estos filtros"
             else
                 "No hay preguntas revisadas",
-            fontSize = 18.sp,
+            fontSize = titleSize,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.TextSecondary
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(spacing * 0.5f))
         Text(
             text = if (hasFilters)
                 "Intenta cambiar los filtros"
             else
                 "Las preguntas aprobadas o rechazadas aparecerán aquí",
-            fontSize = 14.sp,
+            fontSize = bodySize,
             color = EduRachaColors.TextSecondary.copy(alpha = 0.7f)
         )
 
         if (hasFilters) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(spacing))
             Button(
                 onClick = onClearFilters,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = EduRachaColors.Primary
                 )
             ) {
-                Icon(Icons.Default.Clear, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Limpiar filtros")
+                Icon(
+                    Icons.Default.Clear,
+                    contentDescription = null,
+                    modifier = Modifier.size((screenWidth * 0.05f).coerceIn(18.dp, 24.dp))
+                )
+                Spacer(modifier = Modifier.width((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)))
+                Text("Limpiar filtros", fontSize = buttonTextSize)
             }
         }
     }
@@ -493,23 +579,49 @@ fun FilterDialog(
     onCursoSelected: (String?) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val titleSize = (screenWidth * 0.05f).coerceIn(18.dp, 24.dp).value.sp
+    val sectionTitleSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+    val chipTextSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
+    val buttonTextSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+
+    val dialogPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+    val spacing = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+
+    // Log para debug
+    Log.d("FilterDialog", "Cursos recibidos: ${cursos.size}")
+    cursos.forEach { curso ->
+        Log.d("FilterDialog", "Curso: id=${curso.id}, nombre=${curso.nombre}, titulo=${curso.titulo}")
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Filtrar preguntas") },
+        title = {
+            Text(
+                "Filtrar preguntas",
+                fontSize = titleSize,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(dialogPadding)
             ) {
                 // Filtro por estado
                 Text(
                     text = "Estado",
-                    fontSize = 14.sp,
+                    fontSize = sectionTitleSize,
                     fontWeight = FontWeight.Bold,
                     color = EduRachaColors.TextPrimary
                 )
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
                     FilterChip(
                         selected = selectedEstado == EstadoPregunta.APROBADA,
@@ -519,7 +631,13 @@ fun FilterDialog(
                                 else EstadoPregunta.APROBADA
                             )
                         },
-                        label = { Text(" Aprobadas") }
+                        label = {
+                            Text(
+                                " Aprobadas",
+                                fontSize = chipTextSize
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     FilterChip(
@@ -530,7 +648,13 @@ fun FilterDialog(
                                 else EstadoPregunta.RECHAZADA
                             )
                         },
-                        label = { Text(" Rechazadas") }
+                        label = {
+                            Text(
+                                " Rechazadas",
+                                fontSize = chipTextSize
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
@@ -538,36 +662,103 @@ fun FilterDialog(
                 if (cursos.isNotEmpty()) {
                     HorizontalDivider()
                     Text(
-                        text = "Curso",
-                        fontSize = 14.sp,
+                        text = "Curso (${cursos.size} disponibles)",
+                        fontSize = sectionTitleSize,
                         fontWeight = FontWeight.Bold,
                         color = EduRachaColors.TextPrimary
                     )
 
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(spacing)
                     ) {
-                        cursos.take(5).forEach { curso ->
-                            FilterChip(
-                                selected = selectedCurso == curso.id,
-                                onClick = {
-                                    onCursoSelected(
-                                        if (selectedCurso == curso.id) null else curso.id
+                        cursos.forEach { curso ->
+                            val nombreCurso = curso.nombre.ifEmpty { curso.titulo }
+                            Log.d("FilterDialog", "Renderizando curso: $nombreCurso")
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onCursoSelected(
+                                            if (selectedCurso == curso.id) null else curso.id
+                                        )
+                                    },
+                                shape = RoundedCornerShape((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
+                                color = if (selectedCurso == curso.id)
+                                    EduRachaColors.Primary.copy(alpha = 0.2f)
+                                else
+                                    Color.White,
+                                border = BorderStroke(
+                                    width = if (selectedCurso == curso.id) 2.dp else 1.dp,
+                                    color = if (selectedCurso == curso.id)
+                                        EduRachaColors.Primary
+                                    else
+                                        Color.Gray.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = (screenWidth * 0.04f).coerceIn(12.dp, 18.dp),
+                                            vertical = (screenWidth * 0.03f).coerceIn(10.dp, 14.dp)
+                                        ),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = nombreCurso,
+                                        fontSize = chipTextSize,
+                                        color = if (selectedCurso == curso.id)
+                                            EduRachaColors.Primary
+                                        else
+                                            Color.Black,
+                                        fontWeight = if (selectedCurso == curso.id)
+                                            FontWeight.Bold
+                                        else
+                                            FontWeight.Medium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
                                     )
-                                },
-                                label = { Text(curso.nombre) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                                    if (selectedCurso == curso.id) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = "Seleccionado",
+                                            tint = EduRachaColors.Primary,
+                                            modifier = Modifier.size((screenWidth * 0.05f).coerceIn(18.dp, 22.dp))
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
+                } else {
+                    HorizontalDivider()
+                    Text(
+                        text = "Curso",
+                        fontSize = sectionTitleSize,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary
+                    )
+                    Text(
+                        text = "No hay cursos disponibles",
+                        fontSize = chipTextSize,
+                        color = EduRachaColors.TextSecondary,
+                        modifier = Modifier.padding(vertical = spacing)
+                    )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(
+                    "Cerrar",
+                    fontSize = buttonTextSize
+                )
             }
-        }
+        },
+        shape = RoundedCornerShape((screenWidth * 0.05f).coerceIn(16.dp, 24.dp))
     )
 }
 
@@ -577,6 +768,23 @@ fun PreguntaDetailDialog(
     cursoNombre: String?,
     onDismiss: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val titleSize = (screenWidth * 0.045f).coerceIn(16.dp, 20.dp).value.sp
+    val badgeTextSize = (screenWidth * 0.03f).coerceIn(11.dp, 13.dp).value.sp
+    val sectionTitleSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
+    val bodyTextSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+    val smallTextSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
+    val buttonTextSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
+
+    val iconSize = (screenWidth * 0.04f).coerceIn(14.dp, 18.dp)
+    val mediumIconSize = (screenWidth * 0.05f).coerceIn(18.dp, 24.dp)
+    val smallIconSize = (screenWidth * 0.035f).coerceIn(12.dp, 16.dp)
+
+    val radius = (screenWidth * 0.03f).coerceIn(10.dp, 14.dp)
+    val spacing = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -585,9 +793,14 @@ fun PreguntaDetailDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Detalle de la pregunta")
+                Text(
+                    "Detalle de la pregunta",
+                    fontSize = titleSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(radius * 0.67f),
                     color = if (pregunta.estado == EstadoPregunta.APROBADA)
                         EduRachaColors.Success.copy(alpha = 0.15f)
                     else
@@ -595,13 +808,16 @@ fun PreguntaDetailDialog(
                 ) {
                     Text(
                         text = if (pregunta.estado == EstadoPregunta.APROBADA) " Aprobada" else " Rechazada",
-                        fontSize = 12.sp,
+                        fontSize = badgeTextSize,
                         fontWeight = FontWeight.Bold,
                         color = if (pregunta.estado == EstadoPregunta.APROBADA)
                             EduRachaColors.Success
                         else
                             EduRachaColors.Error,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(
+                            horizontal = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp),
+                            vertical = (screenWidth * 0.01f).coerceIn(3.dp, 6.dp)
+                        )
                     )
                 }
             }
@@ -611,31 +827,32 @@ fun PreguntaDetailDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(spacing)
             ) {
                 // Información del curso
                 if (cursoNombre != null) {
                     DetailSection(
                         title = "Curso",
+                        titleSize = sectionTitleSize,
                         content = {
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(radius),
                                 color = EduRachaColors.Primary.copy(alpha = 0.1f)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
+                                    horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         Icons.Outlined.MenuBook,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(iconSize),
                                         tint = EduRachaColors.Primary
                                     )
                                     Text(
                                         text = cursoNombre,
-                                        fontSize = 14.sp,
+                                        fontSize = bodyTextSize,
                                         color = EduRachaColors.Primary,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -648,12 +865,13 @@ fun PreguntaDetailDialog(
                 // Texto de la pregunta
                 DetailSection(
                     title = "Pregunta",
+                    titleSize = sectionTitleSize,
                     content = {
                         Text(
                             text = pregunta.texto,
-                            fontSize = 15.sp,
+                            fontSize = bodyTextSize,
                             color = EduRachaColors.TextPrimary,
-                            lineHeight = 22.sp
+                            lineHeight = bodyTextSize * 1.4f
                         )
                     }
                 )
@@ -661,13 +879,14 @@ fun PreguntaDetailDialog(
                 // Opciones
                 DetailSection(
                     title = "Opciones de respuesta",
+                    titleSize = sectionTitleSize,
                     content = {
                         Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                         ) {
                             pregunta.opciones.forEach { opcion ->
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(radius),
                                     color = if (opcion.esCorrecta)
                                         EduRachaColors.Success.copy(alpha = 0.1f)
                                     else
@@ -678,13 +897,13 @@ fun PreguntaDetailDialog(
                                     else null
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.padding((screenWidth * 0.03f).coerceIn(10.dp, 16.dp)),
+                                        horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.03f).coerceIn(10.dp, 16.dp)),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(24.dp)
+                                                .size((screenWidth * 0.06f).coerceIn(20.dp, 28.dp))
                                                 .clip(CircleShape)
                                                 .background(
                                                     if (opcion.esCorrecta)
@@ -698,13 +917,13 @@ fun PreguntaDetailDialog(
                                                 Icon(
                                                     Icons.Default.Check,
                                                     contentDescription = "Correcta",
-                                                    modifier = Modifier.size(16.dp),
+                                                    modifier = Modifier.size((screenWidth * 0.04f).coerceIn(14.dp, 18.dp)),
                                                     tint = Color.White
                                                 )
                                             } else {
                                                 Text(
                                                     text = "${opcion.id + 1}",
-                                                    fontSize = 12.sp,
+                                                    fontSize = smallTextSize,
                                                     color = Color.White,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -712,7 +931,7 @@ fun PreguntaDetailDialog(
                                         }
                                         Text(
                                             text = opcion.texto,
-                                            fontSize = 14.sp,
+                                            fontSize = bodyTextSize,
                                             color = if (opcion.esCorrecta)
                                                 EduRachaColors.Success
                                             else
@@ -720,7 +939,9 @@ fun PreguntaDetailDialog(
                                             fontWeight = if (opcion.esCorrecta)
                                                 FontWeight.Bold
                                             else
-                                                FontWeight.Normal
+                                                FontWeight.Normal,
+                                            lineHeight = bodyTextSize * 1.3f,
+                                            modifier = Modifier.weight(1f)
                                         )
                                     }
                                 }
@@ -733,26 +954,28 @@ fun PreguntaDetailDialog(
                 if (pregunta.explicacionCorrecta != null && pregunta.explicacionCorrecta.isNotEmpty()) {
                     DetailSection(
                         title = "Explicación de la respuesta",
+                        titleSize = sectionTitleSize,
                         content = {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(radius),
                                 color = EduRachaColors.Primary.copy(alpha = 0.08f)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding((screenWidth * 0.03f).coerceIn(10.dp, 16.dp)),
+                                    horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                                 ) {
                                     Icon(
                                         Icons.Outlined.Lightbulb,
                                         contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(mediumIconSize),
                                         tint = EduRachaColors.Primary
                                     )
                                     Text(
                                         text = pregunta.explicacionCorrecta,
-                                        fontSize = 13.sp,
+                                        fontSize = smallTextSize,
                                         color = EduRachaColors.TextPrimary,
-                                        lineHeight = 20.sp
+                                        lineHeight = smallTextSize * 1.5f,
+                                        modifier = Modifier.weight(1f)
                                     )
                                 }
                             }
@@ -763,7 +986,7 @@ fun PreguntaDetailDialog(
                 // Metadatos
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                 ) {
                     if (pregunta.dificultad != null) {
                         MetadataChip(
@@ -771,7 +994,12 @@ fun PreguntaDetailDialog(
                             label = "Dificultad",
                             value = pregunta.dificultad.replaceFirstChar {
                                 if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                            }
+                            },
+                            labelSize = (screenWidth * 0.025f).coerceIn(9.dp, 11.dp).value.sp,
+                            valueSize = smallTextSize,
+                            iconSize = iconSize,
+                            padding = (screenWidth * 0.025f).coerceIn(8.dp, 12.dp),
+                            radius = radius
                         )
                     }
 
@@ -783,7 +1011,12 @@ fun PreguntaDetailDialog(
                             "docente" -> "Docente"
                             "importada" -> "Importada"
                             else -> pregunta.fuente
-                        }
+                        },
+                        labelSize = (screenWidth * 0.025f).coerceIn(9.dp, 11.dp).value.sp,
+                        valueSize = smallTextSize,
+                        iconSize = iconSize,
+                        padding = (screenWidth * 0.025f).coerceIn(8.dp, 12.dp),
+                        radius = radius
                     )
                 }
 
@@ -791,26 +1024,28 @@ fun PreguntaDetailDialog(
                 if (pregunta.notasRevision != null && pregunta.notasRevision.isNotEmpty()) {
                     DetailSection(
                         title = "Notas de revisión",
+                        titleSize = sectionTitleSize,
                         content = {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(radius),
                                 color = EduRachaColors.Warning.copy(alpha = 0.1f)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding((screenWidth * 0.03f).coerceIn(10.dp, 16.dp)),
+                                    horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                                 ) {
                                     Icon(
                                         Icons.Outlined.Notes,
                                         contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(mediumIconSize),
                                         tint = EduRachaColors.Warning
                                     )
                                     Text(
                                         text = pregunta.notasRevision,
-                                        fontSize = 13.sp,
+                                        fontSize = smallTextSize,
                                         color = EduRachaColors.TextPrimary,
-                                        lineHeight = 20.sp
+                                        lineHeight = smallTextSize * 1.5f,
+                                        modifier = Modifier.weight(1f)
                                     )
                                 }
                             }
@@ -822,20 +1057,24 @@ fun PreguntaDetailDialog(
                 if (pregunta.revisadoPor != null || pregunta.fechaRevision != null) {
                     HorizontalDivider()
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                     ) {
                         if (pregunta.revisadoPor != null) {
                             DetailInfoRow(
                                 icon = Icons.Outlined.Person,
                                 label = "Revisado por",
-                                value = pregunta.revisadoPor
+                                value = pregunta.revisadoPor,
+                                iconSize = smallIconSize,
+                                textSize = smallTextSize
                             )
                         }
                         if (pregunta.fechaRevision != null) {
                             DetailInfoRow(
                                 icon = Icons.Outlined.CalendarMonth,
                                 label = "Fecha de revisión",
-                                value = pregunta.fechaRevision
+                                value = pregunta.fechaRevision,
+                                iconSize = smallIconSize,
+                                textSize = smallTextSize
                             )
                         }
                     }
@@ -844,41 +1083,45 @@ fun PreguntaDetailDialog(
                 // Información de creación
                 HorizontalDivider()
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp))
                 ) {
                     if (pregunta.creadoPor.isNotEmpty()) {
                         DetailInfoRow(
                             icon = Icons.Outlined.PersonAdd,
                             label = "Creado por",
-                            value = pregunta.creadoPor
+                            value = pregunta.creadoPor,
+                            iconSize = smallIconSize,
+                            textSize = smallTextSize
                         )
                     }
                     if (pregunta.fechaCreacion.isNotEmpty()) {
                         DetailInfoRow(
                             icon = Icons.Outlined.Schedule,
                             label = "Fecha de creación",
-                            value = pregunta.fechaCreacion
+                            value = pregunta.fechaCreacion,
+                            iconSize = smallIconSize,
+                            textSize = smallTextSize
                         )
                     }
                     if (pregunta.modificada) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(radius),
                             color = EduRachaColors.Warning.copy(alpha = 0.1f)
                         ) {
                             Row(
-                                modifier = Modifier.padding(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
+                                horizontalArrangement = Arrangement.spacedBy((screenWidth * 0.02f).coerceIn(6.dp, 10.dp)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     Icons.Outlined.Edit,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(iconSize),
                                     tint = EduRachaColors.Warning
                                 )
                                 Text(
                                     text = "Esta pregunta ha sido modificada",
-                                    fontSize = 12.sp,
+                                    fontSize = smallTextSize,
                                     color = EduRachaColors.Warning,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -895,23 +1138,32 @@ fun PreguntaDetailDialog(
                     containerColor = EduRachaColors.Primary
                 )
             ) {
-                Text("Cerrar")
+                Text(
+                    "Cerrar",
+                    fontSize = buttonTextSize
+                )
             }
-        }
+        },
+        shape = RoundedCornerShape((screenWidth * 0.05f).coerceIn(16.dp, 24.dp))
     )
 }
 
 @Composable
 fun DetailSection(
     title: String,
+    titleSize: androidx.compose.ui.unit.TextUnit,
     content: @Composable () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val spacing = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(spacing)
     ) {
         Text(
             text = title,
-            fontSize = 13.sp,
+            fontSize = titleSize,
             fontWeight = FontWeight.Bold,
             color = EduRachaColors.Primary
         )
@@ -923,32 +1175,37 @@ fun DetailSection(
 fun RowScope.MetadataChip(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    labelSize: androidx.compose.ui.unit.TextUnit,
+    valueSize: androidx.compose.ui.unit.TextUnit,
+    iconSize: androidx.compose.ui.unit.Dp,
+    padding: androidx.compose.ui.unit.Dp,
+    radius: androidx.compose.ui.unit.Dp
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(radius),
         color = EduRachaColors.Primary.copy(alpha = 0.08f),
         modifier = Modifier.weight(1f)
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(iconSize),
                 tint = EduRachaColors.Primary
             )
             Text(
                 text = label,
-                fontSize = 10.sp,
+                fontSize = labelSize,
                 color = EduRachaColors.TextSecondary
             )
             Text(
                 text = value,
-                fontSize = 12.sp,
+                fontSize = valueSize,
                 fontWeight = FontWeight.Bold,
                 color = EduRachaColors.TextPrimary
             )
@@ -960,27 +1217,33 @@ fun RowScope.MetadataChip(
 fun DetailInfoRow(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    iconSize: androidx.compose.ui.unit.Dp,
+    textSize: androidx.compose.ui.unit.TextUnit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val spacing = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(iconSize),
             tint = EduRachaColors.TextSecondary
         )
         Text(
             text = "$label:",
-            fontSize = 12.sp,
+            fontSize = textSize,
             color = EduRachaColors.TextSecondary,
             fontWeight = FontWeight.Medium
         )
         Text(
             text = value,
-            fontSize = 12.sp,
+            fontSize = textSize,
             color = EduRachaColors.TextPrimary
         )
     }

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,6 +83,32 @@ fun WelcomeScreen(
     onStudentClick: () -> Unit,
     onTeacherClick: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val screenWidth = configuration.screenWidthDp.dp
+
+    // Calcular tamaños responsivos basados en el ancho de la pantalla
+    val horizontalPadding = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
+    val logoSize = (screenWidth * 0.28f).coerceIn(90.dp, 180.dp)
+    val glowMaxSize = logoSize * 1.1f
+    val glowMidSize = logoSize * 0.89f
+    val glowInnerSize = logoSize * 0.72f
+    val logoCircleSize = logoSize * 0.61f
+
+    // Tamaños de fuente responsivos
+    val institutionalFontSize = (screenWidth.value * 0.035f).coerceIn(12f, 16f).sp
+    val titleFontSize = (screenWidth.value * 0.10f).coerceIn(28f, 44f).sp
+    val subtitleFontSize = (screenWidth.value * 0.038f).coerceIn(13f, 16f).sp
+    val descriptionFontSize = (screenWidth.value * 0.035f).coerceIn(12f, 15f).sp
+    val buttonFontSize = (screenWidth.value * 0.040f).coerceIn(14f, 17f).sp
+    val footerFontSize = (screenWidth.value * 0.032f).coerceIn(11f, 14f).sp
+
+    // Espaciados responsivos
+    val topPadding = (screenHeight * 0.05f).coerceIn(40.dp, 80.dp)
+    val logoTopSpacing = (screenHeight * 0.05f).coerceIn(20.dp, 50.dp)
+    val afterLogoSpacing = (screenHeight * 0.04f).coerceIn(20.dp, 40.dp)
+    val buttonHeight = (screenHeight * 0.075f).coerceIn(56.dp, 68.dp)
+
     val infiniteTransition = rememberInfiniteTransition(label = "glow")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
@@ -112,9 +139,8 @@ fun WelcomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
+                .height((screenHeight * 0.08f).coerceIn(60.dp, 90.dp))
         ) {
-            // Barra de color institucional sutil en la parte superior
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,21 +153,21 @@ fun WelcomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(top = 80.dp),
+                .padding(horizontal = horizontalPadding)
+                .padding(top = topPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(logoTopSpacing))
 
-            // Logo circular con brillo animado más prominente y visible
+            // Logo circular con brillo animado
             Box(
-                modifier = Modifier.size(180.dp),
+                modifier = Modifier.size(logoSize),
                 contentAlignment = Alignment.Center
             ) {
-                // Círculo de brillo externo animado muy grande
+                // Círculo de brillo externo animado
                 Box(
                     modifier = Modifier
-                        .size(200.dp * glowScale)
+                        .size(glowMaxSize * glowScale)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -159,7 +185,7 @@ fun WelcomeScreen(
                 // Círculo de brillo medio animado
                 Box(
                     modifier = Modifier
-                        .size(160.dp * glowScale)
+                        .size(glowMidSize * glowScale)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -176,7 +202,7 @@ fun WelcomeScreen(
                 // Círculo de brillo interno
                 Box(
                     modifier = Modifier
-                        .size(130.dp)
+                        .size(glowInnerSize)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -192,7 +218,7 @@ fun WelcomeScreen(
                 // Logo circular
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
+                        .size(logoCircleSize)
                         .shadow(12.dp, CircleShape)
                         .clip(CircleShape)
                         .background(AppColors.White)
@@ -208,12 +234,12 @@ fun WelcomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(afterLogoSpacing))
 
             // Título institucional minimalista
             Text(
                 text = "UNIAUTÓNOMA",
-                fontSize = 14.sp,
+                fontSize = institutionalFontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.PrimaryBlue,
                 letterSpacing = 1.sp
@@ -224,7 +250,7 @@ fun WelcomeScreen(
             // Título principal
             Text(
                 text = "EduRacha",
-                fontSize = 40.sp,
+                fontSize = titleFontSize,
                 fontWeight = FontWeight.Bold,
                 color = AppColors.DarkBlue
             )
@@ -234,24 +260,24 @@ fun WelcomeScreen(
             // Subtítulo
             Text(
                 text = "Sistema de Gestión Académica",
-                fontSize = 15.sp,
+                fontSize = subtitleFontSize,
                 fontWeight = FontWeight.Normal,
                 color = AppColors.TextGray
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height((screenHeight * 0.025f).coerceIn(12.dp, 24.dp)))
 
             // Descripción simple
             Text(
                 text = "Desbloquea el conocimiento al convertir el estudio en un juego, elevando tus habilidades.",
-                fontSize = 14.sp,
+                fontSize = descriptionFontSize,
                 color = AppColors.TextLightGray,
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                lineHeight = descriptionFontSize * 1.4f,
+                modifier = Modifier.padding(horizontal = (screenWidth * 0.04f).coerceIn(8.dp, 20.dp))
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height((screenHeight * 0.045f).coerceIn(24.dp, 56.dp)))
 
             // Botón Estudiante
             InstitutionalButton(
@@ -259,10 +285,13 @@ fun WelcomeScreen(
                 icon = Icons.Default.School,
                 backgroundColor = AppColors.PrimaryBlue,
                 accentColor = AppColors.AccentGold,
-                onClick = onStudentClick
+                onClick = onStudentClick,
+                buttonHeight = buttonHeight,
+                fontSize = buttonFontSize,
+                iconSize = (buttonFontSize.value * 1.5f).sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height((screenHeight * 0.02f).coerceIn(12.dp, 20.dp)))
 
             // Botón Docente
             InstitutionalButton(
@@ -272,15 +301,18 @@ fun WelcomeScreen(
                 textColor = AppColors.White,
                 accentColor = AppColors.AccentGold,
                 onClick = onTeacherClick,
-                outlined = false
+                outlined = false,
+                buttonHeight = buttonHeight,
+                fontSize = buttonFontSize,
+                iconSize = (buttonFontSize.value * 1.5f).sp
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height((screenHeight * 0.035f).coerceIn(20.dp, 40.dp)))
 
             // Información adicional minimalista
             Text(
                 text = "Construyamos tu conocimiento, en equipo.",
-                fontSize = 13.sp,
+                fontSize = footerFontSize,
                 color = AppColors.TextLightGray,
                 textAlign = TextAlign.Center
             )
@@ -324,11 +356,14 @@ fun InstitutionalButton(
     textColor: Color = AppColors.White,
     accentColor: Color,
     onClick: () -> Unit,
-    outlined: Boolean = false
+    outlined: Boolean = false,
+    buttonHeight: androidx.compose.ui.unit.Dp = 64.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 16.sp,
+    iconSize: androidx.compose.ui.unit.TextUnit = 24.sp
 ) {
     val buttonModifier = Modifier
         .fillMaxWidth()
-        .height(64.dp)
+        .height(buttonHeight)
 
     if (outlined) {
         OutlinedButton(
@@ -350,12 +385,12 @@ fun InstitutionalButton(
                     imageVector = icon,
                     contentDescription = null,
                     tint = textColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(iconSize.value.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = text,
-                    fontSize = 16.sp,
+                    fontSize = fontSize,
                     fontWeight = FontWeight.SemiBold,
                     color = textColor
                 )
@@ -380,12 +415,12 @@ fun InstitutionalButton(
                     imageVector = icon,
                     contentDescription = null,
                     tint = textColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(iconSize.value.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = text,
-                    fontSize = 16.sp,
+                    fontSize = fontSize,
                     fontWeight = FontWeight.SemiBold,
                     color = textColor
                 )
