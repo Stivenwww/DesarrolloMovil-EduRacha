@@ -41,20 +41,12 @@ import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.RankingViewModel
 import com.stiven.sos.viewmodel.TipoRanking
-import kotlin.math.min
 
-/**
- * Activity principal que muestra el sistema de ranking de estudiantes
- * Mantiene toda la lógica original pero con interfaz completamente rediseñada
- */
 class RankingEstudianteActivity : ComponentActivity() {
-
     private val viewModel: RankingViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Carga los cursos en los que el estudiante está inscrito
         viewModel.cargarCursosInscritos()
 
         setContent {
@@ -68,10 +60,6 @@ class RankingEstudianteActivity : ComponentActivity() {
     }
 }
 
-/**
- * Pantalla principal del ranking
- * Muestra lista de cursos o detalle de ranking según selección
- */
 @Composable
 fun RankingEstudianteScreen(
     viewModel: RankingViewModel,
@@ -84,8 +72,8 @@ fun RankingEstudianteScreen(
     Scaffold(
         containerColor = EduRachaColors.Background,
         topBar = {
-            RankingTopBar(
-                titulo = if (cursoSeleccionado == null) "Ranking General" else cursoSeleccionado!!.titulo,
+            TopBarEstudiante(
+                titulo = if (cursoSeleccionado == null) "Mis Rankings" else cursoSeleccionado!!.titulo,
                 mostrarBotonVolver = cursoSeleccionado != null,
                 onNavigateBack = {
                     if (cursoSeleccionado != null) {
@@ -101,19 +89,14 @@ fun RankingEstudianteScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(EduRachaColors.Background)
         ) {
             when {
-                uiState.isLoading -> {
-                    LoadingRanking()
-                }
-                uiState.error != null -> {
-                    ErrorRanking(mensaje = uiState.error!!) {
-                        viewModel.cargarCursosInscritos()
-                    }
+                uiState.isLoading -> LoadingRankingEstudiante()
+                uiState.error != null -> ErrorRankingEstudiante(mensaje = uiState.error!!) {
+                    viewModel.cargarCursosInscritos()
                 }
                 cursoSeleccionado == null -> {
-                    ListaCursosInscritos(
+                    ListaCursosEstudiante(
                         cursos = uiState.cursosInscritos,
                         onCursoClick = { curso ->
                             cursoSeleccionado = curso
@@ -122,8 +105,9 @@ fun RankingEstudianteScreen(
                     )
                 }
                 else -> {
-                    RankingDetalleCurso(
+                    RankingDetalleCursoEstudiante(
                         cursoId = cursoSeleccionado!!.id!!,
+                        cursoTitulo = cursoSeleccionado!!.titulo,
                         tipoRankingSeleccionado = tipoRankingSeleccionado,
                         rankingEstudiantes = uiState.rankingEstudiantes,
                         usuarioActualId = viewModel.obtenerUsuarioActualId(),
@@ -138,110 +122,80 @@ fun RankingEstudianteScreen(
     }
 }
 
-/**
- * Barra superior con gradiente institucional
- * Muestra título y botón de navegación
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RankingTopBar(
+fun TopBarEstudiante(
     titulo: String,
     mostrarBotonVolver: Boolean,
     onNavigateBack: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(4.dp),
-        color = Color.Transparent
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            EduRachaColors.Primary,
-                            EduRachaColors.PrimaryLight,
-                            EduRachaColors.Accent
-                        )
-                    )
+    Column(
+        modifier = Modifier.background(
+            Brush.verticalGradient(
+                colors = listOf(
+                    EduRachaColors.Primary,
+                    EduRachaColors.PrimaryLight
                 )
-                .padding(horizontal = 20.dp, vertical = 24.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Botón de retroceso con diseño circular
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = Color.White.copy(alpha = 0.25f),
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Título con icono de trofeo
+            )
+        )
+    ) {
+        TopAppBar(
+            title = {
                 Row(
-                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.EmojiEvents,
+                        Icons.Default.EmojiEvents,
                         contentDescription = null,
                         tint = EduRachaColors.Secondary,
                         modifier = Modifier.size(28.dp)
                     )
-                    Text(
-                        text = titulo,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    Column {
+                        Text(
+                            titulo,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    }
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        "Volver",
+                        tint = Color.White
                     )
                 }
-            }
-        }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent
+            )
+        )
     }
 }
 
-/**
- * Lista de cursos disponibles para ver ranking
- * Diseño de tarjetas con gradientes y espaciado adecuado
- */
 @Composable
-fun ListaCursosInscritos(
+fun ListaCursosEstudiante(
     cursos: List<Curso>,
     onCursoClick: (Curso) -> Unit
 ) {
     if (cursos.isEmpty()) {
-        EmptyCursosState()
+        EmptyCursosEstudiante()
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Encabezado informativo con contador de cursos
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -249,7 +203,7 @@ fun ListaCursosInscritos(
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        EduRachaColors.Primary.copy(alpha = 0.08f),
+                                        EduRachaColors.Primary.copy(alpha = 0.12f),
                                         EduRachaColors.Accent.copy(alpha = 0.08f)
                                     )
                                 )
@@ -263,25 +217,22 @@ fun ListaCursosInscritos(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Mis Cursos Inscritos",
-                                    fontSize = 24.sp,
+                                    "Mis Cursos",
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EduRachaColors.Primary
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "Selecciona un curso para ver tu posición en el ranking",
+                                    "Selecciona un curso para ver el ranking",
                                     fontSize = 14.sp,
                                     color = EduRachaColors.TextSecondary,
-                                    fontWeight = FontWeight.Medium,
                                     lineHeight = 20.sp
                                 )
                             }
-
-                            // Badge con número de cursos
                             Box(
                                 modifier = Modifier
-                                    .size(68.dp)
+                                    .size(64.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
@@ -290,23 +241,19 @@ fun ListaCursosInscritos(
                                                 EduRachaColors.SecondaryLight
                                             )
                                         )
-                                    )
-                                    .border(3.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
-                                        text = cursos.size.toString(),
-                                        fontSize = 26.sp,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        cursos.size.toString(),
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
                                         color = Color.White
                                     )
                                     Text(
-                                        text = "cursos",
+                                        "cursos",
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Medium,
                                         color = Color.White.copy(alpha = 0.9f)
                                     )
                                 }
@@ -316,29 +263,18 @@ fun ListaCursosInscritos(
                 }
             }
 
-            // Lista de cursos con diseño de tarjetas mejorado
             items(cursos) { curso ->
-                CursoRankingCard(
-                    curso = curso,
-                    onClick = { onCursoClick(curso) }
-                )
+                CursoCardEstudiante(curso = curso, onClick = { onCursoClick(curso) })
             }
         }
     }
 }
 
-/**
- * Tarjeta individual de curso con animación de press
- * Diseño limpio con iconografía y código de curso visible
- */
 @Composable
-fun CursoRankingCard(
-    curso: Curso,
-    onClick: () -> Unit
-) {
+fun CursoCardEstudiante(curso: Curso, onClick: () -> Unit) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
+        targetValue = if (isPressed) 0.98f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "scale"
     )
@@ -351,22 +287,21 @@ fun CursoRankingCard(
                 isPressed = true
                 onClick()
             },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Icono del curso con gradiente
             Box(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -378,141 +313,137 @@ fun CursoRankingCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.MenuBook,
-                    contentDescription = null,
+                    Icons.Default.MenuBook,
+                    null,
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
-            // Información del curso
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = curso.titulo,
-                    fontSize = 17.sp,
+                    curso.titulo,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary,
-                    lineHeight = 22.sp
+                    color = EduRachaColors.TextPrimary
                 )
-
-                // Código del curso con estilo badge
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = EduRachaColors.AccentContainer
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tag,
-                            contentDescription = null,
-                            tint = EduRachaColors.Accent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = curso.codigo,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = EduRachaColors.Accent
-                        )
-                    }
+                    Text(
+                        curso.codigo,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = EduRachaColors.Accent,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
                 }
             }
 
-            // Flecha indicadora
             Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
+                Icons.Default.ChevronRight,
+                null,
                 tint = EduRachaColors.Accent,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
     }
 }
 
-/**
- * Vista principal del detalle de ranking con podio y lista
- * Organización vertical clara con secciones bien definidas
- */
 @Composable
-fun RankingDetalleCurso(
+fun RankingDetalleCursoEstudiante(
     cursoId: String,
+    cursoTitulo: String,
     tipoRankingSeleccionado: TipoRanking,
     rankingEstudiantes: List<RankingEstudiante>,
     usuarioActualId: String?,
     onTipoRankingChange: (TipoRanking) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EduRachaColors.Background)
     ) {
-        // Selector de tipo de ranking
-        item {
-            RankingTypeSelector(
-                tipoSeleccionado = tipoRankingSeleccionado,
-                onTipoChange = onTipoRankingChange
-            )
-        }
+        // Tabs de tipo de ranking
+        TabsRankingEstudiante(
+            tipoSeleccionado = tipoRankingSeleccionado,
+            onTipoChange = onTipoRankingChange
+        )
 
-        // Estadísticas generales con gráfica
-        item {
-            RankingEstadisticasConGrafica(
-                rankingEstudiantes = rankingEstudiantes,
-                tipoRanking = tipoRankingSeleccionado
-            )
-        }
-
-        if (rankingEstudiantes.isEmpty()) {
-            item {
-                EmptyRankingState()
-            }
-        } else {
-            // Podio para los 3 primeros lugares
-            if (rankingEstudiantes.size >= 3) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            if (rankingEstudiantes.isEmpty()) {
+                item { EmptyRankingEstudiante() }
+            } else {
+                // Estadísticas generales
                 item {
-                    PodioTopTres(
-                        estudiantes = rankingEstudiantes.take(3),
-                        tipoRanking = tipoRankingSeleccionado,
-                        usuarioActualId = usuarioActualId
-                    )
-                }
-            }
-
-            // Lista del resto de estudiantes (después del top 3)
-            if (rankingEstudiantes.size > 3) {
-                item {
-                    Text(
-                        text = "Resto del Ranking",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+                    EstadisticasGeneralesEstudiante(
+                        ranking = rankingEstudiantes,
+                        tipoRanking = tipoRankingSeleccionado
                     )
                 }
 
-                itemsIndexed(rankingEstudiantes.drop(3)) { index, estudiante ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(
-                            initialOffsetY = { it / 2 },
-                            animationSpec = tween(
-                                durationMillis = 300,
-                                delayMillis = index * 40
+                // Podio (Top 3)
+                if (rankingEstudiantes.size >= 3) {
+                    item {
+                        PodioEstudiante(
+                            ranking = rankingEstudiantes.take(3),
+                            usuarioActualId = usuarioActualId,
+                            tipoRanking = tipoRankingSeleccionado
+                        )
+                    }
+                }
+
+                // Separador
+                if (rankingEstudiantes.size > 3) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Divider(
+                                modifier = Modifier.weight(1f),
+                                color = EduRachaColors.Border
                             )
-                        )
-                    ) {
-                        RankingEstudianteItem(
-                            posicion = index + 4,
-                            estudiante = estudiante,
-                            tipoRanking = tipoRankingSeleccionado,
-                            esUsuarioActual = estudiante.id == usuarioActualId
-                        )
+                            Text(
+                                "Otros Participantes",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = EduRachaColors.TextSecondary
+                            )
+                            Divider(
+                                modifier = Modifier.weight(1f),
+                                color = EduRachaColors.Border
+                            )
+                        }
+                    }
+
+                    // Resto del ranking
+                    itemsIndexed(rankingEstudiantes.drop(3)) { index, estudiante ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(
+                                initialOffsetY = { it / 2 },
+                                animationSpec = tween(300, delayMillis = index * 50)
+                            )
+                        ) {
+                            RankingItemEstudiante(
+                                posicion = index + 4,
+                                estudiante = estudiante,
+                                esUsuarioActual = estudiante.id == usuarioActualId,
+                                tipoRanking = tipoRankingSeleccionado
+                            )
+                        }
                     }
                 }
             }
@@ -520,294 +451,117 @@ fun RankingDetalleCurso(
     }
 }
 
-/**
- * Estadísticas con gráfica de barras horizontal
- * Muestra distribución de rendimiento en el curso
- */
 @Composable
-fun RankingEstadisticasConGrafica(
-    rankingEstudiantes: List<RankingEstudiante>,
-    tipoRanking: TipoRanking
+fun TabsRankingEstudiante(
+    tipoSeleccionado: TipoRanking,
+    onTipoChange: (TipoRanking) -> Unit
 ) {
-    if (rankingEstudiantes.isEmpty()) return
-
-    val total = rankingEstudiantes.size
-    val valores = when (tipoRanking) {
-        TipoRanking.EXPERIENCIA -> rankingEstudiantes.map { it.experiencia }
-        TipoRanking.RACHA -> rankingEstudiantes.map { it.diasConsecutivos }
-        TipoRanking.VIDAS -> rankingEstudiantes.map { it.vidas }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TabChipEstudiante(
+                label = "Experiencia",
+                icon = Icons.Default.Star,
+                isSelected = tipoSeleccionado == TipoRanking.EXPERIENCIA,
+                onClick = { onTipoChange(TipoRanking.EXPERIENCIA) },
+                color = EduRachaColors.Secondary,
+                modifier = Modifier.weight(1f)
+            )
+            TabChipEstudiante(
+                label = "Racha",
+                icon = Icons.Default.Whatshot,
+                isSelected = tipoSeleccionado == TipoRanking.RACHA,
+                onClick = { onTipoChange(TipoRanking.RACHA) },
+                color = EduRachaColors.StreakFire,
+                modifier = Modifier.weight(1f)
+            )
+            TabChipEstudiante(
+                label = "Vidas",
+                icon = Icons.Default.Favorite,
+                isSelected = tipoSeleccionado == TipoRanking.VIDAS,
+                onClick = { onTipoChange(TipoRanking.VIDAS) },
+                color = EduRachaColors.Error,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
+}
 
-    val promedio = valores.average().toInt()
-    val maximo = valores.maxOrNull() ?: 0
-    val minimo = valores.minOrNull() ?: 0
+@Composable
+fun TabChipEstudiante(
+    label: String,
+    icon: ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = modifier.scale(scale),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) color else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSelected) 3.dp else 1.dp
+        ),
+        border = if (!isSelected) BorderStroke(1.5.dp, color.copy(alpha = 0.3f)) else null,
+        onClick = onClick
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Título de sección
-            Text(
-                text = "Estadísticas del Curso",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.Primary
-            )
-
-            // Métricas principales en fila
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                MetricaCompacta(
-                    label = "Total",
-                    valor = total.toString(),
-                    icon = Icons.Default.People,
-                    color = EduRachaColors.Primary
-                )
-
-                VerticalDivider(
-                    modifier = Modifier.height(60.dp),
-                    thickness = 1.dp,
-                    color = EduRachaColors.Border
-                )
-
-                MetricaCompacta(
-                    label = "Promedio",
-                    valor = promedio.toString(),
-                    icon = Icons.Default.BarChart,
-                    color = EduRachaColors.Secondary
-                )
-
-                VerticalDivider(
-                    modifier = Modifier.height(60.dp),
-                    thickness = 1.dp,
-                    color = EduRachaColors.Border
-                )
-
-                MetricaCompacta(
-                    label = "Máximo",
-                    valor = maximo.toString(),
-                    icon = Icons.Default.TrendingUp,
-                    color = EduRachaColors.Success
-                )
-            }
-
-            Divider(color = EduRachaColors.Border.copy(alpha = 0.5f))
-
-            // Gráfica de distribución
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Distribución de Rendimiento",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = EduRachaColors.TextSecondary
-                )
-
-                GraficaDistribucion(
-                    valores = valores,
-                    tipoRanking = tipoRanking
-                )
-            }
-        }
-    }
-}
-
-/**
- * Métrica compacta para estadísticas
- * Diseño vertical con icono, valor y etiqueta
- */
-@Composable
-fun MetricaCompacta(
-    label: String,
-    valor: String,
-    icon: ImageVector,
-    color: Color
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
+                .padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
+                icon,
+                null,
+                tint = if (isSelected) Color.White else color,
                 modifier = Modifier.size(22.dp)
             )
+            Text(
+                label,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isSelected) Color.White else color
+            )
         }
-        Text(
-            text = valor,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = EduRachaColors.TextSecondary
-        )
     }
 }
 
-/**
- * Gráfica de distribución de valores
- * Muestra rangos de rendimiento (bajo, medio, alto) con barras horizontales
- */
 @Composable
-fun GraficaDistribucion(
-    valores: List<Int>,
+fun EstadisticasGeneralesEstudiante(
+    ranking: List<RankingEstudiante>,
     tipoRanking: TipoRanking
 ) {
-    if (valores.isEmpty()) return
-
+    val total = ranking.size
+    val valores = when (tipoRanking) {
+        TipoRanking.EXPERIENCIA -> ranking.map { it.experiencia }
+        TipoRanking.RACHA -> ranking.map { it.diasConsecutivos }
+        TipoRanking.VIDAS -> ranking.map { it.vidas }
+    }
+    val promedio = valores.average()
     val maximo = valores.maxOrNull() ?: 0
-    if (maximo == 0) return
 
-    // Dividir en 3 rangos: bajo (0-33%), medio (33-66%), alto (66-100%)
-    val rangoAlto = valores.count { it >= maximo * 0.66 }
-    val rangoMedio = valores.count { it in (maximo * 0.33).toInt() until (maximo * 0.66).toInt() }
-    val rangoBajo = valores.count { it < maximo * 0.33 }
-    val total = valores.size
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Barra para rendimiento alto
-        BarraDistribucion(
-            label = "Alto Rendimiento",
-            cantidad = rangoAlto,
-            total = total,
-            color = EduRachaColors.Success
-        )
-
-        // Barra para rendimiento medio
-        BarraDistribucion(
-            label = "Rendimiento Medio",
-            cantidad = rangoMedio,
-            total = total,
-            color = EduRachaColors.Secondary
-        )
-
-        // Barra para rendimiento bajo
-        BarraDistribucion(
-            label = "Necesita Mejorar",
-            cantidad = rangoBajo,
-            total = total,
-            color = EduRachaColors.Warning
-        )
-    }
-}
-
-/**
- * Barra individual de distribución
- * Muestra porcentaje y cantidad con barra de progreso animada
- */
-@Composable
-fun BarraDistribucion(
-    label: String,
-    cantidad: Int,
-    total: Int,
-    color: Color
-) {
-    val porcentaje = if (total > 0) (cantidad.toFloat() / total * 100).toInt() else 0
-    val progress = if (total > 0) cantidad.toFloat() / total else 0f
-
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = 800, easing = EaseOutCubic),
-        label = "progress"
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Etiqueta y valores
-        Column(
-            modifier = Modifier.width(120.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = EduRachaColors.TextPrimary
-            )
-            Text(
-                text = "$cantidad estudiantes",
-                fontSize = 10.sp,
-                color = EduRachaColors.TextSecondary
-            )
-        }
-
-        // Barra de progreso
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(24.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(color.copy(alpha = 0.15f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(animatedProgress)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                color,
-                                color.copy(alpha = 0.8f)
-                            )
-                        )
-                    )
-            )
-        }
-
-        // Porcentaje
-        Text(
-            text = "$porcentaje%",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            modifier = Modifier.width(40.dp),
-            textAlign = TextAlign.End
-        )
-    }
-}
-
-/**
- * Podio animado para los 3 primeros lugares
- * Diseño tipo olimpiadas con alturas diferentes
- * Posición central (1°) más alta que laterales (2° y 3°)
- */
-@Composable
-fun PodioTopTres(
-    estudiantes: List<RankingEstudiante>,
-    tipoRanking: TipoRanking,
-    usuarioActualId: String?
-) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -817,77 +571,201 @@ fun PodioTopTres(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            EduRachaColors.Primary.copy(alpha = 0.05f),
+                            EduRachaColors.Primary.copy(alpha = 0.12f),
                             Color.White
                         )
                     )
                 )
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(20.dp)
         ) {
-            // Título del podio
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = EduRachaColors.Secondary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = "Top 3 del Ranking",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.Primary
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    EduRachaColors.Primary,
+                                    EduRachaColors.PrimaryLight
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.BarChart,
+                        null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        "Estadísticas del Curso",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary
+                    )
+                    Text(
+                        "Resumen general",
+                        fontSize = 13.sp,
+                        color = EduRachaColors.TextSecondary
+                    )
+                }
             }
 
-            // Podio con posiciones
+            Spacer(modifier = Modifier.height(20.dp))
+
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                EstadisticaItemEstudiante(
+                    label = "Participantes",
+                    value = total.toString(),
+                    icon = Icons.Default.People,
+                    color = EduRachaColors.Primary
+                )
+                Divider(
+                    modifier = Modifier
+                        .height(70.dp)
+                        .width(1.dp),
+                    color = EduRachaColors.Border.copy(alpha = 0.5f)
+                )
+                EstadisticaItemEstudiante(
+                    label = "Promedio",
+                    value = String.format("%.1f", promedio),
+                    icon = Icons.Default.TrendingUp,
+                    color = EduRachaColors.Accent
+                )
+                Divider(
+                    modifier = Modifier
+                        .height(70.dp)
+                        .width(1.dp),
+                    color = EduRachaColors.Border.copy(alpha = 0.5f)
+                )
+                EstadisticaItemEstudiante(
+                    label = "Máximo",
+                    value = maximo.toString(),
+                    icon = Icons.Default.EmojiEvents,
+                    color = EduRachaColors.Success
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EstadisticaItemEstudiante(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+        Text(
+            value,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Text(
+            label,
+            fontSize = 11.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun PodioEstudiante(
+    ranking: List<RankingEstudiante>,
+    usuarioActualId: String?,
+    tipoRanking: TipoRanking
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            EduRachaColors.Secondary.copy(alpha = 0.1f),
+                            Color.White
+                        )
+                    )
+                )
+                .padding(20.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("🏆", fontSize = 32.sp)
+                Column {
+                    Text(
+                        "Podio",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary
+                    )
+                    Text(
+                        "Top 3 estudiantes",
+                        fontSize = 13.sp,
+                        color = EduRachaColors.TextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Segundo lugar (izquierda)
-                if (estudiantes.size >= 2) {
-                    PosicionPodio(
-                        estudiante = estudiantes[1],
+                // Segundo lugar
+                if (ranking.size >= 2) {
+                    PosicionPodioEstudiante(
                         posicion = 2,
+                        estudiante = ranking[1],
+                        esUsuarioActual = ranking[1].id == usuarioActualId,
                         tipoRanking = tipoRanking,
-                        esUsuarioActual = estudiantes[1].id == usuarioActualId,
-                        alturaPodio = 180.dp,
-                        modifier = Modifier.weight(1f)
+                        height = 100.dp
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Primer lugar (centro - más alto)
-                PosicionPodio(
-                    estudiante = estudiantes[0],
+                // Primer lugar
+                PosicionPodioEstudiante(
                     posicion = 1,
+                    estudiante = ranking[0],
+                    esUsuarioActual = ranking[0].id == usuarioActualId,
                     tipoRanking = tipoRanking,
-                    esUsuarioActual = estudiantes[0].id == usuarioActualId,
-                    alturaPodio = 240.dp,
-                    modifier = Modifier.weight(1f)
+                    height = 130.dp
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Tercer lugar (derecha)
-                if (estudiantes.size >= 3) {
-                    PosicionPodio(
-                        estudiante = estudiantes[2],
+                // Tercer lugar
+                if (ranking.size >= 3) {
+                    PosicionPodioEstudiante(
                         posicion = 3,
+                        estudiante = ranking[2],
+                        esUsuarioActual = ranking[2].id == usuarioActualId,
                         tipoRanking = tipoRanking,
-                        esUsuarioActual = estudiantes[2].id == usuarioActualId,
-                        alturaPodio = 140.dp,
-                        modifier = Modifier.weight(1f)
+                        height = 80.dp
                     )
                 }
             }
@@ -895,54 +773,29 @@ fun PodioTopTres(
     }
 }
 
-/**
- * Posición individual en el podio
- * Animación de aparición desde abajo hacia arriba
- */
 @Composable
-fun PosicionPodio(
-    estudiante: RankingEstudiante,
+fun PosicionPodioEstudiante(
     posicion: Int,
-    tipoRanking: TipoRanking,
+    estudiante: RankingEstudiante,
     esUsuarioActual: Boolean,
-    alturaPodio: Dp,
-    modifier: Modifier = Modifier
+    tipoRanking: TipoRanking,
+    height: Dp
 ) {
-    // Color según posición
-    val colorPosicion = when (posicion) {
+    val colorMedalla = when (posicion) {
         1 -> EduRachaColors.RankingGold
         2 -> EduRachaColors.RankingSilver
         3 -> EduRachaColors.RankingBronze
-        else -> EduRachaColors.Accent
+        else -> EduRachaColors.TextSecondary
     }
 
-    // Valor según tipo de ranking
-    val info = when (tipoRanking) {
-        TipoRanking.EXPERIENCIA -> RankingUI(
-            valor = estudiante.experiencia.toString(),
-            unidad = "XP",
-            icon = Icons.Default.Star,
-            color = EduRachaColors.Secondary
-        )
-        TipoRanking.RACHA -> RankingUI(
-            valor = estudiante.diasConsecutivos.toString(),
-            unidad = "días",
-            icon = Icons.Default.Whatshot,
-            color = EduRachaColors.StreakFire
-        )
-        TipoRanking.VIDAS -> RankingUI(
-            valor = estudiante.vidas.toString(),
-            unidad = "vidas",
-            icon = Icons.Default.Favorite,
-            color = EduRachaColors.Error
-        )
+    val valor = when (tipoRanking) {
+        TipoRanking.EXPERIENCIA -> estudiante.experiencia.toString()
+        TipoRanking.RACHA -> estudiante.diasConsecutivos.toString()
+        TipoRanking.VIDAS -> estudiante.vidas.toString()
     }
 
-    // Animación de entrada
     var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
+    LaunchedEffect(Unit) { isVisible = true }
 
     val offsetY by animateDpAsState(
         targetValue = if (isVisible) 0.dp else 100.dp,
@@ -954,60 +807,54 @@ fun PosicionPodio(
     )
 
     Column(
-        modifier = modifier.offset(y = offsetY),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom
+        verticalArrangement = Arrangement.Bottom,
+        modifier = Modifier.width(100.dp).offset(y = offsetY)
     ) {
-        // Avatar del estudiante
+        // Medalla
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(56.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(
-                            colorPosicion,
-                            colorPosicion.copy(alpha = 0.7f)
-                        )
+                        colors = listOf(colorMedalla, colorMedalla.copy(alpha = 0.8f))
                     )
                 )
-                .border(
-                    width = if (esUsuarioActual) 3.dp else 2.dp,
-                    color = if (esUsuarioActual) EduRachaColors.Accent else Color.White,
-                    shape = CircleShape
-                ),
+                .then(if (esUsuarioActual) Modifier.scale(1.1f) else Modifier),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = estudiante.nombre.first().toString().uppercase(),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                when (posicion) {
+                    1 -> "🥇"
+                    2 -> "🥈"
+                    3 -> "🥉"
+                    else -> ""
+                },
+                fontSize = 30.sp
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Nombre del estudiante
         Text(
-            text = estudiante.nombre.split(" ").firstOrNull() ?: estudiante.nombre,
-            fontSize = 13.sp,
+            estudiante.nombre.split(" ").firstOrNull() ?: estudiante.nombre,
+            fontSize = 12.sp,
             fontWeight = if (esUsuarioActual) FontWeight.Bold else FontWeight.SemiBold,
             color = EduRachaColors.TextPrimary,
             textAlign = TextAlign.Center,
             maxLines = 1
         )
 
-        // Badge "Tú" si es el usuario actual
         if (esUsuarioActual) {
             Spacer(modifier = Modifier.height(4.dp))
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = EduRachaColors.Accent
+                color = EduRachaColors.Primary
             ) {
                 Text(
-                    text = "Tú",
-                    fontSize = 10.sp,
+                    "TÚ",
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -1015,290 +862,125 @@ fun PosicionPodio(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Base del podio con información
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = colorMedalla.copy(alpha = 0.15f),
+            border = BorderStroke(1.dp, colorMedalla.copy(alpha = 0.3f))
+        ) {
+            Text(
+                valor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colorMedalla,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Pedestal
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(alturaPodio)
+                .height(height)
                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            colorPosicion.copy(alpha = 0.9f),
-                            colorPosicion
+                            colorMedalla.copy(alpha = 0.5f),
+                            colorMedalla.copy(alpha = 0.25f)
                         )
                     )
                 )
-                .border(
-                    width = 2.dp,
-                    color = Color.White.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                )
+                .then(
+                    if (esUsuarioActual) {
+                        Modifier.border(
+                            width = 2.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    EduRachaColors.Primary.copy(alpha = 0.8f),
+                                    EduRachaColors.Primary.copy(alpha = 0.4f)
+                                )
+                            ),
+                            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                        )
+                    } else Modifier
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Número de posición
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.25f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = posicion.toString(),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-
-                // Valor del ranking
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = info.icon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Text(
-                        text = info.valor,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = info.unidad,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Selector de tipo de ranking (Experiencia, Racha, Vidas)
- * Diseño de chips con animación de selección
- */
-@Composable
-fun RankingTypeSelector(
-    tipoSeleccionado: TipoRanking,
-    onTipoChange: (TipoRanking) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "Criterio de Ranking",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.Primary
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            RankingTypeChip(
-                label = "Experiencia",
-                icon = Icons.Default.Star,
-                isSelected = tipoSeleccionado == TipoRanking.EXPERIENCIA,
-                onClick = { onTipoChange(TipoRanking.EXPERIENCIA) },
-                modifier = Modifier.weight(1f),
-                color = EduRachaColors.Secondary
-            )
-
-            RankingTypeChip(
-                label = "Racha",
-                icon = Icons.Default.Whatshot,
-                isSelected = tipoSeleccionado == TipoRanking.RACHA,
-                onClick = { onTipoChange(TipoRanking.RACHA) },
-                modifier = Modifier.weight(1f),
-                color = EduRachaColors.StreakFire
-            )
-
-            RankingTypeChip(
-                label = "Vidas",
-                icon = Icons.Default.Favorite,
-                isSelected = tipoSeleccionado == TipoRanking.VIDAS,
-                onClick = { onTipoChange(TipoRanking.VIDAS) },
-                modifier = Modifier.weight(1f),
-                color = EduRachaColors.Error
-            )
-        }
-    }
-}
-
-/**
- * Chip individual para tipo de ranking
- * Cambio visual claro entre seleccionado y no seleccionado
- */
-@Composable
-fun RankingTypeChip(
-    label: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    color: Color
-) {
-    val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.03f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "scale"
-    )
-
-    Card(
-        modifier = modifier
-            .scale(scale)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) color else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 4.dp else 1.dp
-        ),
-        border = if (!isSelected) BorderStroke(1.5.dp, color.copy(alpha = 0.4f)) else null
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else color,
-                modifier = Modifier.size(26.dp)
-            )
             Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                color = if (isSelected) Color.White else color
+                "#$posicion",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = colorMedalla
             )
         }
     }
 }
 
-/**
- * Data class para información de ranking UI
- */
-data class RankingUI(
-    val valor: String,
-    val unidad: String,
-    val icon: ImageVector,
-    val color: Color
-)
-
-/**
- * Item individual de estudiante en el ranking (después del top 3)
- * Diseño compacto con información esencial
- */
 @Composable
-fun RankingEstudianteItem(
+fun RankingItemEstudiante(
     posicion: Int,
     estudiante: RankingEstudiante,
-    tipoRanking: TipoRanking,
-    esUsuarioActual: Boolean
+    esUsuarioActual: Boolean,
+    tipoRanking: TipoRanking
 ) {
-    val info = when (tipoRanking) {
-        TipoRanking.EXPERIENCIA -> RankingUI(
-            valor = estudiante.experiencia.toString(),
-            unidad = "XP",
-            icon = Icons.Default.Star,
-            color = EduRachaColors.Secondary
-        )
-        TipoRanking.RACHA -> RankingUI(
-            valor = estudiante.diasConsecutivos.toString(),
-            unidad = "días",
-            icon = Icons.Default.Whatshot,
-            color = EduRachaColors.StreakFire
-        )
-        TipoRanking.VIDAS -> RankingUI(
-            valor = estudiante.vidas.toString(),
-            unidad = "vidas",
-            icon = Icons.Default.Favorite,
-            color = EduRachaColors.Error
-        )
-    }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (esUsuarioActual)
-                EduRachaColors.Accent.copy(alpha = 0.08f)
+                EduRachaColors.PrimaryContainer
             else
                 Color.White
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = if (esUsuarioActual)
-            BorderStroke(2.dp, EduRachaColors.Accent)
-        else null
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (esUsuarioActual) 6.dp else 2.dp
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Número de posición
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(EduRachaColors.Accent.copy(alpha = 0.12f)),
+                    .background(EduRachaColors.Accent.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = posicion.toString(),
+                    posicion.toString(),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = EduRachaColors.Accent
                 )
             }
 
-            // Información del estudiante
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = estudiante.nombre,
+                        estudiante.nombre,
                         fontSize = 15.sp,
-                        fontWeight = if (esUsuarioActual) FontWeight.Bold else FontWeight.SemiBold,
+                        fontWeight = if (esUsuarioActual) FontWeight.Bold else FontWeight.Medium,
                         color = EduRachaColors.TextPrimary
                     )
-
                     if (esUsuarioActual) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = EduRachaColors.Accent
+                            color = EduRachaColors.Primary
                         ) {
                             Text(
-                                text = "Tú",
+                                "Tú",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
@@ -1307,251 +989,274 @@ fun RankingEstudianteItem(
                         }
                     }
                 }
-            }
-
-            // Valor del ranking
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = info.icon,
-                    contentDescription = null,
-                    tint = info.color,
-                    modifier = Modifier.size(20.dp)
-                )
-                Column(
-                    horizontalAlignment = Alignment.End
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = info.valor,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = info.color
-                    )
-                    Text(
-                        text = info.unidad,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = EduRachaColors.TextSecondary
-                    )
+                    when (tipoRanking) {
+                        TipoRanking.EXPERIENCIA -> {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = EduRachaColors.Accent.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, EduRachaColors.Accent.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        null,
+                                        tint = EduRachaColors.Accent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        "${estudiante.experiencia} XP",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.Accent
+                                    )
+                                }
+                            }
+                        }
+                        TipoRanking.RACHA -> {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = EduRachaColors.StreakFire.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, EduRachaColors.StreakFire.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Whatshot,
+                                        null,
+                                        tint = EduRachaColors.StreakFire,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        "${estudiante.diasConsecutivos} días",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.StreakFire
+                                    )
+                                }
+                            }
+                        }
+                        TipoRanking.VIDAS -> {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = EduRachaColors.Error.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, EduRachaColors.Error.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Favorite,
+                                        null,
+                                        tint = EduRachaColors.Error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        "${estudiante.vidas} ❤️",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EduRachaColors.Error
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/**
- * Estado vacío cuando no hay cursos inscritos
- */
 @Composable
-fun EmptyCursosState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(40.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.School,
-                    contentDescription = null,
-                    modifier = Modifier.size(60.dp),
-                    tint = EduRachaColors.Accent
-                )
-            }
-            Text(
-                text = "Sin cursos inscritos",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.Primary,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Únete a un curso para ver tu posición en el ranking y competir con otros estudiantes",
-                fontSize = 14.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-        }
-    }
-}
-
-/**
- * Estado vacío cuando no hay estudiantes en el ranking
- */
-@Composable
-fun EmptyRankingState() {
-    Box(
+fun EmptyCursosEstudiante() {
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(300.dp),
-        contentAlignment = Alignment.Center
+            .fillMaxSize()
+            .padding(40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Box(
+            modifier = Modifier
+                .size(130.dp)
+                .clip(CircleShape)
+                .background(EduRachaColors.AccentContainer),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Secondary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    modifier = Modifier.size(50.dp),
-                    tint = EduRachaColors.Secondary
-                )
-            }
-            Text(
-                text = "Ranking vacío",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.Primary,
-                textAlign = TextAlign.Center
+            Icon(
+                Icons.Default.School,
+                null,
+                modifier = Modifier.size(65.dp),
+                tint = EduRachaColors.Accent
             )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Sin cursos inscritos",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Únete a un curso para ver el ranking y competir con otros estudiantes",
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+fun EmptyRankingEstudiante() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(130.dp)
+                .clip(CircleShape)
+                .background(EduRachaColors.AccentContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Leaderboard,
+                null,
+                modifier = Modifier.size(65.dp),
+                tint = EduRachaColors.Accent
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Ranking vacío",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Los estudiantes deben completar quizzes para aparecer en el ranking",
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+fun ErrorRankingEstudiante(mensaje: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(EduRachaColors.ErrorContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Error,
+                null,
+                modifier = Modifier.size(60.dp),
+                tint = EduRachaColors.Error
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Error al cargar",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = EduRachaColors.TextPrimary
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            mensaje,
+            fontSize = 14.sp,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(28.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = EduRachaColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.height(48.dp)
+        ) {
+            Icon(Icons.Default.Refresh, null)
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "Completa quizzes y actividades para aparecer en el ranking",
-                fontSize = 14.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                "Reintentar",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
 }
 
-/**
- * Indicador de carga con animación
- */
 @Composable
-fun LoadingRanking() {
+fun LoadingRankingEstudiante() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "loading")
             val rotation by infiniteTransition.animateFloat(
                 initialValue = 0f,
                 targetValue = 360f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(1200, easing = LinearEasing),
+                    animation = tween(1000, easing = LinearEasing),
                     repeatMode = RepeatMode.Restart
                 ),
                 label = "rotation"
             )
 
-            Box(
+            Icon(
+                Icons.Default.EmojiEvents,
+                null,
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Accent.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .rotate(rotation),
-                    tint = EduRachaColors.Accent
-                )
-            }
-
+                    .size(64.dp)
+                    .rotate(rotation),
+                tint = EduRachaColors.Primary
+            )
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "Cargando ranking...",
+                "Cargando ranking...",
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = EduRachaColors.TextPrimary
+                fontWeight = FontWeight.Medium,
+                color = EduRachaColors.TextSecondary
             )
-        }
-    }
-}
-
-/**
- * Estado de error con opción de reintentar
- */
-@Composable
-fun ErrorRanking(
-    mensaje: String,
-    onRetry: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(40.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Error.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ErrorOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(60.dp),
-                    tint = EduRachaColors.Error
-                )
-            }
-            Text(
-                text = "Error al cargar",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.Primary,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = mensaje,
-                fontSize = 14.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Accent
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Reintentar",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
         }
     }
 }
