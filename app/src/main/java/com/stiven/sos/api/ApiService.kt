@@ -143,7 +143,7 @@ interface ApiService {
     suspend fun iniciarQuizFinal(@Body request: Map<String, String>): Response<IniciarQuizResponse>
 
     // ============================================
-    // 🔥 NUEVO ENDPOINT: PROCESAR RESPUESTA INDIVIDUAL
+     // PROCESAR RESPUESTA INDIVIDUAL
     // ============================================
 
     /**

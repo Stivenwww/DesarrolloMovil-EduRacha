@@ -5,7 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.core.*
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -92,24 +93,24 @@ fun ExplicacionTemaScreen(
     onIniciarQuiz: (String) -> Unit
 ) {
     val uiState by quizViewModel.uiState.collectAsState()
-    var explicacionVista by remember { mutableStateOf(false) }
+    var explicacionCompletada by remember { mutableStateOf(false) }
 
-    // LÓGICA CORRECTA FINAL:
-    // Si sacó >= 80%: YA APROBÓ → Cooldown 24h, NO puede reintentar quiz oficial
-    // Si sacó < 80%: NO aprobó → Puede reintentar inmediatamente
     val aproboQuizOficial = uiState.porcentajeQuizOficial >= 80
     val enCooldown = uiState.yaResolviHoy && aproboQuizOficial
 
-    // Solo puede hacer quiz oficial si NO ha aprobado todavía (<80%) O ya pasó el cooldown
-    val puedeHacerQuizOficial = explicacionVista && !uiState.sinVidas && (!aproboQuizOficial || !enCooldown)
+    val puedeHacerQuizOficial = explicacionCompletada && !uiState.sinVidas && (!aproboQuizOficial || !enCooldown)
     val puedeHacerPractica = aproboQuizOficial && !uiState.sinVidas
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
         // Background gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(250.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
@@ -122,7 +123,6 @@ fun ExplicacionTemaScreen(
         )
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // TopBar moderno
             TopBarExplicacion(
                 titulo = temaTitulo,
                 onNavigateBack = onNavigateBack
@@ -135,7 +135,6 @@ fun ExplicacionTemaScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Mostrar contador de cooldown si aprobó y está esperando
                 if (aproboQuizOficial && enCooldown) {
                     AlertaCooldownActivo(
                         horas = uiState.horasParaNuevoQuiz,
@@ -144,27 +143,24 @@ fun ExplicacionTemaScreen(
                     )
                 }
 
-                // Mostrar mensaje de progreso si ya intentó pero no aprobó
                 if (uiState.porcentajeQuizOficial > 0 && !aproboQuizOficial) {
                     AlertaIntentarNuevamente(
                         porcentajeObtenido = uiState.porcentajeQuizOficial
                     )
                 }
 
-                // Card de Explicación (MEJORADA)
-                CardExplicacionMejorada(
+                // NUEVA IMPLEMENTACIÓN: Lectura por Etapas
+                ExplicacionPorEtapas(
                     explicacion = temaExplicacion,
-                    explicacionVista = explicacionVista,
-                    onMarcarLeida = {
-                        explicacionVista = true
+                    onCompletada = {
+                        explicacionCompletada = true
                         quizViewModel.marcarExplicacionVista(temaId) {}
                     }
                 )
 
-                // Card Quiz Oficial - CORREGIDO
                 CardQuizOficial(
                     puedeIniciar = puedeHacerQuizOficial,
-                    explicacionVista = explicacionVista,
+                    explicacionVista = explicacionCompletada,
                     sinVidas = uiState.sinVidas,
                     aproboQuizOficial = aproboQuizOficial,
                     porcentajeObtenido = uiState.porcentajeQuizOficial,
@@ -174,7 +170,6 @@ fun ExplicacionTemaScreen(
                     onIniciar = { onIniciarQuiz("oficial") }
                 )
 
-                // Card Modo Práctica - Solo si aprobó
                 if (aproboQuizOficial) {
                     CardModoPractica(
                         sinVidas = uiState.sinVidas,
@@ -188,7 +183,367 @@ fun ExplicacionTemaScreen(
     }
 }
 
-// TOPBAR
+// NUEVA FUNCIÓN: Sistema de lectura por etapas
+@Composable
+fun ExplicacionPorEtapas(
+    explicacion: String,
+    onCompletada: () -> Unit
+) {
+    // Dividir la explicación en párrafos
+    val parrafos = remember(explicacion) {
+        explicacion.split("\n\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    var etapaActual by remember { mutableStateOf(0) }
+    var todasLasEtapasVistas by remember { mutableStateOf(false) }
+
+    val progress = (etapaActual + 1).toFloat() / parrafos.size.toFloat()
+
+    // Animación de entrada de cards
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "progress"
+    )
+
+    LaunchedEffect(todasLasEtapasVistas) {
+        if (todasLasEtapasVistas) {
+            onCompletada()
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Header con progreso
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(50.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF1976D2).copy(alpha = 0.15f),
+                            modifier = Modifier.size(50.dp)
+                        ) {}
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF1976D2).copy(alpha = 0.25f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.MenuBook,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Column {
+                        Text(
+                            text = "Contenido del Tema",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = EduRachaColors.TextPrimary
+                        )
+                        Text(
+                            text = if (todasLasEtapasVistas) "¡Completado!" else "Lee con atención",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else EduRachaColors.TextSecondary
+                        )
+                    }
+                }
+
+                // Badge de progreso
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1976D2).copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (todasLasEtapasVistas) Icons.Default.CheckCircle else Icons.Default.Article,
+                            contentDescription = null,
+                            tint = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "${etapaActual + 1}/${parrafos.size}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2)
+                        )
+                    }
+                }
+            }
+
+            // Barra de progreso
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2),
+                    trackColor = Color(0xFFE0E0E0)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    parrafos.forEachIndexed { index, _ ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    when {
+                                        index < etapaActual -> Color(0xFF4CAF50)
+                                        index == etapaActual -> Color(0xFF1976D2)
+                                        else -> Color(0xFFE0E0E0)
+                                    }
+                                )
+                        )
+                    }
+                }
+            }
+
+            // Contenido de la etapa actual con animación
+            AnimatedContent(
+                targetState = etapaActual,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) +
+                            slideInHorizontally(
+                                animationSpec = tween(300),
+                                initialOffsetX = { it }
+                            ) togetherWith
+                            fadeOut(animationSpec = tween(300)) +
+                            slideOutHorizontally(
+                                animationSpec = tween(300),
+                                targetOffsetX = { -it }
+                            )
+                },
+                label = "etapa_content"
+            ) { etapa ->
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFF5F9FF),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF1976D2).copy(alpha = 0.2f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "${etapa + 1}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1976D2)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Párrafo ${etapa + 1} de ${parrafos.size}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1976D2)
+                            )
+                        }
+
+                        Text(
+                            text = parrafos[etapa],
+                            fontSize = 16.sp,
+                            color = EduRachaColors.TextPrimary,
+                            lineHeight = 26.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
+            // Botones de navegación
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Botón "Anterior" (solo si no es la primera etapa)
+                if (etapaActual > 0) {
+                    OutlinedButton(
+                        onClick = { etapaActual-- },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF1976D2)
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            width = 2.dp
+                        ),
+                        contentPadding = PaddingValues(vertical = 14.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                "Anterior",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Botón principal (Siguiente/Completar)
+                Button(
+                    onClick = {
+                        if (etapaActual < parrafos.size - 1) {
+                            etapaActual++
+                        } else {
+                            todasLasEtapasVistas = true
+                        }
+                    },
+                    modifier = Modifier.weight(if (etapaActual > 0) 1f else 1f),
+                    enabled = !todasLasEtapasVistas,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (etapaActual == parrafos.size - 1)
+                            Color(0xFF4CAF50) else Color(0xFF1976D2),
+                        disabledContainerColor = Color(0xFF81C784)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            when {
+                                todasLasEtapasVistas -> Icons.Default.CheckCircle
+                                etapaActual == parrafos.size - 1 -> Icons.Default.Check
+                                else -> Icons.Default.ArrowForward
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            when {
+                                todasLasEtapasVistas -> "✓ Completado"
+                                etapaActual == parrafos.size - 1 -> "Completar Lectura"
+                                else -> "Siguiente"
+                            },
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Info adicional
+            if (!todasLasEtapasVistas) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFF3E0)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = Color(0xFFFF9800),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "Debes leer todo el contenido para desbloquear el quiz",
+                            fontSize = 13.sp,
+                            color = Color(0xFFE65100),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            } else {
+                // Mensaje de éxito
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "¡Excelente! Has completado toda la explicación",
+                            fontSize = 13.sp,
+                            color = Color(0xFF2E7D32),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Mantén las demás funciones como TopBarExplicacion, AlertaCooldownActivo, etc.
+// (Las dejo sin cambios por brevedad, pero puedes copiarlas de tu código original)
+
 @Composable
 fun TopBarExplicacion(
     titulo: String,
