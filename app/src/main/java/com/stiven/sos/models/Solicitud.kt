@@ -16,7 +16,8 @@ data class SolicitudCurso(
     val mensaje: String? = null,  //  Campo unificado (backend)
     val estado: EstadoSolicitud = EstadoSolicitud.PENDIENTE,
     val fechaSolicitud: String = "",
-    val fechaRespuesta: String? = null
+    val fechaRespuesta: String? = null,
+    val nombreCurso: String = ""
 ) {
     // Propiedades computadas para compatibilidad con la UI
     val mensajeEstudiante: String?
