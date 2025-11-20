@@ -1,7 +1,9 @@
 package com.stiven.sos.services
 
 import androidx.compose.animation.*
+
 import androidx.compose.animation.core.*
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -20,17 +23,20 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.stiven.sos.ui.theme.EduRachaColors
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.random.Random
+
 
 @Composable
 fun VentanaRachaDuolingo(
@@ -238,6 +244,8 @@ fun VentanaRachaDuolingo(
         }
     }
 }
+
+
 
 /**
  * ========================================
@@ -865,7 +873,367 @@ fun IndicadorVidasMejorado(
         }
     }
 }
+@Composable
+fun AnimacionEstrellaExitosa(
+    colorModo: Color,
+    onAnimacionCompleta: () -> Unit
+) {
+    var animacionIniciada by remember { mutableStateOf(false) }
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val isTablet = screenWidth > 600.dp
+    val sizeScale = if (isTablet) 1.5f else 1f
+
+    val escalaEstrella by animateFloatAsState(
+        targetValue = if (animacionIniciada) 1.5f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "escalaEstrella"
+    )
+
+    val rotacionEstrella by animateFloatAsState(
+        targetValue = if (animacionIniciada) 360f else 0f,
+        animationSpec = tween(
+            durationMillis = 800,
+            easing = FastOutSlowInEasing
+        ),
+        label = "rotacionEstrella"
+    )
+
+    val alphaEstrella by animateFloatAsState(
+        targetValue = if (animacionIniciada) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = 600,
+            delayMillis = 400,
+            easing = LinearEasing
+        ),
+        label = "alphaEstrella"
+    )
+
+    LaunchedEffect(Unit) {
+        animacionIniciada = true
+        delay(1000)
+        onAnimacionCompleta()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f)
+            .background(Color.Black.copy(alpha = 0.3f * alphaEstrella)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.size((300 * sizeScale).dp),
+            contentAlignment = Alignment.Center
+        ) {
+            ParticulasBrillantes(
+                visible = animacionIniciada,
+                color = colorModo,
+                sizeScale = sizeScale
+            )
+
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                tint = Color(0xFFFFD700),
+                modifier = Modifier
+                    .size((200 * sizeScale).dp)
+                    .scale(escalaEstrella)
+                    .rotate(rotacionEstrella)
+                    .alpha(alphaEstrella)
+            )
+
+            Canvas(
+                modifier = Modifier
+                    .size((250 * sizeScale).dp)
+                    .alpha(alphaEstrella * 0.6f)
+            ) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFD700).copy(alpha = 0.6f),
+                            Color(0xFFFFD700).copy(alpha = 0f)
+                        )
+                    ),
+                    radius = size.minDimension / 2 * escalaEstrella
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimacionEstrellaIncorrecta(
+    onAnimacionCompleta: () -> Unit
+) {
+    var animacionIniciada by remember { mutableStateOf(false) }
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val isTablet = screenWidth > 600.dp
+    val sizeScale = if (isTablet) 1.5f else 1f
+
+    // Animacion de aparicion rapida
+    val escalaInicial by animateFloatAsState(
+        targetValue = if (animacionIniciada) 1.2f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "escalaInicial"
+    )
+
+    // Animacion de rotura - fragmentos se separan
+    val separacionFragmentos by animateFloatAsState(
+        targetValue = if (animacionIniciada) 150f else 0f,
+        animationSpec = tween(
+            durationMillis = 800,
+            delayMillis = 200,
+            easing = FastOutSlowInEasing
+        ),
+        label = "separacion"
+    )
+
+    val alphaEstrella by animateFloatAsState(
+        targetValue = if (animacionIniciada) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = 600,
+            delayMillis = 600,
+            easing = LinearEasing
+        ),
+        label = "alpha"
+    )
+
+    val rotacionFragmentos by animateFloatAsState(
+        targetValue = if (animacionIniciada) 720f else 0f,
+        animationSpec = tween(
+            durationMillis = 800,
+            delayMillis = 200,
+            easing = FastOutSlowInEasing
+        ),
+        label = "rotacion"
+    )
+
+    LaunchedEffect(Unit) {
+        animacionIniciada = true
+        delay(1400)
+        onAnimacionCompleta()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f)
+            .background(Color.Black.copy(alpha = 0.4f * alphaEstrella)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier.size((300 * sizeScale).dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Particulas de polvo rojo
+            ParticulasRotura(
+                visible = animacionIniciada,
+                sizeScale = sizeScale
+            )
+
+            // Circulo de error pulsante
+            Canvas(
+                modifier = Modifier
+                    .size((250 * sizeScale).dp)
+                    .alpha(alphaEstrella * 0.7f)
+            ) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFA0606).copy(alpha = 0.6f),
+                            Color(0xFFF80303).copy(alpha = 0f)
+                        )
+                    ),
+                    radius = size.minDimension / 2 * escalaInicial
+                )
+            }
+
+            // Fragmentos de estrella rota
+            FragmentosEstrellaRota(
+                separacion = separacionFragmentos,
+                rotacion = rotacionFragmentos,
+                alpha = alphaEstrella,
+                escala = escalaInicial,
+                sizeScale = sizeScale
+            )
+
+            // Estrella central que se rompe
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                tint = Color(0xFFFF4B4B),
+                modifier = Modifier
+                    .size((200 * sizeScale).dp)
+                    .scale(escalaInicial)
+                    .alpha(alphaEstrella * 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+fun ParticulasBrillantes(
+    visible: Boolean,
+    color: Color,
+    sizeScale: Float
+) {
+    val numeroParticulas = 12
+
+    for (i in 0 until numeroParticulas) {
+        val angulo = (360f / numeroParticulas) * i
+
+        val offset by animateFloatAsState(
+            targetValue = if (visible) 120f * sizeScale else 0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "offset_$i"
+        )
+
+        val escala by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "escala_$i"
+        )
+
+        val alpha by animateFloatAsState(
+            targetValue = if (visible) 0f else 1f,
+            animationSpec = tween(
+                durationMillis = 500,
+                delayMillis = 300,
+                easing = LinearEasing
+            ),
+            label = "alpha_$i"
+        )
+
+        val offsetX = cos(Math.toRadians(angulo.toDouble())).toFloat() * offset
+        val offsetY = sin(Math.toRadians(angulo.toDouble())).toFloat() * offset
+
+        Box(
+            modifier = Modifier
+                .offset(x = offsetX.dp, y = offsetY.dp)
+                .size((24 * sizeScale).dp)
+        ) {
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                tint = Color(0xFFFFD700),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(escala)
+                    .alpha(alpha)
+            )
+        }
+    }
+}
+
+@Composable
+fun FragmentosEstrellaRota(
+    separacion: Float,
+    rotacion: Float,
+    alpha: Float,
+    escala: Float,
+    sizeScale: Float
+) {
+    val numeroFragmentos = 8
+
+    for (i in 0 until numeroFragmentos) {
+        val angulo = (360f / numeroFragmentos) * i
+        val radianes = Math.toRadians(angulo.toDouble())
+
+        val offsetX = (cos(radianes) * separacion * sizeScale).toFloat()
+        val offsetY = (sin(radianes) * separacion * sizeScale).toFloat()
+
+        Box(
+            modifier = Modifier
+                .offset(x = offsetX.dp, y = offsetY.dp)
+                .size((40 * sizeScale).dp)
+        ) {
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                tint = Color(0xFFFF0303),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(escala * 0.6f)
+                    .rotate(rotacion + (angulo * 2))
+                    .alpha(alpha)
+            )
+        }
+    }
+}
+
+@Composable
+fun ParticulasRotura(
+    visible: Boolean,
+    sizeScale: Float
+) {
+    val numeroParticulas = 20
+
+    for (i in 0 until numeroParticulas) {
+        val angulo = Random.nextFloat() * 360f
+        val radianes = Math.toRadians(angulo.toDouble())
+
+        val offset by animateFloatAsState(
+            targetValue = if (visible) (100f + Random.nextFloat() * 80f) * sizeScale else 0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "offset_$i"
+        )
+
+        val escala by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "escala_$i"
+        )
+
+        val alpha by animateFloatAsState(
+            targetValue = if (visible) 0f else 1f,
+            animationSpec = tween(
+                durationMillis = 600,
+                delayMillis = 400,
+                easing = LinearEasing
+            ),
+            label = "alpha_$i"
+        )
+
+        val offsetX = (cos(radianes) * offset).toFloat()
+        val offsetY = (sin(radianes) * offset).toFloat()
+
+        Box(
+            modifier = Modifier
+                .offset(x = offsetX.dp, y = offsetY.dp)
+                .size((12 * sizeScale).dp)
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = Color(0xFFF80404),
+                    radius = size.minDimension / 2 * escala,
+                    alpha = alpha
+                )
+            }
+        }
+    }
+}
 /**
  * ========================================
  * BARRA DE PROGRESO DEL QUIZ

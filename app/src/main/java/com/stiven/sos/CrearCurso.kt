@@ -189,7 +189,7 @@ fun CrearCursoConTemasScreen(
     LaunchedEffect(Unit) {
         Log.d("CREAR_CURSO", " docenteId obtenido: '$docenteId'")
         if (docenteId.isNullOrBlank()) {
-            Log.e("CREAR_CURSO", " ERROR: docenteId es NULL o vacío!")
+            Log.e("CREAR_CURSO", "ERROR: docenteId es NULL o vacío!")
         }
     }
 

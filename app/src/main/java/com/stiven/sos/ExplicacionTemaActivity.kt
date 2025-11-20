@@ -1172,7 +1172,7 @@ fun CardModoPractica(
             }
 
             Text(
-                text = "🏋️ Modo Práctica",
+                text = " Modo Práctica",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black,
                 color = if (puedeIniciar) Color(0xFFDA582F) else Color.Gray,

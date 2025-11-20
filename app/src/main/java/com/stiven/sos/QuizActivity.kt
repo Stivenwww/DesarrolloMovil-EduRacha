@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.stiven.sos.services.AnimacionEstrellaIncorrecta
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.QuizViewModel
@@ -166,6 +167,7 @@ class QuizActivity : ComponentActivity() {
     }
 }
 
+// Diseño responsivo mejorado para card de preguntas
 @Composable
 fun CardPreguntaMejorada(
     pregunta: com.stiven.sos.models.PreguntaQuizResponse,
@@ -174,11 +176,25 @@ fun CardPreguntaMejorada(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    // Sistema de breakpoints responsivos
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = (4 * paddingScale).dp),
         shape = RoundedCornerShape((24 * paddingScale).dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = (8 * paddingScale).dp)
@@ -194,22 +210,22 @@ fun CardPreguntaMejorada(
                         )
                     )
                 )
-                .padding((28 * paddingScale).dp),
-            verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp)
+                .padding((24 * paddingScale).dp),
+            verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
+                horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp)
             ) {
                 Surface(
                     shape = CircleShape,
                     color = colorModo.copy(alpha = 0.15f),
-                    modifier = Modifier.size((54 * paddingScale).dp)
+                    modifier = Modifier.size((50 * paddingScale).dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "$numeroPregunta",
-                            fontSize = (22 * paddingScale).sp,
+                            fontSize = (20 * paddingScale).sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = colorModo
                         )
@@ -217,7 +233,7 @@ fun CardPreguntaMejorada(
                 }
                 Text(
                     text = "Pregunta",
-                    fontSize = (20 * paddingScale).sp,
+                    fontSize = (18 * paddingScale).sp,
                     fontWeight = FontWeight.Bold,
                     color = colorModo
                 )
@@ -230,15 +246,16 @@ fun CardPreguntaMejorada(
 
             Text(
                 text = pregunta.texto,
-                fontSize = (19 * paddingScale).sp,
+                fontSize = (17 * paddingScale).sp,
                 fontWeight = FontWeight.SemiBold,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (28 * paddingScale).sp
+                lineHeight = (26 * paddingScale).sp
             )
         }
     }
 }
 
+// Opciones de respuesta responsivas
 @Composable
 fun OpcionRespuestaMejorada(
     opcion: com.stiven.sos.models.OpcionQuizResponse,
@@ -250,8 +267,19 @@ fun OpcionRespuestaMejorada(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.03f else 1f,
@@ -268,9 +296,10 @@ fun OpcionRespuestaMejorada(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = (4 * paddingScale).dp)
             .scale(scale)
             .alpha(if (enabled) 1f else 0.5f),
-        shape = RoundedCornerShape((20 * paddingScale).dp),
+        shape = RoundedCornerShape((18 * paddingScale).dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) colorModo.copy(alpha = 0.12f) else Color.White
         ),
@@ -284,14 +313,14 @@ fun OpcionRespuestaMejorada(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding((20 * paddingScale).dp),
+                .padding((18 * paddingScale).dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
+            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp)
         ) {
             Surface(
                 shape = CircleShape,
                 color = if (isSelected) colorModo.copy(alpha = 0.2f) else EduRachaColors.Border.copy(alpha = 0.3f),
-                modifier = Modifier.size((42 * paddingScale).dp)
+                modifier = Modifier.size((40 * paddingScale).dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (isSelected) {
@@ -299,14 +328,14 @@ fun OpcionRespuestaMejorada(
                             Icons.Default.CheckCircle,
                             contentDescription = null,
                             tint = colorModo,
-                            modifier = Modifier.size((26 * paddingScale).dp)
+                            modifier = Modifier.size((24 * paddingScale).dp)
                         )
                     } else {
                         Icon(
                             Icons.Default.RadioButtonUnchecked,
                             contentDescription = null,
                             tint = EduRachaColors.TextSecondary,
-                            modifier = Modifier.size((26 * paddingScale).dp)
+                            modifier = Modifier.size((24 * paddingScale).dp)
                         )
                     }
                 }
@@ -314,16 +343,17 @@ fun OpcionRespuestaMejorada(
 
             Text(
                 text = opcion.texto,
-                fontSize = (17 * paddingScale).sp,
+                fontSize = (16 * paddingScale).sp,
                 color = if (isSelected) colorModo else EduRachaColors.TextPrimary,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                lineHeight = (25 * paddingScale).sp,
+                lineHeight = (24 * paddingScale).sp,
                 modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
+// Boton confirmar responsivo
 @Composable
 fun BotonConfirmarMejorado(
     enabled: Boolean,
@@ -334,38 +364,49 @@ fun BotonConfirmarMejorado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     Button(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height((68 * paddingScale).dp),
+            .height((64 * paddingScale).dp),
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = colorModo,
             disabledContainerColor = EduRachaColors.TextSecondary.copy(alpha = 0.2f)
         ),
-        shape = RoundedCornerShape((20 * paddingScale).dp),
+        shape = RoundedCornerShape((18 * paddingScale).dp),
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = (8 * paddingScale).dp,
             pressedElevation = (12 * paddingScale).dp
         )
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = if (esUltimaPregunta) "Finalizar Quiz" else "Siguiente",
-                fontSize = (19 * paddingScale).sp,
+                fontSize = (18 * paddingScale).sp,
                 fontWeight = FontWeight.ExtraBold
             )
             Icon(
                 if (esUltimaPregunta) Icons.Default.Check else Icons.Default.ArrowForward,
                 contentDescription = null,
-                modifier = Modifier.size((28 * paddingScale).dp)
+                modifier = Modifier.size((26 * paddingScale).dp)
             )
         }
     }
@@ -378,8 +419,19 @@ fun DialogoAbandonarQuizConBloqueo(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = onCancelar,
@@ -407,62 +459,57 @@ fun DialogoAbandonarQuizConBloqueo(
             Text(
                 text = "Salida bloqueada durante el quiz",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (24 * paddingScale).sp,
+                fontSize = (22 * paddingScale).sp,
                 textAlign = TextAlign.Center,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (30 * paddingScale).sp
+                lineHeight = (28 * paddingScale).sp
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     "Por politica de integridad academica, no puedes salir de la aplicacion mientras resuelves un quiz.",
-                    fontSize = (16 * paddingScale).sp,
+                    fontSize = (15 * paddingScale).sp,
                     fontWeight = FontWeight.Medium,
                     color = EduRachaColors.TextPrimary,
                     textAlign = TextAlign.Center,
-                    lineHeight = (24 * paddingScale).sp
+                    lineHeight = (22 * paddingScale).sp
                 )
 
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = EduRachaColors.Warning.copy(alpha = 0.1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding((24 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
+                        modifier = Modifier.padding((20 * paddingScale).dp),
+                        verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
                                 Icons.Default.Warning,
                                 contentDescription = null,
                                 tint = EduRachaColors.Warning,
-                                modifier = Modifier.size((28 * paddingScale).dp)
+                                modifier = Modifier.size((26 * paddingScale).dp)
                             )
                             Column(
-                                verticalArrangement = Arrangement.spacedBy((8 * paddingScale).dp)
+                                verticalArrangement = Arrangement.spacedBy((6 * paddingScale).dp)
                             ) {
                                 Text(
                                     "Si decides abandonar:",
-                                    fontSize = (16 * paddingScale).sp,
+                                    fontSize = (15 * paddingScale).sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EduRachaColors.TextPrimary
                                 )
-                                Text(
-                                    "Perderas 1 vida",
-                                    fontSize = (15 * paddingScale).sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = EduRachaColors.TextPrimary
-                                )
+
                                 Text(
                                     "Perderas tu progreso actual",
-                                    fontSize = (15 * paddingScale).sp,
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary
                                 )
@@ -473,11 +520,11 @@ fun DialogoAbandonarQuizConBloqueo(
 
                 Text(
                     "Te recomendamos continuar y dar lo mejor de ti",
-                    fontSize = (15 * paddingScale).sp,
+                    fontSize = (14 * paddingScale).sp,
                     fontWeight = FontWeight.SemiBold,
                     color = EduRachaColors.Primary,
                     textAlign = TextAlign.Center,
-                    lineHeight = (22 * paddingScale).sp
+                    lineHeight = (20 * paddingScale).sp
                 )
             }
         },
@@ -486,24 +533,24 @@ fun DialogoAbandonarQuizConBloqueo(
                 onClick = onConfirmar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = EduRachaColors.Error
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.ExitToApp,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Abandonar de todas formas",
-                        fontSize = (16 * paddingScale).sp,
+                        fontSize = (15 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -514,24 +561,24 @@ fun DialogoAbandonarQuizConBloqueo(
                 onClick = onCancelar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = EduRachaColors.Primary
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Continuar quiz",
-                        fontSize = (17 * paddingScale).sp,
+                        fontSize = (16 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -550,17 +597,35 @@ fun PreguntaScreen(
     modo: String,
     tiempoTotalQuiz: Int,
     sinVidas: Boolean,
-    onRespuestaSeleccionada: (Int) -> Unit
+    respuestasEstado: Map<Int, Boolean>,
+    ultimaRespuestaCorrecta: Boolean?,
+    mostrarAnimacionRespuesta: Boolean,
+    onRespuestaSeleccionada: (Int) -> Unit,
+    onAnimacionCompletada: () -> Unit
 ) {
     var respuestaSeleccionada by remember(pregunta.id) { mutableStateOf<Int?>(null) }
     val scrollState = rememberScrollState()
-    var mostrarAnimacionEstrella by remember(pregunta.id) { mutableStateOf(false) }
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     LaunchedEffect(sinVidas) {
         if (sinVidas) {
             android.util.Log.w("PreguntaScreen", "Deteccion: Usuario sin vidas")
             android.util.Log.w("PreguntaScreen", "Cancelando animacion y limpiando seleccion")
-            mostrarAnimacionEstrella = false
             respuestaSeleccionada = null
         }
     }
@@ -579,6 +644,7 @@ fun PreguntaScreen(
                     )
                 )
         ) {
+            // Header con colores distintivos
             HeaderQuizMejorado(
                 temaTitulo = temaTitulo,
                 modo = modo,
@@ -586,19 +652,24 @@ fun PreguntaScreen(
                 tiempoTranscurrido = tiempoTotalQuiz
             )
 
+            // Barra de progreso
             BarraProgresoConEstrellasIluminadas(
                 preguntaActual = numeroPregunta,
                 totalPreguntas = totalPreguntas,
                 colorModo = colorModo,
-                respuestaSeleccionada = respuestaSeleccionada != null
+                respuestaSeleccionada = respuestaSeleccionada != null,
+                respuestasEstado = respuestasEstado
             )
 
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(
+                        horizontal = (16 * paddingScale).dp,
+                        vertical = (14 * paddingScale).dp
+                    ),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
             ) {
                 CardPreguntaMejorada(
                     pregunta = pregunta,
@@ -623,13 +694,13 @@ fun PreguntaScreen(
                     )
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height((18 * paddingScale).dp))
             }
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = Color.White,
-                shadowElevation = 8.dp
+                shadowElevation = (8 * paddingScale).dp
             ) {
                 BotonConfirmarMejorado(
                     enabled = respuestaSeleccionada != null && !sinVidas,
@@ -637,14 +708,14 @@ fun PreguntaScreen(
                     esUltimaPregunta = numeroPregunta >= totalPreguntas,
                     onClick = {
                         if (!sinVidas) {
-                            respuestaSeleccionada?.let {
-                                mostrarAnimacionEstrella = true
+                            respuestaSeleccionada?.let { opcionSeleccionada ->
+                                onRespuestaSeleccionada(opcionSeleccionada)
                             }
                         } else {
                             android.util.Log.w("PreguntaScreen", "Click bloqueado: Sin vidas")
                         }
                     },
-                    modifier = Modifier.padding(20.dp)
+                    modifier = Modifier.padding((18 * paddingScale).dp)
                 )
             }
         }
@@ -658,30 +729,30 @@ fun PreguntaScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape((20 * paddingScale).dp),
                     color = Color.White,
-                    shadowElevation = 12.dp
+                    shadowElevation = (12 * paddingScale).dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(32.dp),
+                        modifier = Modifier.padding((32 * paddingScale).dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
                     ) {
                         Icon(
                             Icons.Default.Lock,
                             contentDescription = null,
                             tint = Color(0xFFFF4B4B),
-                            modifier = Modifier.size(64.dp)
+                            modifier = Modifier.size((64 * paddingScale).dp)
                         )
                         Text(
                             "Quiz Bloqueado",
-                            fontSize = 24.sp,
+                            fontSize = (24 * paddingScale).sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFFFF4B4B)
                         )
                         Text(
                             "Te has quedado sin vidas",
-                            fontSize = 16.sp,
+                            fontSize = (16 * paddingScale).sp,
                             color = EduRachaColors.TextSecondary,
                             textAlign = TextAlign.Center
                         )
@@ -691,21 +762,18 @@ fun PreguntaScreen(
         }
     }
 
-    if (mostrarAnimacionEstrella && !sinVidas) {
-        AnimacionEstrellaExitosa(
-            colorModo = colorModo,
-            onAnimacionCompleta = {
-                if (!sinVidas) {
-                    mostrarAnimacionEstrella = false
-                    respuestaSeleccionada?.let { opcionSeleccionada ->
-                        onRespuestaSeleccionada(opcionSeleccionada)
-                    }
-                } else {
-                    mostrarAnimacionEstrella = false
-                    android.util.Log.w("PreguntaScreen", "Animacion cancelada: Vidas agotadas")
-                }
-            }
-        )
+    // Animaciones de respuesta correcta/incorrecta
+    if (mostrarAnimacionRespuesta && !sinVidas) {
+        if (ultimaRespuestaCorrecta == true) {
+            AnimacionEstrellaExitosa(
+                colorModo = colorModo,
+                onAnimacionCompleta = onAnimacionCompletada
+            )
+        } else if (ultimaRespuestaCorrecta == false) {
+            AnimacionEstrellaIncorrecta(
+                onAnimacionCompleta = onAnimacionCompletada
+            )
+        }
     }
 }
 
@@ -861,6 +929,7 @@ fun formatearTiempo(segundos: Int): String {
     return String.format("%d:%02d", minutos, segs)
 }
 
+// Header mejorado con colores distintivos según modo de quiz
 @Composable
 fun HeaderQuizMejorado(
     temaTitulo: String,
@@ -870,65 +939,187 @@ fun HeaderQuizMejorado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
+
+    // Definir colores y textos según el modo
+    data class ModoConfig(
+        val principal: Color,
+        val secundario: Color,
+        val terciario: Color,
+        val texto: String,
+        val icono: androidx.compose.ui.graphics.vector.ImageVector
+    )
+
+    val config = when (modo) {
+        "practica" -> ModoConfig(
+            Color(0xFF9C27B0),
+            Color(0xFFBA68C8),
+            Color(0xFFE1BEE7),
+            "Modo Práctica",
+            Icons.Default.FitnessCenter
+        )
+        "final" -> ModoConfig(
+            Color(0xFFFFB300),
+            Color(0xFFFFCA28),
+            Color(0xFFFFE082),
+            "Quiz Final",
+            Icons.Default.EmojiEvents
+        )
+        else -> ModoConfig(
+            Color(0xFF1CB0F6),
+            Color(0xFF4FC3F7),
+            Color(0xFFB3E5FC),
+            "Modo Oficial",
+            Icons.Default.School
+        )
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shadowElevation = (4 * paddingScale).dp
+        shadowElevation = (6 * paddingScale).dp
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = (20 * paddingScale).dp, vertical = (16 * paddingScale).dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            config.principal,
+                            config.principal.copy(alpha = 0.9f),
+                            config.secundario.copy(alpha = 0.7f),
+                            config.terciario.copy(alpha = 0.5f)
+                        )
+                    )
+                )
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = temaTitulo,
-                    fontSize = (18 * paddingScale).sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = EduRachaColors.TextPrimary,
-                    maxLines = 1
+            // Patrón decorativo de fondo
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height((90 * paddingScale).dp)
+                    .alpha(0.12f)
+            ) {
+                val circleRadius = (45 * paddingScale).dp.toPx()
+
+                drawCircle(
+                    color = Color.White,
+                    radius = circleRadius,
+                    center = Offset(size.width * 0.15f, size.height * 0.5f)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = circleRadius * 0.6f,
+                    center = Offset(size.width * 0.85f, size.height * 0.3f)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = circleRadius * 0.4f,
+                    center = Offset(size.width * 0.92f, size.height * 0.75f)
                 )
 
-                Surface(
-                    shape = RoundedCornerShape((8 * paddingScale).dp),
-                    color = colorModo.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = when (modo) {
-                            "practica" -> "Modo Practica"
-                            "final" -> "Quiz Final"
-                            else -> "Modo Oficial"
-                        },
-                        color = colorModo,
-                        fontSize = (12 * paddingScale).sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = (10 * paddingScale).dp, vertical = (4 * paddingScale).dp)
-                    )
-                }
+                drawLine(
+                    color = Color.White,
+                    start = Offset(0f, size.height * 0.3f),
+                    end = Offset(size.width * 0.3f, size.height * 0.3f),
+                    strokeWidth = 2f
+                )
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = (18 * paddingScale).dp,
+                        vertical = (16 * paddingScale).dp
+                    )
             ) {
-                IconoRelojPulsante()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy((8 * paddingScale).dp)
+                    ) {
+                        Text(
+                            text = temaTitulo,
+                            fontSize = (19 * paddingScale).sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            maxLines = 2,
+                            lineHeight = (25 * paddingScale).sp
+                        )
 
-                Text(
-                    text = formatearTiempo(tiempoTranscurrido),
-                    fontSize = (20 * paddingScale).sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF4CAF50)
-                )
+                        Surface(
+                            shape = RoundedCornerShape((14 * paddingScale).dp),
+                            color = Color.White.copy(alpha = 0.25f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = (14 * paddingScale).dp,
+                                    vertical = (7 * paddingScale).dp
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = config.icono,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size((18 * paddingScale).dp)
+                                )
+                                Text(
+                                    text = config.texto,
+                                    color = Color.White,
+                                    fontSize = (14 * paddingScale).sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape((18 * paddingScale).dp),
+                        color = Color.White.copy(alpha = 0.22f),
+                        modifier = Modifier.padding(start = (10 * paddingScale).dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = (16 * paddingScale).dp,
+                                vertical = (12 * paddingScale).dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconoRelojPulsante()
+
+                            Text(
+                                text = formatearTiempo(tiempoTranscurrido),
+                                fontSize = (21 * paddingScale).sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
-
 @Composable
 fun IconoRelojPulsante() {
     val infiniteTransition = rememberInfiniteTransition(label = "reloj")
@@ -946,7 +1137,7 @@ fun IconoRelojPulsante() {
     Icon(
         Icons.Default.Timer,
         contentDescription = null,
-        tint = Color(0xFF4CAF50),
+        tint = Color.White,
         modifier = Modifier
             .size(24.dp)
             .scale(escala)
@@ -958,12 +1149,24 @@ fun BarraProgresoConEstrellasIluminadas(
     preguntaActual: Int,
     totalPreguntas: Int,
     colorModo: Color,
-    respuestaSeleccionada: Boolean
+    respuestaSeleccionada: Boolean,
+    respuestasEstado: Map<Int, Boolean>
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     val progreso = (preguntaActual.toFloat() / totalPreguntas.toFloat())
 
@@ -981,7 +1184,10 @@ fun BarraProgresoConEstrellasIluminadas(
         color = Color.White
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = (20 * paddingScale).dp, vertical = (12 * paddingScale).dp),
+            modifier = Modifier.padding(
+                horizontal = (18 * paddingScale).dp,
+                vertical = (12 * paddingScale).dp
+            ),
             verticalArrangement = Arrangement.spacedBy((12 * paddingScale).dp)
         ) {
             Box(
@@ -1012,10 +1218,15 @@ fun BarraProgresoConEstrellasIluminadas(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 for (i in 1..totalPreguntas) {
+                    val indice = i - 1
                     val estrellaCompletada = i <= preguntaActual
+                    val estaActiva = i == preguntaActual && respuestaSeleccionada
+                    val esIncorrecta = respuestasEstado[indice] == false
+
                     EstrellaIluminada(
                         completada = estrellaCompletada,
-                        estaActiva = i == preguntaActual && respuestaSeleccionada
+                        estaActiva = estaActiva,
+                        esIncorrecta = esIncorrecta
                     )
                 }
             }
@@ -1026,8 +1237,25 @@ fun BarraProgresoConEstrellasIluminadas(
 @Composable
 fun EstrellaIluminada(
     completada: Boolean,
-    estaActiva: Boolean
+    estaActiva: Boolean,
+    esIncorrecta: Boolean
 ) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val sizeScale = when {
+        isCompact -> 0.9f
+        isSmall -> 1f
+        isMedium -> 1.2f
+        isLarge -> 1.4f
+        else -> 1f
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "estrella")
 
     val brillo by infiniteTransition.animateFloat(
@@ -1050,10 +1278,10 @@ fun EstrellaIluminada(
     )
 
     Box(
-        modifier = Modifier.size(28.dp),
+        modifier = Modifier.size((28 * sizeScale).dp),
         contentAlignment = Alignment.Center
     ) {
-        if (completada && estaActiva) {
+        if (completada && estaActiva && !esIncorrecta) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val radius = size.minDimension / 2 * brillo
                 drawCircle(
@@ -1064,14 +1292,62 @@ fun EstrellaIluminada(
             }
         }
 
-        Icon(
-            if (completada) Icons.Default.Star else Icons.Default.StarBorder,
-            contentDescription = null,
-            tint = if (completada) Color(0xFFFFD700) else EduRachaColors.TextSecondary.copy(alpha = 0.3f),
-            modifier = Modifier
-                .size(24.dp)
-                .scale(escala)
-        )
+        if (esIncorrecta && completada) {
+            // Estrella rota con grietas
+            Box(
+                modifier = Modifier
+                    .size((24 * sizeScale).dp)
+                    .scale(escala),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Color(0xFFFF4B4B),
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Líneas de grieta
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(centerX - size.width * 0.3f, centerY),
+                        end = Offset(centerX + size.width * 0.3f, centerY),
+                        strokeWidth = 2f,
+                        cap = StrokeCap.Round
+                    )
+
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(centerX, centerY - size.height * 0.3f),
+                        end = Offset(centerX, centerY + size.height * 0.3f),
+                        strokeWidth = 2f,
+                        cap = StrokeCap.Round
+                    )
+
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(centerX - size.width * 0.2f, centerY - size.height * 0.2f),
+                        end = Offset(centerX + size.width * 0.2f, centerY + size.height * 0.2f),
+                        strokeWidth = 1.5f,
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+        } else {
+            // Estrella normal
+            Icon(
+                if (completada) Icons.Default.Star else Icons.Default.StarBorder,
+                contentDescription = null,
+                tint = if (completada) Color(0xFFFFD700) else EduRachaColors.TextSecondary.copy(alpha = 0.3f),
+                modifier = Modifier
+                    .size((24 * sizeScale).dp)
+                    .scale(escala)
+            )
+        }
     }
 }
 
@@ -1091,15 +1367,12 @@ fun QuizScreen(
     var yaNavego by remember { mutableStateOf(false) }
     var yaCargoRetroalimentacion by remember { mutableStateOf(false) }
     var mostrarDialogoSalir by remember { mutableStateOf(false) }
-    var mostrarDialogoInfoEstrellas by remember { mutableStateOf(true) }
 
     var tiempoTotalQuiz by remember { mutableStateOf(0) }
 
-    LaunchedEffect(mostrarDialogoInfoEstrellas) {
-        if (!mostrarDialogoInfoEstrellas) {
-            quizViewModel.iniciarObservadores(cursoId, temaId)
-            quizViewModel.iniciarQuiz(cursoId, temaId, modo)
-        }
+    LaunchedEffect(Unit) {
+        quizViewModel.iniciarObservadores(cursoId, temaId)
+        quizViewModel.iniciarQuiz(cursoId, temaId, modo)
     }
 
     LaunchedEffect(uiState.quizActivo, uiState.finalizando) {
@@ -1179,14 +1452,6 @@ fun QuizScreen(
         )
     }
 
-    if (mostrarDialogoInfoEstrellas) {
-        DialogoInfoEstrellas(
-            onAceptar = {
-                mostrarDialogoInfoEstrellas = false
-            }
-        )
-    }
-
     if (uiState.mostrarDialogoTemaAprobado) {
         DialogoTemaYaAprobado(
             onContinuar = {
@@ -1248,7 +1513,7 @@ fun QuizScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            !mostrarDialogoInfoEstrellas && uiState.isLoading && uiState.quizActivo == null -> {
+            uiState.isLoading && uiState.quizActivo == null -> {
                 PantallaCargaQuiz(colorModo = colorModo)
             }
 
@@ -1271,18 +1536,26 @@ fun QuizScreen(
                             modo = modo,
                             tiempoTotalQuiz = tiempoTotalQuiz,
                             sinVidas = uiState.sinVidas,
+                            respuestasEstado = uiState.respuestasEstado,
+                            ultimaRespuestaCorrecta = uiState.ultimaRespuestaCorrecta,
+                            mostrarAnimacionRespuesta = uiState.mostrarAnimacionRespuesta,
                             onRespuestaSeleccionada = { opcionId ->
                                 if (!uiState.sinVidas) {
                                     quizViewModel.responderPregunta(
                                         preguntaId = preguntaActual.id,
                                         respuestaSeleccionada = opcionId
                                     )
-
-                                    if (uiState.preguntaActual + 1 >= quiz.preguntas.size) {
-                                        quizViewModel.finalizarQuiz()
-                                    }
                                 } else {
                                     android.util.Log.w("QuizScreen", "Intento de responder sin vidas - BLOQUEADO")
+                                }
+                            },
+                            onAnimacionCompletada = {
+                                quizViewModel.ocultarAnimacionRespuesta()
+
+                                quizViewModel.avanzarSiguientePregunta()
+
+                                if (uiState.preguntaActual + 1 >= quiz.preguntas.size) {
+                                    quizViewModel.finalizarQuiz()
                                 }
                             }
                         )
@@ -1301,11 +1574,27 @@ fun DialogoSinVidasDuranteQuizMejorado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
 
-    val paddingScale = if (isTablet) 1.5f else 1f
-    val textScale = if (isTablet) 1.2f else 1f
-    val iconScale = if (isTablet) 1.3f else 1f
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
+
+    val textScale = when {
+        isCompact -> 0.9f
+        isSmall -> 1f
+        isMedium -> 1.15f
+        isLarge -> 1.3f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = {},
@@ -1313,7 +1602,7 @@ fun DialogoSinVidasDuranteQuizMejorado(
         shape = RoundedCornerShape((28 * paddingScale).dp),
         icon = {
             Box(
-                modifier = Modifier.size((100 * iconScale).dp),
+                modifier = Modifier.size((100 * paddingScale).dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
@@ -1325,7 +1614,7 @@ fun DialogoSinVidasDuranteQuizMejorado(
                     Icons.Default.HeartBroken,
                     contentDescription = null,
                     tint = Color(0xFFFF4B4B),
-                    modifier = Modifier.size((56 * iconScale).dp)
+                    modifier = Modifier.size((56 * paddingScale).dp)
                 )
             }
         },
@@ -1333,36 +1622,36 @@ fun DialogoSinVidasDuranteQuizMejorado(
             Text(
                 text = "Te quedaste sin vidas",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (26 * textScale).sp,
+                fontSize = (24 * textScale).sp,
                 textAlign = TextAlign.Center,
                 color = Color(0xFFFF4B4B),
-                lineHeight = (32 * textScale).sp,
+                lineHeight = (30 * textScale).sp,
                 modifier = Modifier.padding(horizontal = (8 * paddingScale).dp)
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(horizontal = (4 * paddingScale).dp)
             ) {
                 Text(
                     "El quiz ha sido bloqueado porque te has quedado sin vidas disponibles",
-                    fontSize = (17 * textScale).sp,
+                    fontSize = (16 * textScale).sp,
                     fontWeight = FontWeight.Medium,
                     color = EduRachaColors.TextPrimary,
                     textAlign = TextAlign.Center,
-                    lineHeight = (24 * textScale).sp
+                    lineHeight = (23 * textScale).sp
                 )
 
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = Color(0xFF1CB0F6).copy(alpha = 0.1f)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding((20 * paddingScale).dp),
+                            .padding((18 * paddingScale).dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1370,19 +1659,19 @@ fun DialogoSinVidasDuranteQuizMejorado(
                             Icons.Default.Timer,
                             contentDescription = null,
                             tint = Color(0xFF1CB0F6),
-                            modifier = Modifier.size((32 * iconScale).dp)
+                            modifier = Modifier.size((30 * paddingScale).dp)
                         )
-                        Spacer(Modifier.width((12 * paddingScale).dp))
+                        Spacer(Modifier.width((10 * paddingScale).dp))
                         Column {
                             Text(
                                 text = "Proxima vida en:",
-                                fontSize = (14 * textScale).sp,
+                                fontSize = (13 * textScale).sp,
                                 color = Color(0xFF1CB0F6),
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
                                 text = "$minutosParaProxima minutos",
-                                fontSize = (24 * textScale).sp,
+                                fontSize = (22 * textScale).sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color(0xFF1CB0F6)
                             )
@@ -1392,17 +1681,17 @@ fun DialogoSinVidasDuranteQuizMejorado(
 
                 Text(
                     "Vuelve cuando tengas vidas disponibles para continuar aprendiendo",
-                    fontSize = (15 * textScale).sp,
+                    fontSize = (14 * textScale).sp,
                     color = EduRachaColors.TextSecondary,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = (22 * textScale).sp
+                    lineHeight = (20 * textScale).sp
                 )
             }
         },
         confirmButton = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = (4 * paddingScale).dp)
@@ -1411,24 +1700,24 @@ fun DialogoSinVidasDuranteQuizMejorado(
                     onClick = onVolverATemas,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height((60 * paddingScale).dp),
+                        .height((56 * paddingScale).dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Primary
                     ),
-                    shape = RoundedCornerShape((18 * paddingScale).dp)
+                    shape = RoundedCornerShape((16 * paddingScale).dp)
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                        horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = null,
-                            modifier = Modifier.size((24 * iconScale).dp)
+                            modifier = Modifier.size((22 * paddingScale).dp)
                         )
                         Text(
                             "Volver a Temas del Curso",
-                            fontSize = (18 * textScale).sp,
+                            fontSize = (16 * textScale).sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -1438,16 +1727,16 @@ fun DialogoSinVidasDuranteQuizMejorado(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height((56 * paddingScale).dp),
+                        .height((52 * paddingScale).dp),
                     border = androidx.compose.foundation.BorderStroke(
                         (2 * paddingScale).dp,
                         Color(0xFFFF4B4B)
                     ),
-                    shape = RoundedCornerShape((18 * paddingScale).dp)
+                    shape = RoundedCornerShape((16 * paddingScale).dp)
                 ) {
                     Text(
                         "Cerrar",
-                        fontSize = (16 * textScale).sp,
+                        fontSize = (15 * textScale).sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFF4B4B)
                     )
@@ -1461,8 +1750,19 @@ fun DialogoSinVidasDuranteQuizMejorado(
 fun PantallaCargaQuiz(colorModo: Color) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     Box(
         modifier = Modifier
@@ -1480,14 +1780,14 @@ fun PantallaCargaQuiz(colorModo: Color) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy((32 * paddingScale).dp),
-            modifier = Modifier.padding((32 * paddingScale).dp)
+            verticalArrangement = Arrangement.spacedBy((28 * paddingScale).dp),
+            modifier = Modifier.padding((28 * paddingScale).dp)
         ) {
             LoadingAnimation(colorModo = colorModo)
 
             Text(
                 text = "Preparando tu quiz...",
-                fontSize = (24 * paddingScale).sp,
+                fontSize = (22 * paddingScale).sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = EduRachaColors.TextPrimary,
                 textAlign = TextAlign.Center
@@ -1495,7 +1795,7 @@ fun PantallaCargaQuiz(colorModo: Color) {
 
             Text(
                 text = "Cargando las mejores preguntas para ti",
-                fontSize = (16 * paddingScale).sp,
+                fontSize = (15 * paddingScale).sp,
                 color = EduRachaColors.TextSecondary,
                 textAlign = TextAlign.Center
             )
@@ -1567,8 +1867,19 @@ fun LoadingAnimation(colorModo: Color) {
 fun PantallaFinalizando() {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     Box(
         modifier = Modifier
@@ -1586,14 +1897,14 @@ fun PantallaFinalizando() {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy((32 * paddingScale).dp),
-            modifier = Modifier.padding((32 * paddingScale).dp)
+            verticalArrangement = Arrangement.spacedBy((28 * paddingScale).dp),
+            modifier = Modifier.padding((28 * paddingScale).dp)
         ) {
             FinalizandoAnimation()
 
             Text(
                 text = "Finalizando quiz...",
-                fontSize = (26 * paddingScale).sp,
+                fontSize = (24 * paddingScale).sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = EduRachaColors.TextPrimary,
                 textAlign = TextAlign.Center
@@ -1601,7 +1912,7 @@ fun PantallaFinalizando() {
 
             Text(
                 text = "Calculando tu puntuacion y recompensas",
-                fontSize = (17 * paddingScale).sp,
+                fontSize = (16 * paddingScale).sp,
                 color = EduRachaColors.TextSecondary,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Medium
@@ -1651,6 +1962,7 @@ fun FinalizandoAnimation() {
     }
 }
 
+// Diálogos responsivos
 @Composable
 fun DialogoPeriodoFinalizado(
     mensajeError: String,
@@ -1659,8 +1971,19 @@ fun DialogoPeriodoFinalizado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = onAceptar,
@@ -1688,54 +2011,54 @@ fun DialogoPeriodoFinalizado(
             Text(
                 text = "Periodo Finalizado",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (26 * paddingScale).sp,
+                fontSize = (24 * paddingScale).sp,
                 textAlign = TextAlign.Center,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (32 * paddingScale).sp
+                lineHeight = (30 * paddingScale).sp
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "El periodo de este tema ya finalizo",
-                    fontSize = (18 * paddingScale).sp,
+                    fontSize = (17 * paddingScale).sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFFF9800),
                     textAlign = TextAlign.Center,
-                    lineHeight = (26 * paddingScale).sp
+                    lineHeight = (24 * paddingScale).sp
                 )
 
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = Color(0xFFFF9800).copy(alpha = 0.1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding((24 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
+                        modifier = Modifier.padding((20 * paddingScale).dp),
+                        verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Default.MenuBook,
                                 contentDescription = null,
                                 tint = Color(0xFFFF9800),
-                                modifier = Modifier.size((28 * paddingScale).dp)
+                                modifier = Modifier.size((26 * paddingScale).dp)
                             )
                             Column {
                                 Text(
                                     "Tema:",
-                                    fontSize = (14 * paddingScale).sp,
+                                    fontSize = (13 * paddingScale).sp,
                                     color = EduRachaColors.TextSecondary,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
                                     temaTitulo,
-                                    fontSize = (16 * paddingScale).sp,
+                                    fontSize = (15 * paddingScale).sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EduRachaColors.TextPrimary
                                 )
@@ -1748,37 +2071,37 @@ fun DialogoPeriodoFinalizado(
                         )
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
                                 tint = Color(0xFFFF9800),
-                                modifier = Modifier.size((28 * paddingScale).dp)
+                                modifier = Modifier.size((26 * paddingScale).dp)
                             )
                             Column(
-                                verticalArrangement = Arrangement.spacedBy((8 * paddingScale).dp)
+                                verticalArrangement = Arrangement.spacedBy((6 * paddingScale).dp)
                             ) {
                                 Text(
                                     "Que significa esto?",
-                                    fontSize = (16 * paddingScale).sp,
+                                    fontSize = (15 * paddingScale).sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EduRachaColors.TextPrimary
                                 )
                                 Text(
                                     "Este tema tiene un periodo de disponibilidad que ya ha terminado",
-                                    fontSize = (15 * paddingScale).sp,
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary,
-                                    lineHeight = (22 * paddingScale).sp
+                                    lineHeight = (20 * paddingScale).sp
                                 )
                                 Text(
                                     "Ya no puedes realizar quizzes para este tema",
-                                    fontSize = (15 * paddingScale).sp,
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary,
-                                    lineHeight = (22 * paddingScale).sp
+                                    lineHeight = (20 * paddingScale).sp
                                 )
                             }
                         }
@@ -1786,54 +2109,54 @@ fun DialogoPeriodoFinalizado(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape((16 * paddingScale).dp),
+                    shape = RoundedCornerShape((14 * paddingScale).dp),
                     color = Color(0xFF1CB0F6).copy(alpha = 0.1f)
                 ) {
                     Row(
-                        modifier = Modifier.padding((16 * paddingScale).dp),
-                        horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
+                        modifier = Modifier.padding((14 * paddingScale).dp),
+                        horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.Lightbulb,
                             contentDescription = null,
                             tint = Color(0xFF1CB0F6),
-                            modifier = Modifier.size((24 * paddingScale).dp)
+                            modifier = Modifier.size((22 * paddingScale).dp)
                         )
                         Text(
                             "Consulta con tu profesor sobre otros temas disponibles",
-                            fontSize = (14 * paddingScale).sp,
+                            fontSize = (13 * paddingScale).sp,
                             color = Color(0xFF1CB0F6),
                             fontWeight = FontWeight.SemiBold,
-                            lineHeight = (20 * paddingScale).sp
+                            lineHeight = (18 * paddingScale).sp
                         )
                     }
                 }
 
                 if (mensajeError.isNotEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape((12 * paddingScale).dp),
+                        shape = RoundedCornerShape((10 * paddingScale).dp),
                         color = EduRachaColors.TextSecondary.copy(alpha = 0.1f)
                     ) {
                         Row(
-                            modifier = Modifier.padding((12 * paddingScale).dp),
-                            horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
+                            modifier = Modifier.padding((10 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((6 * paddingScale).dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
                                 Icons.Default.Code,
                                 contentDescription = null,
                                 tint = EduRachaColors.TextSecondary,
-                                modifier = Modifier.size((18 * paddingScale).dp)
+                                modifier = Modifier.size((16 * paddingScale).dp)
                             )
                             Text(
                                 text = mensajeError.replace("{\"error\":\"", "")
                                     .replace("\"}", "")
                                     .replace("\\", ""),
-                                fontSize = (12 * paddingScale).sp,
+                                fontSize = (11 * paddingScale).sp,
                                 color = EduRachaColors.TextSecondary,
                                 fontWeight = FontWeight.Medium,
-                                lineHeight = (16 * paddingScale).sp
+                                lineHeight = (14 * paddingScale).sp
                             )
                         }
                     }
@@ -1845,24 +2168,24 @@ fun DialogoPeriodoFinalizado(
                 onClick = onAceptar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFF9800)
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Volver a Temas",
-                        fontSize = (18 * paddingScale).sp,
+                        fontSize = (17 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -1879,8 +2202,19 @@ fun DialogoErrorGeneral(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = onAceptar,
@@ -1908,34 +2242,34 @@ fun DialogoErrorGeneral(
             Text(
                 text = titulo.ifEmpty { "Error" },
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (24 * paddingScale).sp,
+                fontSize = (22 * paddingScale).sp,
                 textAlign = TextAlign.Center,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (30 * paddingScale).sp
+                lineHeight = (28 * paddingScale).sp
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = Color(0xFFFF4B4B).copy(alpha = 0.1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding((20 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((12 * paddingScale).dp)
+                        modifier = Modifier.padding((18 * paddingScale).dp),
+                        verticalArrangement = Arrangement.spacedBy((10 * paddingScale).dp)
                     ) {
                         Text(
                             text = mensaje.replace("{\"error\":\"", "")
                                 .replace("\"}", "")
                                 .replace("\\", ""),
-                            fontSize = (16 * paddingScale).sp,
+                            fontSize = (15 * paddingScale).sp,
                             fontWeight = FontWeight.Medium,
                             color = EduRachaColors.TextPrimary,
                             textAlign = TextAlign.Center,
-                            lineHeight = (24 * paddingScale).sp
+                            lineHeight = (22 * paddingScale).sp
                         )
                     }
                 }
@@ -1946,24 +2280,24 @@ fun DialogoErrorGeneral(
                 onClick = onAceptar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFF4B4B)
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Regresar",
-                        fontSize = (18 * paddingScale).sp,
+                        fontSize = (17 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -1979,8 +2313,19 @@ fun DialogoTemaYaAprobado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = onCancelar,
@@ -2008,68 +2353,68 @@ fun DialogoTemaYaAprobado(
             Text(
                 text = "Tema ya aprobado",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (24 * paddingScale).sp,
+                fontSize = (22 * paddingScale).sp,
                 textAlign = TextAlign.Center,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (30 * paddingScale).sp
+                lineHeight = (28 * paddingScale).sp
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     "Ya has aprobado este tema con exito",
-                    fontSize = (16 * paddingScale).sp,
+                    fontSize = (15 * paddingScale).sp,
                     fontWeight = FontWeight.Medium,
                     color = EduRachaColors.TextPrimary,
                     textAlign = TextAlign.Center,
-                    lineHeight = (24 * paddingScale).sp
+                    lineHeight = (22 * paddingScale).sp
                 )
 
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = Color(0xFF4CAF50).copy(alpha = 0.1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding((24 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
+                        modifier = Modifier.padding((20 * paddingScale).dp),
+                        verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
                                 tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size((28 * paddingScale).dp)
+                                modifier = Modifier.size((26 * paddingScale).dp)
                             )
                             Column(
-                                verticalArrangement = Arrangement.spacedBy((8 * paddingScale).dp)
+                                verticalArrangement = Arrangement.spacedBy((6 * paddingScale).dp)
                             ) {
                                 Text(
                                     "Si deseas seguir practicando:",
-                                    fontSize = (16 * paddingScale).sp,
+                                    fontSize = (15 * paddingScale).sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EduRachaColors.TextPrimary
                                 )
                                 Text(
                                     "Podras hacer el quiz en modo practica",
-                                    fontSize = (15 * paddingScale).sp,
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary
                                 )
                                 Text(
-                                    "No perderas vidas",
-                                    fontSize = (15 * paddingScale).sp,
+                                    "Pierdes vidas",
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary
                                 )
                                 Text(
                                     "Seguiras ganando experiencia",
-                                    fontSize = (15 * paddingScale).sp,
+                                    fontSize = (14 * paddingScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     color = EduRachaColors.TextPrimary
                                 )
@@ -2084,24 +2429,24 @@ fun DialogoTemaYaAprobado(
                 onClick = onContinuar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF4CAF50)
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.FitnessCenter,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Seguir practicando",
-                        fontSize = (16 * paddingScale).sp,
+                        fontSize = (15 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -2112,13 +2457,13 @@ fun DialogoTemaYaAprobado(
                 onClick = onCancelar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 border = androidx.compose.foundation.BorderStroke((2 * paddingScale).dp, Color(0xFF4CAF50)),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Text(
                     "Regresar",
-                    fontSize = (17 * paddingScale).sp,
+                    fontSize = (16 * paddingScale).sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFF4CAF50)
                 )
@@ -2133,8 +2478,19 @@ fun DialogoQuizFinalCompletado(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
+
+    val isCompact = screenWidth < 360.dp
+    val isSmall = screenWidth in 360.dp..600.dp
+    val isMedium = screenWidth in 600.dp..840.dp
+    val isLarge = screenWidth > 840.dp
+
+    val paddingScale = when {
+        isCompact -> 0.85f
+        isSmall -> 1f
+        isMedium -> 1.3f
+        isLarge -> 1.6f
+        else -> 1f
+    }
 
     AlertDialog(
         onDismissRequest = onAceptar,
@@ -2162,47 +2518,47 @@ fun DialogoQuizFinalCompletado(
             Text(
                 text = "Quiz Final Completado",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = (24 * paddingScale).sp,
+                fontSize = (22 * paddingScale).sp,
                 textAlign = TextAlign.Center,
                 color = EduRachaColors.TextPrimary,
-                lineHeight = (30 * paddingScale).sp
+                lineHeight = (28 * paddingScale).sp
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp),
+                verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     "Ya has completado exitosamente el Quiz Final de este curso",
-                    fontSize = (16 * paddingScale).sp,
+                    fontSize = (15 * paddingScale).sp,
                     fontWeight = FontWeight.Medium,
                     color = EduRachaColors.TextPrimary,
                     textAlign = TextAlign.Center,
-                    lineHeight = (24 * paddingScale).sp
+                    lineHeight = (22 * paddingScale).sp
                 )
 
                 Surface(
-                    shape = RoundedCornerShape((20 * paddingScale).dp),
+                    shape = RoundedCornerShape((18 * paddingScale).dp),
                     color = Color(0xFFFFB300).copy(alpha = 0.1f)
                 ) {
                     Column(
-                        modifier = Modifier.padding((24 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((18 * paddingScale).dp)
+                        modifier = Modifier.padding((20 * paddingScale).dp),
+                        verticalArrangement = Arrangement.spacedBy((16 * paddingScale).dp)
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
+                            horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Default.Star,
                                 contentDescription = null,
                                 tint = Color(0xFFFFB300),
-                                modifier = Modifier.size((28 * paddingScale).dp)
+                                modifier = Modifier.size((26 * paddingScale).dp)
                             )
                             Text(
                                 "Felicidades por tu logro",
-                                fontSize = (16 * paddingScale).sp,
+                                fontSize = (15 * paddingScale).sp,
                                 fontWeight = FontWeight.Bold,
                                 color = EduRachaColors.TextPrimary
                             )
@@ -2210,9 +2566,9 @@ fun DialogoQuizFinalCompletado(
 
                         Text(
                             "El Quiz Final solo puede realizarse una vez por curso. Si deseas mejorar tu conocimiento, puedes practicar en los temas individuales.",
-                            fontSize = (15 * paddingScale).sp,
+                            fontSize = (14 * paddingScale).sp,
                             color = EduRachaColors.TextPrimary,
-                            lineHeight = (22 * paddingScale).sp,
+                            lineHeight = (20 * paddingScale).sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -2224,250 +2580,24 @@ fun DialogoQuizFinalCompletado(
                 onClick = onAceptar,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((60 * paddingScale).dp),
+                    .height((56 * paddingScale).dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFFB300)
                 ),
-                shape = RoundedCornerShape((18 * paddingScale).dp)
+                shape = RoundedCornerShape((16 * paddingScale).dp)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy((10 * paddingScale).dp),
+                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        modifier = Modifier.size((24 * paddingScale).dp)
+                        modifier = Modifier.size((22 * paddingScale).dp)
                     )
                     Text(
                         "Entendido",
-                        fontSize = (17 * paddingScale).sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-        }
-    )
-}
-
-@Composable
-fun DialogoInfoEstrellas(
-    onAceptar: () -> Unit
-) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val isTablet = screenWidth > 600.dp
-    val paddingScale = if (isTablet) 1.5f else 1f
-
-    AlertDialog(
-        onDismissRequest = onAceptar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape((28 * paddingScale).dp),
-        icon = {
-            Box(
-                modifier = Modifier.size((120 * paddingScale).dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val infiniteTransition = rememberInfiniteTransition(label = "estrella_info")
-                val escala by infiniteTransition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.15f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "escala"
-                )
-
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFFD700).copy(alpha = 0.2f),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .scale(escala)
-                ) {}
-
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color(0xFFFFD700),
-                    modifier = Modifier.size((70 * paddingScale).dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Informacion Importante",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = (26 * paddingScale).sp,
-                textAlign = TextAlign.Center,
-                color = EduRachaColors.TextPrimary,
-                lineHeight = (32 * paddingScale).sp
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy((24 * paddingScale).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    shape = RoundedCornerShape((24 * paddingScale).dp),
-                    color = Color(0xFFFFD700).copy(alpha = 0.1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding((24 * paddingScale).dp),
-                        verticalArrangement = Arrangement.spacedBy((20 * paddingScale).dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFD700),
-                                modifier = Modifier.size((32 * paddingScale).dp)
-                            )
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy((8 * paddingScale).dp)
-                            ) {
-                                Text(
-                                    "Que significan las estrellas?",
-                                    fontSize = (18 * paddingScale).sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = EduRachaColors.TextPrimary
-                                )
-                                Text(
-                                    "Las estrellas solo indican la cantidad de preguntas que has respondido",
-                                    fontSize = (16 * paddingScale).sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = EduRachaColors.TextPrimary,
-                                    lineHeight = (24 * paddingScale).sp
-                                )
-                            }
-                        }
-
-                        Divider(
-                            color = Color(0xFFFFD700).copy(alpha = 0.3f),
-                            thickness = (1 * paddingScale).dp
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy((14 * paddingScale).dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = null,
-                                tint = Color(0xFF1CB0F6),
-                                modifier = Modifier.size((32 * paddingScale).dp)
-                            )
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy((10 * paddingScale).dp)
-                            ) {
-                                Text(
-                                    "Importante:",
-                                    fontSize = (18 * paddingScale).sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFF1CB0F6)
-                                )
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Text("*", fontSize = (20 * paddingScale).sp, color = Color(0xFF1CB0F6))
-                                    Text(
-                                        "Las estrellas NO indican si tu respuesta es correcta o incorrecta",
-                                        fontSize = (15 * paddingScale).sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = EduRachaColors.TextPrimary,
-                                        lineHeight = (22 * paddingScale).sp
-                                    )
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Text("*", fontSize = (20 * paddingScale).sp, color = Color(0xFF1CB0F6))
-                                    Text(
-                                        "Solo muestran tu progreso en el quiz",
-                                        fontSize = (15 * paddingScale).sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = EduRachaColors.TextPrimary,
-                                        lineHeight = (22 * paddingScale).sp
-                                    )
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy((8 * paddingScale).dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Text("*", fontSize = (20 * paddingScale).sp, color = Color(0xFF1CB0F6))
-                                    Text(
-                                        "Veras tus respuestas correctas e incorrectas al finalizar el quiz",
-                                        fontSize = (15 * paddingScale).sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = EduRachaColors.TextPrimary,
-                                        lineHeight = (22 * paddingScale).sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape((16 * paddingScale).dp),
-                    color = Color(0xFF4CAF50).copy(alpha = 0.1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding((16 * paddingScale).dp),
-                        horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size((28 * paddingScale).dp)
-                        )
-                        Text(
-                            "Confia en tus conocimientos y da lo mejor de ti",
-                            fontSize = (15 * paddingScale).sp,
-                            color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = (22 * paddingScale).sp
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onAceptar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height((64 * paddingScale).dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFD700)
-                ),
-                shape = RoundedCornerShape((18 * paddingScale).dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = (6 * paddingScale).dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy((12 * paddingScale).dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size((26 * paddingScale).dp)
-                    )
-                    Text(
-                        "Entendido, comenzar quiz",
-                        fontSize = (18 * paddingScale).sp,
+                        fontSize = (16 * paddingScale).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }

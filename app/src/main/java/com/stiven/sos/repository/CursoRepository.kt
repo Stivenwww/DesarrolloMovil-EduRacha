@@ -32,15 +32,15 @@ class CursoRepository {
             val response = api.crearCurso(cursoRequest)
 
             if (response.isSuccessful && response.body() != null) {
-                Log.d("CursoRepository", "✅ Curso creado exitosamente")
+                Log.d("CursoRepository", " Curso creado exitosamente")
                 Result.success(response.body()!!)
             } else {
                 val errorBody = response.errorBody()?.string()
-                Log.e("CursoRepository", "❌ Error ${response.code()}: $errorBody")
+                Log.e("CursoRepository", " Error ${response.code()}: $errorBody")
                 Result.failure(Exception("Error al crear curso: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
-            Log.e("CursoRepository", "❌ Excepción al crear curso", e)
+            Log.e("CursoRepository", " Excepción al crear curso", e)
             Result.failure(e)
         }
     }

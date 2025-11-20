@@ -859,7 +859,7 @@ fun TarjetaModoPracticaDuolingo(
             }
 
             Text(
-                text = "Sigue practicando para ganar más experiencia sin perder vidas",
+                text = "Sigue practicando para ganar más experiencia ",
                 fontSize = 15.sp,
                 color = Color.White.copy(alpha = 0.95f),
                 fontWeight = FontWeight.Medium,

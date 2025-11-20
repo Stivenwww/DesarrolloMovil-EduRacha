@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -64,9 +65,13 @@ data class QuizUiState(
     val mostrarDialogoPeriodoFinalizado: Boolean = false,
     val mostrarDialogoErrorGeneral: Boolean = false,
     val mensajeErrorDetallado: String = "",
-    val tituloError: String = ""
-
+    val tituloError: String = "",
+    val respuestasEstado: Map<Int, Boolean> = emptyMap(), // índice de pregunta -> es correcta
+    val ultimaRespuestaCorrecta: Boolean? = null,
+    val mostrarAnimacionRespuesta: Boolean = false
 )
+
+
 
 enum class TipoMensaje {
     EXITO, ERROR, INFO, ADVERTENCIA
@@ -272,6 +277,8 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+
     /**
      * VERIFICAR SI EL QUIZ FINAL YA FUE COMPLETADO
      *
@@ -660,6 +667,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
     // Función para parsear mensaje de error corto (para el toast/mensaje flotante)
     private fun parsearMensajeErrorCorto(mensaje: String): String {
         return when {
@@ -774,6 +782,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun responderPregunta(preguntaId: String, respuestaSeleccionada: Int) {
         viewModelScope.launch {
+            // ✅ VALIDACIÓN LOCAL PREVIA
             val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 0
 
             if (vidasActuales == 0) {
@@ -790,19 +799,21 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val quizId = _uiState.value.quizActivo?.quizId ?: return@launch
+            val indicePregunta = _uiState.value.preguntaActual
 
             Log.d(TAG, "========================================")
             Log.d(TAG, "PROCESANDO RESPUESTA EN TIEMPO REAL")
             Log.d(TAG, "Quiz: $quizId")
             Log.d(TAG, "Pregunta: $preguntaId")
             Log.d(TAG, "Opción: $respuestaSeleccionada")
+            Log.d(TAG, "Índice pregunta: $indicePregunta")
             Log.d(TAG, "Vidas actuales (local): $vidasActuales")
             Log.d(TAG, "========================================")
 
             // Mostrar loading mientras procesa
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            // ENVIAR AL BACKEND INMEDIATAMENTE
+            // ✅ ENVIAR AL BACKEND INMEDIATAMENTE
             val result = repository.procesarRespuestaIndividual(
                 quizId = quizId,
                 preguntaId = preguntaId,
@@ -812,25 +823,42 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
             result.fold(
                 onSuccess = { respuesta ->
-                    Log.d(TAG, " Respuesta procesada por backend")
+                    Log.d(TAG, "✓ Respuesta procesada por backend")
                     Log.d(TAG, "   Es correcta: ${respuesta.esCorrecta}")
                     Log.d(TAG, "   Vidas restantes: ${respuesta.vidasRestantes}")
                     Log.d(TAG, "   Quiz activo: ${respuesta.quizActivo}")
 
-                    // CTUALIZAR VIDAS LOCALMENTE CON VALOR DEL BACKEND
+                    val esCorrecta = respuesta.esCorrecta
+
+                    Log.d(TAG, "========================================")
+                    Log.d(TAG, if (esCorrecta) "✓ RESPUESTA CORRECTA" else "✗ RESPUESTA INCORRECTA")
+                    Log.d(TAG, "========================================")
+
+                    // ✅ ACTUALIZAR MAPA DE RESPUESTAS
+                    val nuevasRespuestas = _uiState.value.respuestasEstado.toMutableMap()
+                    nuevasRespuestas[indicePregunta] = esCorrecta
+
+                    // ✅ CRÍTICO: ACTUALIZAR VIDAS INMEDIATAMENTE CON VALOR DEL BACKEND
+                    val vidasActualizadas = VidasResponse(
+                        vidasActuales = respuesta.vidasRestantes,
+                        vidasMax = 5,
+                        minutosParaProximaVida = 0
+                    )
+
                     _uiState.value = _uiState.value.copy(
-                        vidas = VidasResponse(
-                            vidasActuales = respuesta.vidasRestantes,
-                            vidasMax = 5,
-                            minutosParaProximaVida = 0
-                        ),
+                        vidas = vidasActualizadas, // ✅ ACTUALIZACIÓN INMEDIATA
+                        respuestasEstado = nuevasRespuestas,
+                        ultimaRespuestaCorrecta = esCorrecta,
+                        mostrarAnimacionRespuesta = true,
                         isLoading = false
                     )
 
-                    //  SI BACKEND DICE VIDAS = 0 → INTERRUMPIR
+                    Log.d(TAG, "✓ Vidas actualizadas localmente: ${respuesta.vidasRestantes}")
+
+                    // ✅ VALIDACIÓN: SI BACKEND REPORTA VIDAS = 0 → INTERRUMPIR
                     if (respuesta.vidasRestantes == 0 || !respuesta.quizActivo) {
                         Log.e(TAG, "========================================")
-                        Log.e(TAG, "BACKEND REPORTÓ: VIDAS AGOTADAS")
+                        Log.e(TAG, "✗ BACKEND REPORTÓ: VIDAS AGOTADAS")
                         Log.e(TAG, "Activando interrupción inmediata")
                         Log.e(TAG, "========================================")
 
@@ -842,38 +870,37 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         return@fold
                     }
 
+                    // ✅ GUARDAR RESPUESTA LOCALMENTE
                     val respuestaLocal = RespuestaUsuario(
                         preguntaId = preguntaId,
                         respuestaSeleccionada = respuestaSeleccionada,
                         tiempoSeg = 0
                     )
 
-                    // Avanzar a siguiente pregunta
                     _uiState.value = _uiState.value.copy(
                         respuestas = _uiState.value.respuestas + respuestaLocal,
-                        preguntaActual = _uiState.value.preguntaActual + 1,
                         respuestaProcesada = true
                     )
 
-                    Log.d(TAG, " Pregunta ${_uiState.value.preguntaActual} completada")
-                    Log.d(TAG, "   Total respondidas: ${respuesta.preguntasRespondidas}")
-                    Log.d(TAG, "   Correctas: ${respuesta.preguntasCorrectas}")
+                    Log.d(TAG, "✓ Respuesta guardada localmente")
+                    Log.d(TAG, "✓ Animación configurada: ${if (esCorrecta) "Estrella Dorada" else "Estrella Rota"}")
                 },
                 onFailure = { error ->
                     Log.e(TAG, "========================================")
-                    Log.e(TAG, " ERROR AL PROCESAR RESPUESTA")
+                    Log.e(TAG, "✗ ERROR AL PROCESAR RESPUESTA")
                     Log.e(TAG, "Mensaje: ${error.message}")
                     Log.e(TAG, "========================================")
 
-                    //  DETECTAR SI ES ERROR DE VIDAS AGOTADAS
+                    // ✅ DETECTAR SI ES ERROR DE VIDAS AGOTADAS
                     if (error is QuizAbandonadoPorVidasException) {
-                        Log.e(TAG, " TIPO: Quiz abandonado por vidas")
+                        Log.e(TAG, "✗ TIPO: Quiz abandonado por vidas")
 
                         _uiState.value = _uiState.value.copy(
                             mostrarDialogoSinVidas = true,
                             quizInterrumpidoPorVidas = true,
                             sinVidas = true,
-                            isLoading = false
+                            isLoading = false,
+                            vidas = VidasResponse(0, 5, 0) // ✅ FORZAR VIDAS A 0
                         )
                     } else {
                         // Error genérico
@@ -1349,6 +1376,15 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cerrarDialogoSinVidas() {
         _uiState.value = _uiState.value.copy(mostrarDialogoSinVidas = false)
+    }
+
+    fun ocultarAnimacionRespuesta() {
+        _uiState.update { it.copy(mostrarAnimacionRespuesta = false) }
+    }
+    fun avanzarSiguientePregunta() {
+        _uiState.value = _uiState.value.copy(
+            preguntaActual = _uiState.value.preguntaActual + 1
+        )
     }
 
     override fun onCleared() {

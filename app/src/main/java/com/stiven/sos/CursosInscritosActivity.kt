@@ -1,4 +1,3 @@
-
 package com.stiven.sos
 
 import android.content.Intent
@@ -15,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,7 +29,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,69 +80,105 @@ fun CursosInscritosScreen(
     onCursoClick: (Curso) -> Unit
 ) {
     val uiState by quizViewModel.uiState.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
+    val cursosFiltrados = remember(uiState.cursosInscritos, searchQuery) {
+        if (searchQuery.isBlank()) {
+            uiState.cursosInscritos
+        } else {
+            uiState.cursosInscritos.filter { curso ->
+                curso.titulo.contains(searchQuery, ignoreCase = true) ||
+                        curso.codigo.contains(searchQuery, ignoreCase = true) ||
+                        curso.descripcion?.contains(searchQuery, ignoreCase = true) == true
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = Color(0xFFF5F7FA)
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            EduRachaColors.Primary,
-                            EduRachaColors.PrimaryLight,
-                            EduRachaColors.Accent.copy(alpha = 0.7f)
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Header con gradiente
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                EduRachaColors.Primary,
+                                EduRachaColors.PrimaryLight,
+                                EduRachaColors.Accent.copy(alpha = 0.8f)
+                            )
                         )
                     )
-                )
-        )
-
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Mis Cursos",
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 28.sp,
-                            letterSpacing = 0.5.sp
-                        )
-                        if (uiState.cursosInscritos.isNotEmpty()) {
-                            Text(
-                                text = "${uiState.cursosInscritos.size} ${if (uiState.cursosInscritos.size == 1) "curso inscrito" else "cursos inscritos"}",
-                                color = Color.White.copy(alpha = 0.95f),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(bottom = 24.dp)
+                ) {
+                    // TopBar con botón de volver
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    color = Color.White.copy(alpha = 0.2f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .size(48.dp)
-                            .background(
-                                color = Color.White.copy(alpha = 0.15f),
-                                shape = CircleShape
+
+                        Spacer(Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Mis Cursos",
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 28.sp,
+                                letterSpacing = 0.5.sp
                             )
-                    ) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            if (uiState.cursosInscritos.isNotEmpty()) {
+                                Text(
+                                    text = "${uiState.cursosInscritos.size} ${if (uiState.cursosInscritos.size == 1) "curso inscrito" else "cursos inscritos"}",
+                                    color = Color.White.copy(alpha = 0.95f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    // Buscador
+                    if (uiState.cursosInscritos.isNotEmpty()) {
+                        SearchBar(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                ),
-                modifier = Modifier.statusBarsPadding()
-            )
+                }
+            }
 
+            // Contenido
             when {
                 uiState.isLoading -> {
                     LoadingView()
@@ -156,18 +195,22 @@ fun CursosInscritosScreen(
                     EmptyCursosView()
                 }
 
+                cursosFiltrados.isEmpty() -> {
+                    EmptySearchView(searchQuery = searchQuery)
+                }
+
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(
                             start = 20.dp,
                             end = 20.dp,
-                            top = 20.dp,
+                            top = 24.dp,
                             bottom = 32.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(
-                            items = uiState.cursosInscritos,
+                            items = cursosFiltrados,
                             key = { it.id ?: it.codigo }
                         ) { curso ->
                             CursoInscritoCard(
@@ -180,6 +223,66 @@ fun CursosInscritosScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    TextField(
+        value = searchQuery,
+        onValueChange = onSearchQueryChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp)
+            ),
+        placeholder = {
+            Text(
+                "Buscar cursos...",
+                color = Color.Gray.copy(alpha = 0.6f),
+                fontSize = 15.sp
+            )
+        },
+        leadingIcon = {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = "Buscar",
+                tint = EduRachaColors.Primary,
+                modifier = Modifier.size(24.dp)
+            )
+        },
+        trailingIcon = {
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchQueryChange("") }) {
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = "Limpiar",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        colors = TextFieldDefaults.textFieldColors(
+            containerColor = Color.White,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            cursorColor = EduRachaColors.Primary
+        ),
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = { keyboardController?.hide() }
+        )
+    )
 }
 
 @Composable
@@ -205,17 +308,18 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                 indication = null,
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             ),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // Header del curso con gradiente y animación
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(160.dp)
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(
@@ -231,34 +335,64 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
                     ) {
+                        // Badge de código
                         Surface(
-                            shape = RoundedCornerShape(20.dp),
+                            shape = RoundedCornerShape(12.dp),
                             color = Color.White.copy(alpha = 0.25f)
                         ) {
                             Row(
                                 modifier = Modifier.padding(
-                                    horizontal = 16.dp,
-                                    vertical = 10.dp
+                                    horizontal = 12.dp,
+                                    vertical = 6.dp
                                 ),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Tag,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = curso.codigo,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        // Badge de inscrito
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF4CAF50).copy(alpha = 0.9f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = 12.dp,
+                                    vertical = 6.dp
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     text = "Inscrito",
-                                    fontSize = 13.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -266,76 +400,48 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                         }
                     }
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = curso.titulo,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            lineHeight = 30.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White.copy(alpha = 0.25f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = 14.dp,
-                                    vertical = 8.dp
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Tag,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = curso.codigo,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
+                    // Título del curso
+                    Text(
+                        text = curso.titulo,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        lineHeight = 28.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
+            // Contenido del card
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
+                    .padding(20.dp)
             ) {
                 if (!curso.descripcion.isNullOrBlank()) {
                     Text(
                         text = curso.descripcion ?: "",
                         fontSize = 14.sp,
                         color = EduRachaColors.TextSecondary,
-                        lineHeight = 22.sp,
+                        lineHeight = 21.sp,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(18.dp))
                 }
 
+                // Botón de acción
                 Button(
                     onClick = onClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(52.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Transparent
                     ),
                     contentPadding = PaddingValues(0.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     elevation = ButtonDefaults.buttonElevation(
                         defaultElevation = 0.dp,
                         pressedElevation = 0.dp
@@ -356,17 +462,17 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Icon(
                                 Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                modifier = Modifier.size(26.dp),
+                                modifier = Modifier.size(24.dp),
                                 tint = Color.White
                             )
                             Text(
                                 text = "Comenzar a Practicar",
-                                fontSize = 17.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 letterSpacing = 0.5.sp
@@ -402,38 +508,91 @@ fun AnimatedBackground() {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .size(150.dp)
-                .offset(x = (-30).dp, y = (-30).dp)
+                .size(120.dp)
+                .offset(x = (-25).dp, y = (-25).dp)
                 .rotate(rotation)
                 .background(
                     color = Color.White.copy(alpha = 0.06f),
-                    shape = RoundedCornerShape(35.dp)
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 30.dp, y = 50.dp)
-                .rotate(-rotation)
-                .background(
-                    color = Color.White.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(25.dp)
+                    shape = RoundedCornerShape(30.dp)
                 )
         )
 
         Box(
             modifier = Modifier
                 .size(80.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 25.dp, y = 40.dp)
+                .rotate(-rotation)
+                .background(
+                    color = Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(20.dp)
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .size(60.dp)
                 .align(Alignment.BottomEnd)
-                .offset(x = 20.dp, y = 30.dp)
+                .offset(x = 15.dp, y = 20.dp)
                 .rotate(rotation * 0.7f)
                 .background(
                     color = Color.White.copy(alpha = 0.04f),
                     shape = CircleShape
                 )
         )
+    }
+}
+
+@Composable
+fun EmptySearchView(searchQuery: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.SearchOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(50.dp),
+                    tint = Color.Gray
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text = "No se encontraron cursos",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = EduRachaColors.TextPrimary
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "No hay cursos que coincidan con \"$searchQuery\"",
+                fontSize = 15.sp,
+                color = EduRachaColors.TextSecondary,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
+            )
+        }
     }
 }
 
@@ -463,7 +622,7 @@ fun EmptyCursosView() {
 
             Box(
                 modifier = Modifier
-                    .size(140.dp)
+                    .size(120.dp)
                     .offset(y = float.dp)
             ) {
                 Box(
@@ -472,7 +631,7 @@ fun EmptyCursosView() {
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    EduRachaColors.Primary.copy(alpha = 0.2f),
+                                    EduRachaColors.Primary.copy(alpha = 0.15f),
                                     Color.Transparent
                                 )
                             ),
@@ -482,7 +641,7 @@ fun EmptyCursosView() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(15.dp)
+                        .padding(12.dp)
                         .background(
                             brush = Brush.linearGradient(
                                 colors = listOf(
@@ -497,57 +656,56 @@ fun EmptyCursosView() {
                     Icon(
                         Icons.Default.School,
                         contentDescription = null,
-                        modifier = Modifier.size(65.dp),
+                        modifier = Modifier.size(55.dp),
                         tint = Color.White
                     )
                 }
             }
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
 
             Text(
                 text = "No tienes cursos activos",
-                fontSize = 26.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
+                color = EduRachaColors.TextPrimary,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "Cuando un docente acepte tu solicitud de inscripción, tus cursos aparecerán aquí",
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 15.sp,
+                color = EduRachaColors.TextSecondary,
                 textAlign = TextAlign.Center,
-                lineHeight = 24.sp,
-                fontWeight = FontWeight.Medium
+                lineHeight = 22.sp
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
 
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(16.dp),
+                color = EduRachaColors.Primary.copy(alpha = 0.1f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
                         Icons.Default.Info,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        tint = EduRachaColors.Primary,
+                        modifier = Modifier.size(24.dp)
                     )
                     Text(
                         text = "Solicita acceso a los cursos disponibles en tu institución",
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.95f),
-                        lineHeight = 20.sp
+                        color = EduRachaColors.TextPrimary,
+                        lineHeight = 19.sp
                     )
                 }
             }
@@ -565,19 +723,19 @@ fun LoadingView() {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(60.dp),
-                color = Color.White,
-                strokeWidth = 5.dp
+                modifier = Modifier.size(50.dp),
+                color = EduRachaColors.Primary,
+                strokeWidth = 4.dp
             )
 
             Text(
                 text = "Cargando tus cursos...",
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                color = EduRachaColors.TextSecondary
             )
         }
     }
@@ -599,11 +757,11 @@ fun ErrorView(error: String, onRetry: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(100.dp)
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                EduRachaColors.Error.copy(alpha = 0.2f),
+                                EduRachaColors.Error.copy(alpha = 0.15f),
                                 Color.Transparent
                             )
                         ),
@@ -613,7 +771,7 @@ fun ErrorView(error: String, onRetry: () -> Unit) {
             ) {
                 Box(
                     modifier = Modifier
-                        .size(90.dp)
+                        .size(75.dp)
                         .background(
                             color = Color.White,
                             shape = CircleShape
@@ -623,63 +781,62 @@ fun ErrorView(error: String, onRetry: () -> Unit) {
                     Icon(
                         Icons.Default.ErrorOutline,
                         contentDescription = null,
-                        modifier = Modifier.size(50.dp),
+                        modifier = Modifier.size(40.dp),
                         tint = EduRachaColors.Error
                     )
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Algo salió mal",
-                fontSize = 26.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.White
+                color = EduRachaColors.TextPrimary
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = error,
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 15.sp,
+                color = EduRachaColors.TextSecondary,
                 textAlign = TextAlign.Center,
-                lineHeight = 24.sp,
-                fontWeight = FontWeight.Medium
+                lineHeight = 22.sp
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
 
             Button(
                 onClick = onRetry,
                 modifier = Modifier
                     .fillMaxWidth(0.8f)
-                    .height(56.dp),
+                    .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White
+                    containerColor = EduRachaColors.Primary
                 ),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 12.dp
+                    defaultElevation = 4.dp,
+                    pressedElevation = 8.dp
                 )
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = null,
-                        tint = EduRachaColors.Primary,
-                        modifier = Modifier.size(24.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
                     Text(
                         "Reintentar",
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary
+                        color = Color.White
                     )
                 }
             }
