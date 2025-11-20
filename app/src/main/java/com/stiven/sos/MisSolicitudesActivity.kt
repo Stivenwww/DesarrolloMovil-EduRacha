@@ -205,28 +205,25 @@ fun MisSolicitudesScreen(
         }
     }
 
-    Scaffold(
-        topBar = { ModernTopBar(onNavigateBack, solicitudUiState.solicitudes.size) },
-        containerColor = EduRachaColors.Background
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                solicitudUiState.isLoading -> ModernLoadingScreen()
-                solicitudUiState.solicitudes.isEmpty() -> ModernEmptyState()
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = padding,
-                        end = padding,
-                        top = gap,
-                        bottom = gap * 2
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(gap * 1.2f)
-                ) {
-                    item {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EduRachaColors.Background)
+    ) {
+        when {
+            solicitudUiState.isLoading -> ModernLoadingScreen()
+            solicitudUiState.solicitudes.isEmpty() -> ModernEmptyState()
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = gap * 2)
+            ) {
+                item {
+                    ModernTopBar(onNavigateBack, solicitudUiState.solicitudes.size)
+                }
+
+                item {
+                    Spacer(Modifier.height(gap))
+                    Box(modifier = Modifier.padding(horizontal = padding)) {
                         StatsCards(
                             solicitudes = solicitudUiState.solicitudes,
                             filtroSeleccionado = filtroSeleccionado,
@@ -234,15 +231,19 @@ fun MisSolicitudesScreen(
                                 filtroSeleccionado = if (filtroSeleccionado == nuevoFiltro) null else nuevoFiltro
                             }
                         )
-                        Spacer(Modifier.height(gap))
                     }
+                    Spacer(Modifier.height(gap))
+                }
 
-                    if (solicitudesFiltradas.isEmpty() && filtroSeleccionado != null) {
-                        item {
+                if (solicitudesFiltradas.isEmpty() && filtroSeleccionado != null) {
+                    item {
+                        Box(modifier = Modifier.padding(horizontal = padding)) {
                             EmptyFilterState(filtroSeleccionado!!)
                         }
-                    } else {
-                        items(solicitudesFiltradas, key = { it.id!! }) { solicitud ->
+                    }
+                } else {
+                    items(solicitudesFiltradas, key = { it.id!! }) { solicitud ->
+                        Box(modifier = Modifier.padding(horizontal = padding, vertical = gap * 0.6f)) {
                             ModernSolicitudCard(solicitud)
                         }
                     }
@@ -263,7 +264,7 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
     val infiniteTransition = rememberInfiniteTransition(label = "badge")
     val badgeScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -296,7 +297,7 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                     .fillMaxWidth()
                     .align(Alignment.Center),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(gap * 1.5f)
+                horizontalArrangement = Arrangement.spacedBy(gap)
             ) {
                 var backPressed by remember { mutableStateOf(false) }
 
@@ -306,7 +307,7 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                         onNavigateBack()
                     },
                     modifier = Modifier
-                        .size(iconSize * 1.8f)
+                        .size(iconSize * 1.6f)
                         .graphicsLayer {
                             scaleX = if (backPressed) 0.85f else 1f
                             scaleY = if (backPressed) 0.85f else 1f
@@ -317,24 +318,27 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                         Icons.Default.ArrowBack,
                         contentDescription = "Volver",
                         tint = Color.White,
-                        modifier = Modifier.size(iconSize * 1.1f)
+                        modifier = Modifier.size(iconSize)
                     )
                 }
 
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(gap * 0.4f)
+                    verticalArrangement = Arrangement.spacedBy(gap * 0.3f)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(gap)
+                        horizontalArrangement = Arrangement.spacedBy(gap * 0.7f),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "Mis Solicitudes",
                             color = Color.White,
-                            fontSize = titleSize * 1.15f,
+                            fontSize = titleSize * 0.95f,
                             fontWeight = FontWeight.Black,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
 
                         if (total > 0) {
@@ -353,12 +357,12 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                                         ),
                                         CircleShape
                                     )
-                                    .padding(horizontal = gap * 1.5f, vertical = gap * 0.7f)
+                                    .padding(horizontal = gap * 1.1f, vertical = gap * 0.5f)
                             ) {
                                 Text(
                                     text = total.toString(),
                                     color = Color.White,
-                                    fontSize = subtitleSize * 1.2f,
+                                    fontSize = subtitleSize * 0.95f,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             }
@@ -366,11 +370,12 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                     }
 
                     Text(
-                        text = "Seguimiento académico en tiempo real",
+                        text = "Seguimiento académico",
                         color = Color.White.copy(0.95f),
-                        fontSize = subtitleSize * 1.1f,
+                        fontSize = subtitleSize * 0.85f,
                         fontWeight = FontWeight.Medium,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -386,7 +391,7 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
 
                 Box(
                     modifier = Modifier
-                        .size(iconSize * 2.2f)
+                        .size(iconSize * 1.8f)
                         .graphicsLayer { rotationZ = rotation }
                         .background(
                             Brush.radialGradient(
@@ -404,7 +409,7 @@ fun ModernTopBar(onNavigateBack: () -> Unit, total: Int) {
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier
-                            .size(iconSize * 1.3f)
+                            .size(iconSize * 1.1f)
                             .graphicsLayer { rotationZ = -rotation }
                     )
                 }
