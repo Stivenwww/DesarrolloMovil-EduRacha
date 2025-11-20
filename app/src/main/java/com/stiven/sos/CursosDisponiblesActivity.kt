@@ -22,11 +22,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -76,6 +76,10 @@ fun CursosDisponiblesScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val isTablet = screenWidth >= 600
+
     val cursoUiState by cursoViewModel.uiState.collectAsState()
     val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
@@ -130,84 +134,112 @@ fun CursosDisponiblesScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            EduRachaColors.Primary,
-                            EduRachaColors.Primary.copy(alpha = 0.8f)
-                        )
-                    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F7FA))
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
+            // TopBar como primer item del LazyColumn
+            item {
+                ResponsiveTopBar(
+                    onNavigateBack = onNavigateBack,
+                    cursosCount = cursoUiState.cursos.size,
+                    pendingCount = cursosConSolicitud.size,
+                    isTablet = isTablet
                 )
-        )
+            }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            ModernTopBar(
-                onNavigateBack = onNavigateBack,
-                cursosCount = cursoUiState.cursos.size,
-                pendingCount = cursosConSolicitud.size
-            )
+            // Contenido principal
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (isTablet) 32.dp else 16.dp)
+                ) {
+                    Spacer(Modifier.height(if (isTablet) 20.dp else 16.dp))
 
-            ModernSearchBar(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+                    ModernSearchBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        isTablet = isTablet
+                    )
 
-            FilterChips(
-                selectedFilter = selectedFilter,
-                onFilterSelected = { selectedFilter = it },
-                availableCount = cursoUiState.cursos.size - cursosConSolicitud.size,
-                requestedCount = cursosConSolicitud.size
-            )
+                    Spacer(Modifier.height(16.dp))
 
+                    FilterChips(
+                        selectedFilter = selectedFilter,
+                        onFilterSelected = { selectedFilter = it },
+                        availableCount = cursoUiState.cursos.size - cursosConSolicitud.size,
+                        requestedCount = cursosConSolicitud.size,
+                        isTablet = isTablet
+                    )
+
+                    Spacer(Modifier.height(20.dp))
+                }
+            }
+
+            // Estados de carga/vacío/contenido
             when {
                 cursoUiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(
-                                color = EduRachaColors.Primary,
-                                strokeWidth = 3.dp
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                "Cargando cursos...",
-                                color = EduRachaColors.TextSecondary,
-                                fontSize = 14.sp
-                            )
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(400.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = EduRachaColors.Primary,
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Text(
+                                    "Cargando cursos...",
+                                    color = EduRachaColors.TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
 
                 cursosFiltrados.isEmpty() -> {
-                    ModernEmptyView(
-                        isSearchActive = searchQuery.isNotBlank(),
-                        filterActive = selectedFilter != "Disponibles"
-                    )
+                    item {
+                        ModernEmptyView(
+                            isSearchActive = searchQuery.isNotBlank(),
+                            filterActive = selectedFilter != "Disponibles"
+                        )
+                    }
                 }
 
                 else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(cursosFiltrados, key = { it.codigo }) { curso ->
-                            val tieneSolicitudPendiente = cursosConSolicitud.contains(curso.codigo)
+                    // Lista de cursos
+                    items(cursosFiltrados, key = { it.codigo }) { curso ->
+                        val tieneSolicitudPendiente = cursosConSolicitud.contains(curso.codigo)
 
-                            AnimatedVisibility(
-                                visible = true,
-                                enter = fadeIn() + expandVertically()
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + expandVertically()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    horizontal = if (isTablet) 32.dp else 16.dp,
+                                    vertical = 8.dp
+                                )
                             ) {
                                 ModernCursoCard(
                                     curso = curso,
                                     tieneSolicitudPendiente = tieneSolicitudPendiente,
+                                    isTablet = isTablet,
                                     onSolicitarClick = {
                                         if (tieneSolicitudPendiente) {
                                             cursoSeleccionado = curso
@@ -232,6 +264,7 @@ fun CursosDisponiblesScreen(
             curso = cursoSeleccionado!!,
             mensaje = mensajeEstudiante,
             onMensajeChange = { mensajeEstudiante = it },
+            isTablet = isTablet,
             onDismiss = {
                 showSolicitudDialog = false
                 cursoSeleccionado = null
@@ -255,6 +288,7 @@ fun CursosDisponiblesScreen(
     if (showErrorDialog && cursoSeleccionado != null) {
         ErrorSolicitudDialog(
             curso = cursoSeleccionado!!,
+            isTablet = isTablet,
             onDismiss = {
                 showErrorDialog = false
                 cursoSeleccionado = null
@@ -266,104 +300,100 @@ fun CursosDisponiblesScreen(
 @Composable
 fun ErrorSolicitudDialog(
     curso: Curso,
+    isTablet: Boolean,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (isTablet) 32.dp else 24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White,
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(if (isTablet) 32.dp else 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Icono de error animado
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(if (isTablet) 90.dp else 80.dp)
                         .background(
-                            EduRachaColors.Warning.copy(alpha = 0.1f),
+                            EduRachaColors.Warning.copy(alpha = 0.12f),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.Warning,
+                        Icons.Default.HourglassTop,
                         contentDescription = null,
                         tint = EduRachaColors.Warning,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(if (isTablet) 46.dp else 42.dp)
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
-
-                Text(
-                    text = "Solicitud ya enviada",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    text = "Ya tienes una solicitud pendiente para este curso. El docente revisará tu solicitud pronto.",
-                    fontSize = 15.sp,
-                    color = EduRachaColors.TextSecondary,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
-                )
-
-                Spacer(Modifier.height(20.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Solicitud Pendiente",
+                        fontSize = if (isTablet) 26.sp else 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Tu solicitud está siendo revisada",
+                        fontSize = if (isTablet) 16.sp else 15.sp,
+                        color = EduRachaColors.TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EduRachaColors.Primary.copy(alpha = 0.05f)
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFFF8F9FA)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
                             text = curso.titulo,
-                            fontSize = 16.sp,
+                            fontSize = if (isTablet) 17.sp else 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Primary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            color = EduRachaColors.TextPrimary
                         )
-                        Spacer(Modifier.height(8.dp))
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Código: ",
-                                fontSize = 13.sp,
-                                color = EduRachaColors.TextSecondary
-                            )
-                            Text(
-                                text = curso.codigo,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.TextPrimary
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                            ) {
+                                Text(
+                                    text = curso.codigo,
+                                    fontSize = if (isTablet) 14.sp else 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = EduRachaColors.Primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
-
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EduRachaColors.Warning.copy(alpha = 0.1f),
-                    border = BorderStroke(1.dp, EduRachaColors.Warning.copy(alpha = 0.3f))
+                    shape = RoundedCornerShape(16.dp),
+                    color = EduRachaColors.Warning.copy(alpha = 0.08f)
                 ) {
                     Row(
                         modifier = Modifier
@@ -373,45 +403,35 @@ fun ErrorSolicitudDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.HourglassTop,
+                            Icons.Default.Info,
                             contentDescription = null,
                             tint = EduRachaColors.Warning,
                             modifier = Modifier.size(24.dp)
                         )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Estado: En revisión",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Warning
-                            )
-                            Text(
-                                text = "Recibirás una notificación cuando el docente responda",
-                                fontSize = 12.sp,
-                                color = EduRachaColors.TextSecondary,
-                                lineHeight = 16.sp
-                            )
-                        }
+                        Text(
+                            text = "Te notificaremos cuando el docente revise tu solicitud",
+                            fontSize = if (isTablet) 14.sp else 13.sp,
+                            color = EduRachaColors.TextSecondary,
+                            lineHeight = 18.sp
+                        )
                     }
                 }
-
-                Spacer(Modifier.height(24.dp))
 
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(if (isTablet) 56.dp else 52.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EduRachaColors.Primary
                     ),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
                     Text(
                         "Entendido",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = if (isTablet) 17.sp else 16.sp
                     )
                 }
             }
@@ -420,68 +440,86 @@ fun ErrorSolicitudDialog(
 }
 
 @Composable
-fun ModernTopBar(
+fun ResponsiveTopBar(
     onNavigateBack: () -> Unit,
     cursosCount: Int,
-    pendingCount: Int
+    pendingCount: Int,
+    isTablet: Boolean
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = EduRachaColors.Primary,
+        shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = Color.White.copy(alpha = 0.2f),
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = Color.White
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(
+                    horizontal = if (isTablet) 32.dp else 16.dp,
+                    vertical = if (isTablet) 24.dp else 20.dp
                 )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (pendingCount > 0) {
-                    StatBadge(
-                        icon = Icons.Default.HourglassTop,
-                        text = "$pendingCount",
-                        backgroundColor = Color.White.copy(alpha = 0.2f)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier
+                        .size(if (isTablet) 48.dp else 44.dp)
+                        .background(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isTablet) 24.dp else 22.dp)
                     )
                 }
-                StatBadge(
-                    icon = Icons.Default.School,
-                    text = "$cursosCount",
-                    backgroundColor = Color.White.copy(alpha = 0.2f)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (pendingCount > 0) {
+                        StatBadge(
+                            icon = Icons.Default.Schedule,
+                            text = "$pendingCount",
+                            backgroundColor = EduRachaColors.Warning,
+                            iconTint = Color.White,
+                            isTablet = isTablet
+                        )
+                    }
+                    StatBadge(
+                        icon = Icons.Default.LocalLibrary,
+                        text = "$cursosCount",
+                        backgroundColor = Color.White.copy(alpha = 0.2f),
+                        iconTint = Color.White,
+                        isTablet = isTablet
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(if (isTablet) 20.dp else 16.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Explora Cursos",
+                    fontSize = if (isTablet) 30.sp else 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "Encuentra tu próximo curso",
+                    fontSize = if (isTablet) 16.sp else 15.sp,
+                    color = Color.White.copy(alpha = 0.9f)
                 )
             }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Column {
-            Text(
-                text = "Explora Cursos",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Encuentra el curso perfecto para ti",
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.9f)
-            )
         }
     }
 }
@@ -490,28 +528,33 @@ fun ModernTopBar(
 fun StatBadge(
     icon: ImageVector,
     text: String,
-    backgroundColor: Color
+    backgroundColor: Color,
+    iconTint: Color,
+    isTablet: Boolean
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = backgroundColor
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(
+                horizontal = if (isTablet) 14.dp else 12.dp,
+                vertical = if (isTablet) 10.dp else 8.dp
+            ),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 icon,
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
+                tint = iconTint,
+                modifier = Modifier.size(if (isTablet) 20.dp else 18.dp)
             )
             Text(
                 text = text,
-                color = Color.White,
+                color = iconTint,
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
+                fontSize = if (isTablet) 15.sp else 14.sp
             )
         }
     }
@@ -522,19 +565,19 @@ fun StatBadge(
 fun ModernSearchBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    isTablet: Boolean
 ) {
     TextField(
         value = searchQuery,
         onValueChange = onSearchQueryChange,
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(16.dp)),
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
         placeholder = {
             Text(
-                "Buscar por nombre, código o descripción...",
-                color = EduRachaColors.TextSecondary.copy(alpha = 0.6f),
-                fontSize = 14.sp
+                "Buscar cursos...",
+                color = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
+                fontSize = if (isTablet) 16.sp else 15.sp
             )
         },
         leadingIcon = {
@@ -542,7 +585,7 @@ fun ModernSearchBar(
                 Icons.Default.Search,
                 contentDescription = "Buscar",
                 tint = EduRachaColors.Primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(if (isTablet) 26.dp else 24.dp)
             )
         },
         trailingIcon = {
@@ -551,7 +594,8 @@ fun ModernSearchBar(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Limpiar",
-                        tint = EduRachaColors.TextSecondary
+                        tint = EduRachaColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -564,7 +608,8 @@ fun ModernSearchBar(
             unfocusedIndicatorColor = Color.Transparent
         ),
         shape = RoundedCornerShape(16.dp),
-        singleLine = true
+        singleLine = true,
+        textStyle = LocalTextStyle.current.copy(fontSize = if (isTablet) 16.sp else 15.sp)
     )
 }
 
@@ -573,12 +618,11 @@ fun FilterChips(
     selectedFilter: String,
     onFilterSelected: (String) -> Unit,
     availableCount: Int,
-    requestedCount: Int
+    requestedCount: Int,
+    isTablet: Boolean
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 11.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         FilterChip(
@@ -586,14 +630,18 @@ fun FilterChips(
             count = availableCount,
             selected = selectedFilter == "Disponibles",
             onClick = { onFilterSelected("Disponibles") },
-            icon = Icons.Default.CheckCircle
+            icon = Icons.Default.CheckCircle,
+            isTablet = isTablet,
+            modifier = Modifier.weight(1f)
         )
         FilterChip(
             label = "Solicitados",
             count = requestedCount,
             selected = selectedFilter == "Solicitados",
             onClick = { onFilterSelected("Solicitados") },
-            icon = Icons.Default.HourglassTop
+            icon = Icons.Default.Schedule,
+            isTablet = isTablet,
+            modifier = Modifier.weight(1f)
         )
     }
 }
@@ -605,46 +653,51 @@ fun FilterChip(
     selected: Boolean,
     onClick: () -> Unit,
     icon: ImageVector,
+    isTablet: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val height = if (isTablet) 100.dp else 86.dp
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = if (selected) EduRachaColors.Primary else Color.White,
-        border = if (!selected) BorderStroke(1.5.dp, EduRachaColors.Primary.copy(alpha = 0.3f)) else null,
-        modifier = modifier.shadow(if (selected) 6.dp else 0.dp, RoundedCornerShape(16.dp))
+        shadowElevation = if (selected) 4.dp else 1.dp,
+        modifier = modifier.height(height)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(if (isTablet) 18.dp else 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Icon(
                 icon,
                 contentDescription = null,
                 tint = if (selected) Color.White else EduRachaColors.Primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(if (isTablet) 28.dp else 26.dp)
             )
+
             Text(
                 text = label,
                 color = if (selected) Color.White else EduRachaColors.TextPrimary,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = if (isTablet) 15.sp else 14.sp,
                 textAlign = TextAlign.Center
             )
-            if (count > 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (selected) Color.White.copy(alpha = 0.3f) else EduRachaColors.Primary.copy(alpha = 0.1f)
-                ) {
-                    Text(
-                        text = count.toString(),
-                        color = if (selected) Color.White else EduRachaColors.Primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (selected) Color.White.copy(alpha = 0.25f) else EduRachaColors.Primary.copy(alpha = 0.1f)
+            ) {
+                Text(
+                    text = count.toString(),
+                    color = if (selected) Color.White else EduRachaColors.Primary,
+                    fontSize = if (isTablet) 14.sp else 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
             }
         }
     }
@@ -654,12 +707,13 @@ fun FilterChip(
 fun ModernCursoCard(
     curso: Curso,
     tieneSolicitudPendiente: Boolean,
+    isTablet: Boolean,
     onSolicitarClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(20.dp)),
+            .shadow(3.dp, RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
@@ -669,12 +723,12 @@ fun ModernCursoCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
+                    .height(if (isTablet) 110.dp else 100.dp)
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
                                 EduRachaColors.Primary,
-                                EduRachaColors.Primary.copy(alpha = 0.7f)
+                                EduRachaColors.Primary.copy(alpha = 0.8f)
                             )
                         )
                     )
@@ -686,15 +740,16 @@ fun ModernCursoCard(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = Color.White.copy(alpha = 0.2f)
+                            color = Color.White.copy(alpha = 0.25f)
                         ) {
                             Text(
                                 text = curso.codigo,
-                                fontSize = 12.sp,
+                                fontSize = if (isTablet) 13.sp else 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -707,12 +762,12 @@ fun ModernCursoCard(
                                 color = EduRachaColors.Warning
                             ) {
                                 Icon(
-                                    Icons.Default.HourglassTop,
+                                    Icons.Default.Schedule,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier
                                         .padding(8.dp)
-                                        .size(20.dp)
+                                        .size(18.dp)
                                 )
                             }
                         }
@@ -720,24 +775,28 @@ fun ModernCursoCard(
 
                     Text(
                         text = curso.titulo,
-                        fontSize = 20.sp,
+                        fontSize = if (isTablet) 18.sp else 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        maxLines = 2
+                        maxLines = 2,
+                        lineHeight = 22.sp
                     )
                 }
             }
 
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
                     text = curso.descripcion,
-                    fontSize = 14.sp,
+                    fontSize = if (isTablet) 15.sp else 14.sp,
                     color = EduRachaColors.TextSecondary,
-                    lineHeight = 22.sp,
+                    lineHeight = 20.sp,
                     maxLines = 3
                 )
-
-                Spacer(Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -746,20 +805,21 @@ fun ModernCursoCard(
                     ModernInfoChip(
                         icon = Icons.Outlined.CalendarToday,
                         text = "${curso.duracionDias} días",
+                        isTablet = isTablet,
                         modifier = Modifier.weight(1f)
                     )
                     ModernInfoChip(
                         icon = Icons.Outlined.Person,
                         text = "Docente",
+                        isTablet = isTablet,
                         modifier = Modifier.weight(1f)
                     )
                 }
 
                 if (tieneSolicitudPendiente) {
-                    Spacer(Modifier.height(16.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = EduRachaColors.Warning.copy(alpha = 0.1f),
+                        color = EduRachaColors.Warning.copy(alpha = 0.08f),
                         border = BorderStroke(1.dp, EduRachaColors.Warning.copy(alpha = 0.3f))
                     ) {
                         Row(
@@ -776,8 +836,8 @@ fun ModernCursoCard(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Solicitud en revisión por el docente",
-                                fontSize = 13.sp,
+                                text = "En revisión",
+                                fontSize = if (isTablet) 14.sp else 13.sp,
                                 color = EduRachaColors.Warning,
                                 fontWeight = FontWeight.Medium
                             )
@@ -785,22 +845,19 @@ fun ModernCursoCard(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
-
                 Button(
                     onClick = onSolicitarClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(if (isTablet) 54.dp else 50.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (tieneSolicitudPendiente)
-                            EduRachaColors.TextSecondary.copy(alpha = 0.3f)
-                        else EduRachaColors.Primary,
-                        disabledContainerColor = EduRachaColors.TextSecondary.copy(alpha = 0.3f)
+                            EduRachaColors.TextSecondary.copy(alpha = 0.2f)
+                        else EduRachaColors.Primary
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = if (tieneSolicitudPendiente) 0.dp else 4.dp
+                        defaultElevation = if (tieneSolicitudPendiente) 0.dp else 0.dp
                     )
                 ) {
                     Icon(
@@ -808,11 +865,11 @@ fun ModernCursoCard(
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = if (tieneSolicitudPendiente) "Solicitud Enviada" else "Solicitar Unirse",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = if (isTablet) 16.sp else 15.sp
                     )
                 }
             }
@@ -824,15 +881,18 @@ fun ModernCursoCard(
 fun ModernInfoChip(
     icon: ImageVector,
     text: String,
+    isTablet: Boolean,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        modifier = modifier.height(if (isTablet) 44.dp else 42.dp),
+        shape = RoundedCornerShape(12.dp),
         color = EduRachaColors.Primary.copy(alpha = 0.08f)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -844,7 +904,7 @@ fun ModernInfoChip(
             )
             Text(
                 text = text,
-                fontSize = 13.sp,
+                fontSize = if (isTablet) 14.sp else 13.sp,
                 color = EduRachaColors.TextPrimary,
                 fontWeight = FontWeight.Medium
             )
@@ -857,6 +917,7 @@ fun ModernSolicitudDialog(
     curso: Curso,
     mensaje: String,
     onMensajeChange: (String) -> Unit,
+    isTablet: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -872,21 +933,22 @@ fun ModernSolicitudDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
+                .padding(horizontal = if (isTablet) 40.dp else 20.dp)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White,
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header fijo
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color.White,
-                    shadowElevation = 2.dp
+                    color = Color.White
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp)
+                        modifier = Modifier.padding(if (isTablet) 28.dp else 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -895,9 +957,9 @@ fun ModernSolicitudDialog(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(if (isTablet) 52.dp else 48.dp)
                                     .background(
-                                        EduRachaColors.Primary.copy(alpha = 0.1f),
+                                        EduRachaColors.Primary.copy(alpha = 0.12f),
                                         CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -906,11 +968,14 @@ fun ModernSolicitudDialog(
                                     Icons.Default.School,
                                     contentDescription = null,
                                     tint = EduRachaColors.Primary,
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(if (isTablet) 28.dp else 26.dp)
                                 )
                             }
 
-                            IconButton(onClick = onDismiss) {
+                            IconButton(
+                                onClick = onDismiss,
+                                modifier = Modifier.size(if (isTablet) 44.dp else 40.dp)
+                            ) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Cerrar",
@@ -919,66 +984,62 @@ fun ModernSolicitudDialog(
                             }
                         }
 
-                        Spacer(Modifier.height(20.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                text = "Solicitar Unirse",
+                                fontSize = if (isTablet) 28.sp else 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EduRachaColors.TextPrimary
+                            )
 
-                        Text(
-                            text = "Solicitar Unirse",
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.TextPrimary
-                        )
-
-                        Spacer(Modifier.height(12.dp))
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = EduRachaColors.Primary.copy(alpha = 0.05f)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFFF8F9FA)
                             ) {
-                                Text(
-                                    text = curso.titulo,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EduRachaColors.Primary
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "Código:",
-                                        fontSize = 13.sp,
-                                        color = EduRachaColors.TextSecondary
-                                    )
-                                    Text(
-                                        text = curso.codigo,
-                                        fontSize = 13.sp,
+                                        text = curso.titulo,
+                                        fontSize = if (isTablet) 17.sp else 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = EduRachaColors.TextPrimary
                                     )
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                                    ) {
+                                        Text(
+                                            text = curso.codigo,
+                                            fontSize = if (isTablet) 14.sp else 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = EduRachaColors.Primary,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Contenido scrolleable
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    contentPadding = PaddingValues(
+                        horizontal = if (isTablet) 28.dp else 24.dp,
+                        vertical = 16.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
                         Text(
                             text = "Mensaje para el docente",
-                            fontSize = 16.sp,
+                            fontSize = if (isTablet) 17.sp else 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = EduRachaColors.TextPrimary
                         )
@@ -986,8 +1047,8 @@ fun ModernSolicitudDialog(
 
                     item {
                         Text(
-                            text = "Mensajes sugeridos:",
-                            fontSize = 13.sp,
+                            text = "Selecciona un mensaje sugerido:",
+                            fontSize = if (isTablet) 14.sp else 13.sp,
                             color = EduRachaColors.TextSecondary,
                             fontWeight = FontWeight.Medium
                         )
@@ -997,6 +1058,7 @@ fun ModernSolicitudDialog(
                         PredefinedMessageChip(
                             message = predefinido,
                             isSelected = selectedPredefined == predefinido,
+                            isTablet = isTablet,
                             onClick = {
                                 selectedPredefined = predefinido
                                 onMensajeChange(predefinido)
@@ -1008,7 +1070,7 @@ fun ModernSolicitudDialog(
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = "O escribe tu propio mensaje:",
-                            fontSize = 13.sp,
+                            fontSize = if (isTablet) 14.sp else 13.sp,
                             color = EduRachaColors.TextSecondary,
                             fontWeight = FontWeight.Medium
                         )
@@ -1024,17 +1086,18 @@ fun ModernSolicitudDialog(
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = {
                                 Text(
-                                    "Escribe aquí tu mensaje personalizado...",
-                                    fontSize = 14.sp
+                                    "Escribe aquí tu mensaje...",
+                                    fontSize = if (isTablet) 15.sp else 14.sp
                                 )
                             },
                             minLines = 4,
                             maxLines = 6,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = EduRachaColors.Primary,
                                 unfocusedBorderColor = EduRachaColors.TextSecondary.copy(alpha = 0.3f)
-                            )
+                            ),
+                            textStyle = LocalTextStyle.current.copy(fontSize = if (isTablet) 15.sp else 14.sp)
                         )
                     }
 
@@ -1043,7 +1106,6 @@ fun ModernSolicitudDialog(
                     }
                 }
 
-                // Footer fijo con botones
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.White,
@@ -1052,21 +1114,22 @@ fun ModernSolicitudDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(if (isTablet) 28.dp else 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedButton(
                             onClick = onDismiss,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(52.dp),
+                                .height(if (isTablet) 56.dp else 52.dp),
                             shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.5.dp, EduRachaColors.TextSecondary.copy(alpha = 0.5f))
+                            border = BorderStroke(1.5.dp, EduRachaColors.TextSecondary.copy(alpha = 0.3f))
                         ) {
                             Text(
                                 "Cancelar",
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp
+                                fontSize = if (isTablet) 16.sp else 15.sp,
+                                color = EduRachaColors.TextPrimary
                             )
                         }
 
@@ -1074,12 +1137,12 @@ fun ModernSolicitudDialog(
                             onClick = onConfirm,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(52.dp),
+                                .height(if (isTablet) 56.dp else 52.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = EduRachaColors.Primary
                             ),
                             shape = RoundedCornerShape(14.dp),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                         ) {
                             Icon(
                                 Icons.Default.Send,
@@ -1089,8 +1152,8 @@ fun ModernSolicitudDialog(
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 "Enviar",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = if (isTablet) 16.sp else 15.sp
                             )
                         }
                     }
@@ -1104,14 +1167,15 @@ fun ModernSolicitudDialog(
 fun PredefinedMessageChip(
     message: String,
     isSelected: Boolean,
+    isTablet: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = if (isSelected) EduRachaColors.Primary.copy(alpha = 0.1f) else Color.White,
         border = BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
+            width = if (isSelected) 2.dp else 1.5.dp,
             color = if (isSelected) EduRachaColors.Primary else EduRachaColors.TextSecondary.copy(alpha = 0.2f)
         ),
         modifier = Modifier.fillMaxWidth()
@@ -1119,23 +1183,23 @@ fun PredefinedMessageChip(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(if (isTablet) 16.dp else 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top
         ) {
             Icon(
                 if (isSelected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
                 contentDescription = null,
-                tint = if (isSelected) EduRachaColors.Primary else EduRachaColors.TextSecondary.copy(alpha = 0.5f),
+                tint = if (isSelected) EduRachaColors.Primary else EduRachaColors.TextSecondary.copy(alpha = 0.4f),
                 modifier = Modifier
                     .size(20.dp)
                     .padding(top = 2.dp)
             )
             Text(
                 text = message,
-                fontSize = 13.sp,
+                fontSize = if (isTablet) 14.sp else 13.sp,
                 color = if (isSelected) EduRachaColors.Primary else EduRachaColors.TextSecondary,
-                lineHeight = 18.sp,
+                lineHeight = 19.sp,
                 fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
             )
         }
@@ -1147,16 +1211,16 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "empty_animation")
         val scale by infiniteTransition.animateFloat(
-            initialValue = 0.9f,
-            targetValue = 1.1f,
+            initialValue = 0.95f,
+            targetValue = 1.05f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1500, easing = FastOutSlowInEasing),
+                animation = tween(2000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
             label = "scale"
@@ -1166,7 +1230,7 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
             modifier = Modifier
                 .size(120.dp)
                 .background(
-                    EduRachaColors.Primary.copy(alpha = 0.1f),
+                    EduRachaColors.Primary.copy(alpha = 0.08f),
                     CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -1178,18 +1242,18 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
                     else -> Icons.Default.School
                 },
                 contentDescription = null,
-                modifier = Modifier.size(60.dp),
-                tint = EduRachaColors.Primary.copy(alpha = 0.6f)
+                modifier = Modifier.size(56.dp),
+                tint = EduRachaColors.Primary.copy(alpha = 0.5f)
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         Text(
             text = when {
                 isSearchActive -> "No se encontraron cursos"
                 filterActive -> "Sin cursos en esta categoría"
-                else -> "No hay cursos disponibles por ahora"
+                else -> "No hay cursos disponibles"
             },
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -1202,8 +1266,8 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
         Text(
             text = when {
                 isSearchActive -> "Intenta con otros términos de búsqueda"
-                filterActive -> "Prueba con otro filtro para ver más cursos"
-                else -> "Pronto habrá nuevos cursos disponibles"
+                filterActive -> "Prueba con otro filtro"
+                else -> "Pronto habrá nuevos cursos"
             },
             fontSize = 15.sp,
             color = EduRachaColors.TextSecondary,
@@ -1215,12 +1279,12 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
             Spacer(Modifier.height(24.dp))
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = EduRachaColors.Primary.copy(alpha = 0.1f)
+                shape = RoundedCornerShape(14.dp),
+                color = EduRachaColors.Primary.copy(alpha = 0.08f)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -1230,7 +1294,7 @@ fun ModernEmptyView(isSearchActive: Boolean, filterActive: Boolean) {
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Tip: Usa palabras clave más generales",
+                        text = "Usa palabras clave más generales",
                         fontSize = 13.sp,
                         color = EduRachaColors.Primary,
                         fontWeight = FontWeight.Medium
