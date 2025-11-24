@@ -782,7 +782,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
     fun responderPregunta(preguntaId: String, respuestaSeleccionada: Int) {
         viewModelScope.launch {
-            // ✅ VALIDACIÓN LOCAL PREVIA
+            //  VALIDACIÓN LOCAL PREVIA
             val vidasActuales = _uiState.value.vidas?.vidasActuales ?: 0
 
             if (vidasActuales == 0) {
@@ -801,6 +801,18 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             val quizId = _uiState.value.quizActivo?.quizId ?: return@launch
             val indicePregunta = _uiState.value.preguntaActual
 
+            //  VALIDACIÓN CRÍTICA: Verificar si esta pregunta ya fue respondida
+            val yaRespondida = _uiState.value.respuestas.any { it.preguntaId == preguntaId }
+
+            if (yaRespondida) {
+                Log.w(TAG, "========================================")
+                Log.w(TAG, "INTENTO DE RESPONDER PREGUNTA YA CONTESTADA")
+                Log.w(TAG, "Pregunta ID: $preguntaId")
+                Log.w(TAG, "BLOQUEADO - Evitando duplicación")
+                Log.w(TAG, "========================================")
+                return@launch
+            }
+
             Log.d(TAG, "========================================")
             Log.d(TAG, "PROCESANDO RESPUESTA EN TIEMPO REAL")
             Log.d(TAG, "Quiz: $quizId")
@@ -813,7 +825,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             // Mostrar loading mientras procesa
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            // ✅ ENVIAR AL BACKEND INMEDIATAMENTE
+            // ENVIAR AL BACKEND INMEDIATAMENTE
             val result = repository.procesarRespuestaIndividual(
                 quizId = quizId,
                 preguntaId = preguntaId,
@@ -834,11 +846,11 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     Log.d(TAG, if (esCorrecta) "✓ RESPUESTA CORRECTA" else "✗ RESPUESTA INCORRECTA")
                     Log.d(TAG, "========================================")
 
-                    // ✅ ACTUALIZAR MAPA DE RESPUESTAS
+                    //  ACTUALIZAR MAPA DE RESPUESTAS
                     val nuevasRespuestas = _uiState.value.respuestasEstado.toMutableMap()
                     nuevasRespuestas[indicePregunta] = esCorrecta
 
-                    // ✅ CRÍTICO: ACTUALIZAR VIDAS INMEDIATAMENTE CON VALOR DEL BACKEND
+                    //  CRÍTICO: ACTUALIZAR VIDAS INMEDIATAMENTE CON VALOR DEL BACKEND
                     val vidasActualizadas = VidasResponse(
                         vidasActuales = respuesta.vidasRestantes,
                         vidasMax = 5,
@@ -846,7 +858,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     )
 
                     _uiState.value = _uiState.value.copy(
-                        vidas = vidasActualizadas, // ✅ ACTUALIZACIÓN INMEDIATA
+                        vidas = vidasActualizadas,
                         respuestasEstado = nuevasRespuestas,
                         ultimaRespuestaCorrecta = esCorrecta,
                         mostrarAnimacionRespuesta = true,
@@ -855,7 +867,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
                     Log.d(TAG, "✓ Vidas actualizadas localmente: ${respuesta.vidasRestantes}")
 
-                    // ✅ VALIDACIÓN: SI BACKEND REPORTA VIDAS = 0 → INTERRUMPIR
+                    //  VALIDACIÓN: SI BACKEND REPORTA VIDAS = 0 → INTERRUMPIR
                     if (respuesta.vidasRestantes == 0 || !respuesta.quizActivo) {
                         Log.e(TAG, "========================================")
                         Log.e(TAG, "✗ BACKEND REPORTÓ: VIDAS AGOTADAS")
@@ -870,19 +882,29 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                         return@fold
                     }
 
-                    // ✅ GUARDAR RESPUESTA LOCALMENTE
+                    //  GUARDAR RESPUESTA LOCALMENTE (SOLO UNA VEZ)
                     val respuestaLocal = RespuestaUsuario(
                         preguntaId = preguntaId,
                         respuestaSeleccionada = respuestaSeleccionada,
                         tiempoSeg = 0
                     )
 
-                    _uiState.value = _uiState.value.copy(
-                        respuestas = _uiState.value.respuestas + respuestaLocal,
-                        respuestaProcesada = true
-                    )
+                    // VERIFICACIÓN FINAL: Asegurar que no se duplique al agregar
+                    val respuestasActualizadas = _uiState.value.respuestas.toMutableList()
+                    if (!respuestasActualizadas.any { it.preguntaId == preguntaId }) {
+                        respuestasActualizadas.add(respuestaLocal)
 
-                    Log.d(TAG, "✓ Respuesta guardada localmente")
+                        _uiState.value = _uiState.value.copy(
+                            respuestas = respuestasActualizadas,
+                            respuestaProcesada = true
+                        )
+
+                        Log.d(TAG, "✓ Respuesta guardada localmente")
+                        Log.d(TAG, "✓ Total respuestas: ${respuestasActualizadas.size}")
+                    } else {
+                        Log.w(TAG, "⚠ Respuesta duplicada detectada y bloqueada")
+                    }
+
                     Log.d(TAG, "✓ Animación configurada: ${if (esCorrecta) "Estrella Dorada" else "Estrella Rota"}")
                 },
                 onFailure = { error ->
@@ -891,7 +913,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     Log.e(TAG, "Mensaje: ${error.message}")
                     Log.e(TAG, "========================================")
 
-                    // ✅ DETECTAR SI ES ERROR DE VIDAS AGOTADAS
+                    //  DETECTAR SI ES ERROR DE VIDAS AGOTADAS
                     if (error is QuizAbandonadoPorVidasException) {
                         Log.e(TAG, "✗ TIPO: Quiz abandonado por vidas")
 
@@ -900,10 +922,9 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                             quizInterrumpidoPorVidas = true,
                             sinVidas = true,
                             isLoading = false,
-                            vidas = VidasResponse(0, 5, 0) // ✅ FORZAR VIDAS A 0
+                            vidas = VidasResponse(0, 5, 0)
                         )
                     } else {
-                        // Error genérico
                         _uiState.value = _uiState.value.copy(
                             isLoading = false
                         )
