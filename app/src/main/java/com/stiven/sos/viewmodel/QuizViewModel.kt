@@ -135,7 +135,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             cursoId = cursoId,
             onVidasActualizadas = { vidas ->
                 Log.d(TAG, "----------------------------------------")
-                Log.d(TAG, "ACTUALIZACION DE VIDAS DETECTADA")
+                Log.d(TAG, "ACTUALIZACION DE VIDAS DETECTADA.")
                 Log.d(TAG, "Vidas actuales: ${vidas.vidasActuales}")
 
                 val estadoAnterior = _uiState.value
