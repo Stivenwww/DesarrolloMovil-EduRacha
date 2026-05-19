@@ -9,10 +9,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,13 +22,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.EduRachaV2Colors
+import com.stiven.sos.ui.theme.EduRachaV2Gradients
 import com.stiven.sos.viewmodel.QuizViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class ExplicacionTemaActivity : ComponentActivity() {
 
@@ -81,7 +84,10 @@ class ExplicacionTemaActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ============================================================================
+// PANTALLA PRINCIPAL
+// ============================================================================
+
 @Composable
 fun ExplicacionTemaScreen(
     temaTitulo: String,
@@ -93,446 +99,636 @@ fun ExplicacionTemaScreen(
     onIniciarQuiz: (String) -> Unit
 ) {
     val uiState by quizViewModel.uiState.collectAsState()
-    var explicacionCompletada by remember { mutableStateOf(false) }
+
+    // Dividir explicación en secciones
+    val secciones = remember(temaExplicacion) {
+        temaExplicacion.split("\n\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    var seccionesCompletadas by remember { mutableStateOf(setOf<Int>()) }
+    val todasCompletadas = seccionesCompletadas.size == secciones.size
 
     val aproboQuizOficial = uiState.porcentajeQuizOficial >= 80
     val enCooldown = uiState.yaResolviHoy && aproboQuizOficial
 
-    val puedeHacerQuizOficial = explicacionCompletada && !uiState.sinVidas && (!aproboQuizOficial || !enCooldown)
-    val puedeHacerPractica = aproboQuizOficial && !uiState.sinVidas
+    // IMPORTANTE: Quiz práctica solo se habilita si YA resolvió el oficial HOY
+    val yaResolviHoy = uiState.yaResolviHoy
+
+    var seccionActual by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    // Expresión de la mascota según progreso
+    val expresionBuho = when {
+        todasCompletadas -> OwlExpression.HAPPY
+        seccionesCompletadas.size >= secciones.size / 2 -> OwlExpression.EXCITED
+        seccionesCompletadas.isEmpty() -> OwlExpression.CURIOUS
+        else -> OwlExpression.FOCUSED
+    }
+
+    // Marcar explicación como vista cuando se completan todas las secciones
+    LaunchedEffect(todasCompletadas) {
+        if (todasCompletadas) {
+            quizViewModel.marcarExplicacionVista(temaId) {}
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .background(EduRachaV2Colors.Background)
     ) {
-        // Background gradient
-        Box(
+        // TODO ES SCROLLABLE INCLUYENDO EL HEADER
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 100.dp)
+        ) {
+            // HEADER SIMPLE CON TÍTULO Y BURBUJAS
+            item {
+                HeaderConBurbujas(
+                    titulo = temaTitulo,
+                    cantidadSecciones = secciones.size,
+                    onNavigateBack = onNavigateBack
+                )
+            }
+
+            // INDICADORES DE PROGRESO
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    IndicadoresProgreso(
+                        total = secciones.size,
+                        seccionActual = seccionActual,
+                        seccionesCompletadas = seccionesCompletadas,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                    )
+
+                    // MASCOTA BÚHO ANIMADA
+                    MascotaBuho(
+                        expresion = expresionBuho,
+                        mensaje = obtenerMensajeBuho(seccionesCompletadas.size, secciones.size, todasCompletadas),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                }
+            }
+
+            // TARJETA STORY ACTUAL
+            item {
+                StoryCard(
+                    numero = seccionActual + 1,
+                    contenido = secciones[seccionActual],
+                    completada = seccionesCompletadas.contains(seccionActual),
+                    onCompletar = {
+                        seccionesCompletadas = seccionesCompletadas + seccionActual
+                        // Transición más rápida (600ms)
+                        scope.launch {
+                            delay(600)
+                            if (seccionActual < secciones.size - 1) {
+                                seccionActual++
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+
+            // CARDS DE QUIZ (solo si todas completadas)
+            if (todasCompletadas) {
+                // Card de completado
+                item {
+                    CardTemaCompletadoModerno(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                    )
+                }
+
+                // Quiz Oficial Card
+                item {
+                    QuizOficialCard(
+                        aproboQuizOficial = aproboQuizOficial,
+                        porcentajeObtenido = uiState.porcentajeQuizOficial,
+                        enCooldown = enCooldown,
+                        horasRestantes = uiState.horasParaNuevoQuiz,
+                        minutosRestantes = uiState.minutosParaNuevoQuiz,
+                        sinVidas = uiState.sinVidas,
+                        onIniciar = { onIniciarQuiz("oficial") },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    )
+                }
+
+                // Quiz Práctica Card - SOLO SI YA RESOLVIÓ HOY
+                if (yaResolviHoy && aproboQuizOficial) {
+                    item {
+                        QuizPracticaCard(
+                            sinVidas = uiState.sinVidas,
+                            onIniciar = { onIniciarQuiz("practica") },
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            } else {
+                // Mensaje de bloqueo
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = EduRachaV2Colors.TextSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Column {
+                                Text(
+                                    "Quiz bloqueado",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EduRachaV2Colors.TextPrimary
+                                )
+                                Text(
+                                    "Lee todas las secciones para desbloquear",
+                                    fontSize = 14.sp,
+                                    color = EduRachaV2Colors.TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // BOTONES DE NAVEGACIÓN FIJOS EN LA PARTE INFERIOR
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(250.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            EduRachaColors.Primary,
-                            EduRachaColors.Primary.copy(alpha = 0.9f),
-                            EduRachaColors.Background
-                        )
-                    )
-                )
-        )
-
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopBarExplicacion(
-                titulo = temaTitulo,
-                onNavigateBack = onNavigateBack
-            )
-
-            Column(
+                .align(Alignment.BottomCenter),
+            color = EduRachaV2Colors.Background,
+            shadowElevation = 8.dp
+        ) {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (aproboQuizOficial && enCooldown) {
-                    AlertaCooldownActivo(
-                        horas = uiState.horasParaNuevoQuiz,
-                        minutos = uiState.minutosParaNuevoQuiz,
-                        porcentajeObtenido = uiState.porcentajeQuizOficial
+                // Anterior
+                IconButton(
+                    onClick = { if (seccionActual > 0) seccionActual-- },
+                    enabled = seccionActual > 0,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(
+                            if (seccionActual > 0) EduRachaV2Colors.Primary
+                            else EduRachaV2Colors.SoftGray,
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Anterior",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
-                if (uiState.porcentajeQuizOficial > 0 && !aproboQuizOficial) {
-                    AlertaIntentarNuevamente(
-                        porcentajeObtenido = uiState.porcentajeQuizOficial
-                    )
-                }
-
-                // NUEVA IMPLEMENTACIÓN: Lectura por Etapas
-                ExplicacionPorEtapas(
-                    explicacion = temaExplicacion,
-                    onCompletada = {
-                        explicacionCompletada = true
-                        quizViewModel.marcarExplicacionVista(temaId) {}
-                    }
+                // Texto indicador
+                Text(
+                    "${seccionActual + 1} / ${secciones.size}",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaV2Colors.TextPrimary,
+                    modifier = Modifier.align(Alignment.CenterVertically)
                 )
 
-                CardQuizOficial(
-                    puedeIniciar = puedeHacerQuizOficial,
-                    explicacionVista = explicacionCompletada,
-                    sinVidas = uiState.sinVidas,
-                    aproboQuizOficial = aproboQuizOficial,
-                    porcentajeObtenido = uiState.porcentajeQuizOficial,
-                    enCooldown = enCooldown,
-                    horasRestantes = uiState.horasParaNuevoQuiz,
-                    minutosRestantes = uiState.minutosParaNuevoQuiz,
-                    onIniciar = { onIniciarQuiz("oficial") }
-                )
-
-                if (aproboQuizOficial) {
-                    CardModoPractica(
-                        sinVidas = uiState.sinVidas,
-                        onIniciar = { onIniciarQuiz("practica") }
+                // Siguiente
+                IconButton(
+                    onClick = {
+                        if (seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1) {
+                            seccionActual++
+                        }
+                    },
+                    enabled = seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(
+                            if (seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1)
+                                EduRachaV2Colors.Primary
+                            else EduRachaV2Colors.SoftGray,
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        Icons.Default.ArrowForward,
+                        contentDescription = "Siguiente",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-
-                Spacer(Modifier.height(20.dp))
             }
         }
     }
 }
 
-// NUEVA FUNCIÓN: Sistema de lectura por etapas
+// ============================================================================
+// HEADER CON BURBUJAS - COMPACTO
+// ============================================================================
+
 @Composable
-fun ExplicacionPorEtapas(
-    explicacion: String,
-    onCompletada: () -> Unit
+fun HeaderConBurbujas(
+    titulo: String,
+    cantidadSecciones: Int,
+    onNavigateBack: () -> Unit
 ) {
-    // Dividir la explicación en párrafos
-    val parrafos = remember(explicacion) {
-        explicacion.split("\n\n")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .background(EduRachaV2Gradients.Purple)
+            .statusBarsPadding()
+    ) {
+        // Burbujas decorativas animadas
+        Box(modifier = Modifier.fillMaxSize()) {
+            val infiniteTransition = rememberInfiniteTransition(label = "bubbles")
 
-    var etapaActual by remember { mutableStateOf(0) }
-    var todasLasEtapasVistas by remember { mutableStateOf(false) }
+            val bubble1Offset by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 10f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "bubble1"
+            )
 
-    val progress = (etapaActual + 1).toFloat() / parrafos.size.toFloat()
+            // Burbuja grande
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .offset(x = 250.dp, y = (-10).dp)
+                    .graphicsLayer { translationY = bubble1Offset }
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
+            )
 
-    // Animación de entrada de cards
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
-        label = "progress"
-    )
+            // Burbuja mediana
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .offset(x = 200.dp, y = 60.dp)
+                    .graphicsLayer { translationY = -bubble1Offset * 0.7f }
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+            )
 
-    LaunchedEffect(todasLasEtapasVistas) {
-        if (todasLasEtapasVistas) {
-            onCompletada()
+            // Burbuja pequeña
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .offset(x = 20.dp, y = 30.dp)
+                    .graphicsLayer { translationY = bubble1Offset * 0.5f }
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Botón back
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White.copy(0.2f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Column {
+                // Ícono de libro
+                Icon(
+                    Icons.Default.MenuBook,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(36.dp)
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // Título
+                Text(
+                    titulo,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    lineHeight = 28.sp,
+                    maxLines = 2
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                // Badge de secciones
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color.White.copy(0.2f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Circle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(6.dp)
+                        )
+                        Text(
+                            "$cantidadSecciones secciones",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
     }
+}
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+// ============================================================================
+// INDICADORES DE PROGRESO
+// ============================================================================
+
+@Composable
+fun IndicadoresProgreso(
+    total: Int,
+    seccionActual: Int,
+    seccionesCompletadas: Set<Int>,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        repeat(total) { index ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        when {
+                            seccionesCompletadas.contains(index) -> EduRachaV2Colors.Success
+                            index == seccionActual -> EduRachaV2Colors.Primary
+                            else -> EduRachaV2Colors.SoftGray
+                        }
+                    )
+            )
+        }
+    }
+}
+
+// ============================================================================
+// MASCOTA BÚHO
+// ============================================================================
+
+enum class OwlExpression {
+    CURIOUS, FOCUSED, EXCITED, HAPPY
+}
+
+@Composable
+fun MascotaBuho(
+    expresion: OwlExpression,
+    mensaje: String,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "owl")
+
+    val bounce by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bounce"
+    )
+
+    val blink by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 3000
+                1f at 0
+                1f at 2800
+                0.3f at 2850
+                1f at 2900
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "blink"
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Búho animado
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .offset(y = bounce.dp)
+            ) {
+                Text(
+                    text = when (expresion) {
+                        OwlExpression.CURIOUS -> "🦉"
+                        OwlExpression.FOCUSED -> "🦉"
+                        OwlExpression.EXCITED -> "🦉"
+                        OwlExpression.HAPPY -> "🎉"
+                    },
+                    fontSize = 60.sp,
+                    modifier = Modifier.graphicsLayer {
+                        scaleY = blink
+                    }
+                )
+            }
+
+            // Mensaje
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    when (expresion) {
+                        OwlExpression.CURIOUS -> "¡Empecemos!"
+                        OwlExpression.FOCUSED -> "¡Vas bien!"
+                        OwlExpression.EXCITED -> "¡Casi terminas!"
+                        OwlExpression.HAPPY -> "¡Excelente!"
+                    },
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaV2Colors.TextPrimary
+                )
+                Text(
+                    mensaje,
+                    fontSize = 14.sp,
+                    color = EduRachaV2Colors.TextSecondary,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+fun obtenerMensajeBuho(completadas: Int, total: Int, todasCompletadas: Boolean): String {
+    return when {
+        todasCompletadas -> "¡Has leído todo! Ahora puedes hacer el quiz 🎯"
+        completadas == 0 -> "Lee cada sección usando los botones de navegación"
+        completadas < total / 2 -> "Continúa leyendo, estás aprendiendo mucho"
+        else -> "Solo te faltan ${total - completadas} secciones más"
+    }
+}
+
+// ============================================================================
+// STORY CARD
+// ============================================================================
+
+@Composable
+fun StoryCard(
+    numero: Int,
+    contenido: String,
+    completada: Boolean,
+    onCompletar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 8.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(28.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header con progreso
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.size(50.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF1976D2).copy(alpha = 0.15f),
-                            modifier = Modifier.size(50.dp)
-                        ) {}
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF1976D2).copy(alpha = 0.25f),
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.MenuBook,
-                                    contentDescription = null,
-                                    tint = Color(0xFF1976D2),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Column {
-                        Text(
-                            text = "Contenido del Tema",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            color = EduRachaColors.TextPrimary
-                        )
-                        Text(
-                            text = if (todasLasEtapasVistas) "¡Completado!" else "Lee con atención",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else EduRachaColors.TextSecondary
-                        )
-                    }
-                }
-
-                // Badge de progreso
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1976D2).copy(alpha = 0.1f)
+                    shape = CircleShape,
+                    color = EduRachaV2Colors.Secondary.copy(0.15f)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            if (todasLasEtapasVistas) Icons.Default.CheckCircle else Icons.Default.Article,
-                            contentDescription = null,
-                            tint = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "${etapaActual + 1}/${parrafos.size}",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2)
-                        )
-                    }
+                    Text(
+                        "Parte $numero",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaV2Colors.Secondary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+
+                if (completada) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Completado",
+                        tint = EduRachaV2Colors.Success,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
 
-            // Barra de progreso
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = if (todasLasEtapasVistas) Color(0xFF4CAF50) else Color(0xFF1976D2),
-                    trackColor = Color(0xFFE0E0E0)
-                )
+            Spacer(Modifier.height(24.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    parrafos.forEachIndexed { index, _ ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(
-                                    when {
-                                        index < etapaActual -> Color(0xFF4CAF50)
-                                        index == etapaActual -> Color(0xFF1976D2)
-                                        else -> Color(0xFFE0E0E0)
-                                    }
-                                )
-                        )
-                    }
-                }
-            }
+            // Contenido - TEXTO NEGRO Y MÁS GRANDE
+            Text(
+                contenido,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.Black,
+                lineHeight = 28.sp
+            )
 
-            // Contenido de la etapa actual con animación
-            AnimatedContent(
-                targetState = etapaActual,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) +
-                            slideInHorizontally(
-                                animationSpec = tween(300),
-                                initialOffsetX = { it }
-                            ) togetherWith
-                            fadeOut(animationSpec = tween(300)) +
-                            slideOutHorizontally(
-                                animationSpec = tween(300),
-                                targetOffsetX = { -it }
-                            )
-                },
-                label = "etapa_content"
-            ) { etapa ->
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFF5F9FF),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF1976D2).copy(alpha = 0.2f),
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "${etapa + 1}",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1976D2)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Párrafo ${etapa + 1} de ${parrafos.size}",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1976D2)
-                            )
-                        }
+            Spacer(Modifier.height(24.dp))
 
-                        Text(
-                            text = parrafos[etapa],
-                            fontSize = 16.sp,
-                            color = EduRachaColors.TextPrimary,
-                            lineHeight = 26.sp,
-                            fontWeight = FontWeight.Normal
-                        )
-                    }
-                }
-            }
-
-            // Botones de navegación
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Botón "Anterior" (solo si no es la primera etapa)
-                if (etapaActual > 0) {
-                    OutlinedButton(
-                        onClick = { etapaActual-- },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF1976D2)
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            width = 2.dp
-                        ),
-                        contentPadding = PaddingValues(vertical = 14.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                "Anterior",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                // Botón principal (Siguiente/Completar)
+            // Botón completar
+            if (!completada) {
                 Button(
-                    onClick = {
-                        if (etapaActual < parrafos.size - 1) {
-                            etapaActual++
-                        } else {
-                            todasLasEtapasVistas = true
-                        }
-                    },
-                    modifier = Modifier.weight(if (etapaActual > 0) 1f else 1f),
-                    enabled = !todasLasEtapasVistas,
+                    onClick = onCompletar,
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (etapaActual == parrafos.size - 1)
-                            Color(0xFF4CAF50) else Color(0xFF1976D2),
-                        disabledContainerColor = Color(0xFF81C784)
+                        containerColor = EduRachaV2Colors.Success
                     ),
-                    shape = RoundedCornerShape(14.dp),
-                    contentPadding = PaddingValues(vertical = 14.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(vertical = 18.dp)
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            when {
-                                todasLasEtapasVistas -> Icons.Default.CheckCircle
-                                etapaActual == parrafos.size - 1 -> Icons.Default.Check
-                                else -> Icons.Default.ArrowForward
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            when {
-                                todasLasEtapasVistas -> "✓ Completado"
-                                etapaActual == parrafos.size - 1 -> "Completar Lectura"
-                                else -> "Siguiente"
-                            },
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Info adicional
-            if (!todasLasEtapasVistas) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFFF3E0)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = Color(0xFFFF9800),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            "Debes leer todo el contenido para desbloquear el quiz",
-                            fontSize = 13.sp,
-                            color = Color(0xFFE65100),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Marcar como leído",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             } else {
-                // Mensaje de éxito
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFE8F5E9)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = EduRachaV2Colors.Success.copy(0.15f)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(vertical = 18.dp),
+                        horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(20.dp)
+                            tint = EduRachaV2Colors.Success,
+                            modifier = Modifier.size(24.dp)
                         )
+                        Spacer(Modifier.width(12.dp))
                         Text(
-                            "¡Excelente! Has completado toda la explicación",
-                            fontSize = 13.sp,
-                            color = Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold
+                            "Sección completada",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaV2Colors.Success
                         )
                     }
                 }
@@ -541,557 +737,259 @@ fun ExplicacionPorEtapas(
     }
 }
 
-// Mantén las demás funciones como TopBarExplicacion, AlertaCooldownActivo, etc.
-// (Las dejo sin cambios por brevedad, pero puedes copiarlas de tu código original)
+// ============================================================================
+// CARD DE TEMA COMPLETADO MODERNO
+// ============================================================================
 
 @Composable
-fun TopBarExplicacion(
-    titulo: String,
-    onNavigateBack: () -> Unit
+fun CardTemaCompletadoModerno(
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                onClick = onNavigateBack,
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.25f),
-                modifier = Modifier.size(46.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.25f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.MenuBook,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        "Aprende",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = titulo,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            lineHeight = 32.sp
-        )
-    }
-}
-
-// NUEVA ALERTA: Cooldown activo con contador
-@Composable
-fun AlertaCooldownActivo(horas: Int, minutos: Int, porcentajeObtenido: Int) {
-    // Animación de pulso para el ícono del reloj
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFE3F2FD) // Azul claro
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFF2196F3).copy(alpha = 0.2f),
-                modifier = Modifier.size(50.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.scale(scale)
-                ) {
-                    Icon(
-                        Icons.Default.Schedule,
-                        contentDescription = null,
-                        tint = Color(0xFF2196F3),
-                        modifier = Modifier.size(28.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFF7096),
+                            Color(0xFFFF5277)
+                        )
                     )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "¡Quiz aprobado!",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1565C0)
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.AccessTime,
-                        contentDescription = null,
-                        tint = Color(0xFF1976D2),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "Próximo quiz en: ${horas}h ${minutos}m",
-                        fontSize = 14.sp,
-                        color = Color(0xFF1976D2),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AlertaIntentarNuevamente(porcentajeObtenido: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFFF3E0)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFFFF9800).copy(alpha = 0.2f),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.TrendingUp,
-                        contentDescription = null,
-                        tint = Color(0xFFFF9800),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Último intento: $porcentajeObtenido%",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFE65100)
-                )
-                Text(
-                    text = "Te falta ${80 - porcentajeObtenido}% para aprobar. ¡Sigue intentando!",
-                    fontSize = 13.sp,
-                    color = Color(0xFF6D4C41),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
-
-// CARD EXPLICACIÓN
-@Composable
-fun CardExplicacionMejorada(
-    explicacion: String,
-    explicacionVista: Boolean,
-    onMarcarLeida: () -> Unit
-) {
-    val scale = remember { Animatable(1f) }
-
-    LaunchedEffect(explicacionVista) {
-        if (explicacionVista) {
-            scale.animateTo(1.05f, tween(200))
-            scale.animateTo(1f, tween(200))
-        }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale.value),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Header con icono
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(56.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFF1976D2).copy(alpha = 0.15f),
-                        modifier = Modifier.size(56.dp)
-                    ) {}
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFF1976D2).copy(alpha = 0.25f),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Lightbulb,
-                                contentDescription = null,
-                                tint = Color(0xFF1976D2),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
-
-                Column {
-                    Text(
-                        text = "Contenido del Tema",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = EduRachaColors.TextPrimary
-                    )
-                    Text(
-                        text = "Lee con atención",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-            }
-
-            // Divider decorativo
+            // Burbujas decorativas
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0xFF1976D2).copy(alpha = 0.3f),
-                                Color(0xFF64B5F6).copy(alpha = 0.1f),
-                                Color.Transparent
-                            )
-                        )
-                    )
+                    .size(100.dp)
+                    .offset(x = 250.dp, y = (-20).dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.1f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .offset(x = 20.dp, y = 100.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
             )
 
-            // Contenido de la explicación con mejor formato
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color(0xFFF5F5F5)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = explicacion,
-                    fontSize = 16.sp,
-                    color = EduRachaColors.TextPrimary,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(20.dp)
+                // Emoji animado
+                val infiniteTransition = rememberInfiniteTransition(label = "trophy")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.15f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "scale"
                 )
-            }
 
-            // Botón de marcar como leída
-            Button(
-                onClick = onMarcarLeida,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !explicacionVista,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50),
-                    disabledContainerColor = Color(0xFF81C784)
-                ),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        if (explicacionVista) Icons.Default.CheckCircle else Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        if (explicacionVista) "✓ Explicación leída" else "Marcar como leída",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+                Text(
+                    "🏆",
+                    fontSize = 80.sp,
+                    modifier = Modifier
+                        .scale(scale)
+                        .padding(bottom = 16.dp)
+                )
 
-            // Info adicional
-            if (!explicacionVista) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF2196F3).copy(alpha = 0.08f)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = Color(0xFF2196F3),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            "Debes leer el contenido para desbloquear el quiz",
-                            fontSize = 13.sp,
-                            color = Color(0xFF1976D2),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+                Text(
+                    "¡Tema Completado!",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    "Has leído todas las secciones. ¡Es hora de poner a prueba tus conocimientos!",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(0.95f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 24.sp
+                )
             }
         }
     }
 }
 
+// ============================================================================
+// CARD QUIZ OFICIAL MEJORADA
+// ============================================================================
 
 @Composable
-fun CardQuizOficial(
-    puedeIniciar: Boolean,
-    explicacionVista: Boolean,
-    sinVidas: Boolean,
+fun QuizOficialCard(
     aproboQuizOficial: Boolean,
     porcentajeObtenido: Int,
     enCooldown: Boolean,
     horasRestantes: Int,
     minutosRestantes: Int,
-    onIniciar: () -> Unit
+    sinVidas: Boolean,
+    onIniciar: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (puedeIniciar) Color.White else Color.White.copy(alpha = 0.7f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (puedeIniciar) 8.dp else 4.dp)
+    val puedeIniciar = !sinVidas && !enCooldown
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    if (puedeIniciar) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF1976D2).copy(alpha = 0.08f),
-                                Color.White
-                            )
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFF6B9D),
+                            Color(0xFFFF5277)
                         )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.LightGray.copy(alpha = 0.1f),
-                                Color.White
-                            )
-                        )
-                    }
+                    )
                 )
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Icono principal
+            // Burbujas decorativas
             Box(
-                modifier = Modifier.size(80.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier
+                    .size(120.dp)
+                    .offset(x = 220.dp, y = (-30).dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.1f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .offset(x = 280.dp, y = 60.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(28.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (puedeIniciar)
-                        Color(0xFF1976D2).copy(alpha = 0.15f)
-                    else
-                        Color.Gray.copy(alpha = 0.2f),
-                    modifier = Modifier.size(80.dp)
-                ) {}
-                Surface(
-                    shape = CircleShape,
-                    color = if (puedeIniciar)
-                        Color(0xFF1976D2).copy(alpha = 0.25f)
-                    else
-                        Color.Gray.copy(alpha = 0.3f),
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            when {
-                                enCooldown -> Icons.Default.Schedule
-                                aproboQuizOficial && !enCooldown -> Icons.Default.School // Puede volver a hacer el quiz
-                                sinVidas || !explicacionVista -> Icons.Default.Lock
-                                else -> Icons.Default.School
-                            },
-                            contentDescription = null,
-                            tint = if (puedeIniciar) Color(0xFF1976D2) else Color.Gray,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = "Quiz Oficial",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                color = if (puedeIniciar) Color(0xFF1976D2) else Color.Gray,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = when {
-                    enCooldown -> "Racha completada. Vuelve en ${horasRestantes}h ${minutosRestantes}m"
-                    aproboQuizOficial && !enCooldown -> "¡Completaste la racha! Puedes volver a intentar mejorar"
-                    sinVidas -> "Necesitas energía disponible para iniciar"
-                    !explicacionVista -> "Primero lee la explicación del tema"
-                    porcentajeObtenido > 0 -> "Último intento: $porcentajeObtenido%. ¡Sigue intentando!"
-                    else -> "Resuelve el quiz para ganar XP y mantener tu racha"
-                },
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (puedeIniciar) EduRachaColors.TextSecondary else Color.Gray,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-
-            // Mostrar contador de tiempo si está en cooldown
-            if (enCooldown) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF2196F3).copy(alpha = 0.12f)
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = Color(0xFF2196F3),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = "${horasRestantes}h ${minutosRestantes}m restantes",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1976D2)
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🏆", fontSize = 32.sp)
+                        }
+
+                        Column {
+                            Text(
+                                "Quiz Oficial",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                "Demuestra tu conocimiento",
+                                fontSize = 13.sp,
+                                color = Color.White.copy(0.9f)
+                            )
+                        }
+                    }
+
+                    // Badge de estado
+                    if (aproboQuizOficial) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.White.copy(0.3f)
+                        ) {
+                            Text(
+                                "$porcentajeObtenido%",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Características
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CaracteristicaQuiz(
+                        icono = "⭐",
+                        texto = "Afecta tu racha diaria"
+                    )
+                    CaracteristicaQuiz(
+                        icono = "💎",
+                        texto = "Gana experiencia y progreso"
+                    )
+                    if (enCooldown) {
+                        CaracteristicaQuiz(
+                            icono = "⏰",
+                            texto = "Próximo intento: ${horasRestantes}h ${minutosRestantes}m"
                         )
                     }
                 }
-            }
 
-            Button(
-                onClick = onIniciar,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = puedeIniciar,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1976D2),
-                    disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(Modifier.height(24.dp))
+
+                // Botón
+                Button(
+                    onClick = onIniciar,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = puedeIniciar,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        disabledContainerColor = Color.White.copy(0.3f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp
+                    )
                 ) {
                     Icon(
                         if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
                         contentDescription = null,
+                        tint = if (puedeIniciar) Color(0xFFFF5277) else Color(0xFF9CA3AF),
                         modifier = Modifier.size(24.dp)
                     )
+                    Spacer(Modifier.width(12.dp))
                     Text(
                         when {
-                            enCooldown -> "Esperando cooldown"
-                            aproboQuizOficial && !enCooldown -> "Mejorar Puntuación"
-                            puedeIniciar -> if (porcentajeObtenido > 0 && porcentajeObtenido < 80) "Mejorar Puntuación" else "Iniciar Quiz Oficial"
-                            else -> "Bloqueado"
+                            enCooldown -> "En cooldown"
+                            sinVidas -> "Sin energía"
+                            else -> "Comenzar Quiz"
                         },
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // Rewards
-            if (puedeIniciar && !enCooldown) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    RewardBadge(
-                        icon = Icons.Default.Star,
-                        text = "+50 XP",
-                        color = Color(0xFFFFC107),
-                        modifier = Modifier.weight(1f)
-                    )
-                    RewardBadge(
-                        icon = Icons.Default.Whatshot,
-                        text = if (aproboQuizOficial) "Mejora tu score" else "Mantén racha",
-                        color = Color(0xFFE02127),
-                        modifier = Modifier.weight(1f)
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (puedeIniciar) Color(0xFFFF5277) else Color(0xFF9CA3AF)
                     )
                 }
             }
@@ -1099,122 +997,133 @@ fun CardQuizOficial(
     }
 }
 
-//  CARD MODO PRÁCTICA - SIMPLIFICADA
+// ============================================================================
+// CARD QUIZ PRÁCTICA MEJORADA
+// ============================================================================
+
 @Composable
-fun CardModoPractica(
+fun QuizPracticaCard(
     sinVidas: Boolean,
-    onIniciar: () -> Unit
+    onIniciar: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val puedeIniciar = !sinVidas
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (puedeIniciar) Color.White else Color.White.copy(alpha = 0.7f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (puedeIniciar) 6.dp else 3.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    if (puedeIniciar) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFDA582F).copy(alpha = 0.08f),
-                                Color.White
-                            )
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF3B82F6),
+                            Color(0xFF2563EB)
                         )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.LightGray.copy(alpha = 0.1f),
-                                Color.White
-                            )
-                        )
-                    }
+                    )
                 )
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Icono
+            // Burbujas decorativas
             Box(
-                modifier = Modifier.size(72.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier
+                    .size(100.dp)
+                    .offset(x = 240.dp, y = (-20).dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.1f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(70.dp)
+                    .offset(x = 20.dp, y = 80.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(28.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (puedeIniciar)
-                        Color(0xFFDA582F).copy(alpha = 0.15f)
-                    else
-                        Color.Gray.copy(alpha = 0.2f),
-                    modifier = Modifier.size(72.dp)
-                ) {}
-                Surface(
-                    shape = CircleShape,
-                    color = if (puedeIniciar)
-                        Color(0xFFDA582F).copy(alpha = 0.25f)
-                    else
-                        Color.Gray.copy(alpha = 0.3f),
-                    modifier = Modifier.size(56.dp)
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (puedeIniciar) Icons.Default.FitnessCenter else Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = if (puedeIniciar) Color(0xFFDA582F) else Color.Gray,
-                            modifier = Modifier.size(32.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("💪", fontSize = 32.sp)
+                    }
+
+                    Column {
+                        Text(
+                            "Modo Práctica",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Text(
+                            "Refuerza tu aprendizaje",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(0.9f)
                         )
                     }
                 }
-            }
 
-            Text(
-                text = " Modo Práctica",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black,
-                color = if (puedeIniciar) Color(0xFFDA582F) else Color.Gray,
-                textAlign = TextAlign.Center
-            )
+                Spacer(Modifier.height(20.dp))
 
-            Text(
-                text = if (sinVidas)
-                    "Necesitas energía disponible para iniciar"
-                else
-                    "Practica sin límites. Gana XP pero no afecta tu racha",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (puedeIniciar) EduRachaColors.TextSecondary else Color.Gray,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
+                // Características
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CaracteristicaQuiz(
+                        icono = "🎯",
+                        texto = "Practica sin límites"
+                    )
+                    CaracteristicaQuiz(
+                        icono = "💎",
+                        texto = "Gana XP sin afectar tu racha"
+                    )
 
-            Button(
-                onClick = onIniciar,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = puedeIniciar,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF5722),
-                    disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // Botón
+                Button(
+                    onClick = onIniciar,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = puedeIniciar,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        disabledContainerColor = Color.White.copy(0.3f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp
+                    )
                 ) {
                     Icon(
                         if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
                         contentDescription = null,
+                        tint = if (puedeIniciar) Color(0xFF2563EB) else Color(0xFF9CA3AF),
                         modifier = Modifier.size(24.dp)
                     )
+                    Spacer(Modifier.width(12.dp))
                     Text(
-                        if (puedeIniciar) "Iniciar Práctica" else "Bloqueado",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
+                        if (sinVidas) "Sin energía" else "Comenzar Práctica",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (puedeIniciar) Color(0xFF2563EB) else Color(0xFF9CA3AF)
                     )
                 }
             }
@@ -1222,35 +1131,28 @@ fun CardModoPractica(
     }
 }
 
+// ============================================================================
+// COMPONENTE AUXILIAR - CARACTERÍSTICA QUIZ
+// ============================================================================
+
 @Composable
-fun RewardBadge(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier
+fun CaracteristicaQuiz(
+    icono: String,
+    texto: String
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = color.copy(alpha = 0.12f)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = text,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-        }
+        Text(
+            icono,
+            fontSize = 20.sp
+        )
+        Text(
+            texto,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.White.copy(0.95f)
+        )
     }
 }

@@ -9,25 +9,29 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -37,11 +41,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.Curso
-import com.stiven.sos.ui.theme.EduRachaColors
-import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.QuizViewModel
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 class CursosInscritosActivity : ComponentActivity() {
 
@@ -54,7 +57,7 @@ class CursosInscritosActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
-                CursosInscritosScreen(
+                CursosInscritosScreenV2Figma(
                     quizViewModel = quizViewModel,
                     onNavigateBack = { finish() },
                     onCursoClick = { curso ->
@@ -72,9 +75,8 @@ class CursosInscritosActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CursosInscritosScreen(
+fun CursosInscritosScreenV2Figma(
     quizViewModel: QuizViewModel,
     onNavigateBack: () -> Unit,
     onCursoClick: (Curso) -> Unit
@@ -82,6 +84,7 @@ fun CursosInscritosScreen(
     val uiState by quizViewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
+    // Filtrado de cursos
     val cursosFiltrados = remember(uiState.cursosInscritos, searchQuery) {
         if (searchQuery.isBlank()) {
             uiState.cursosInscritos
@@ -94,85 +97,49 @@ fun CursosInscritosScreen(
         }
     }
 
-    Scaffold(
-        containerColor = Color(0xFFF5F7FA)
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Header con gradiente
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary,
-                                EduRachaColors.PrimaryLight,
-                                EduRachaColors.Accent.copy(alpha = 0.8f)
-                            )
-                        )
+    // Animación de entrada
+    var screenVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        screenVisible = true
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF7F9FC),
+                        Color(0xFFE8ECF0)
                     )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(bottom = 24.dp)
-                ) {
-                    // TopBar con botón de volver
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                )
+            )
+    ) {
+        // Header con fondo verde estilo Figma
+        HeaderGreenFigma(
+            totalCursos = uiState.cursosInscritos.size,
+            onNavigateBack = onNavigateBack
+        )
+
+        // Contenido principal con scroll mejorado
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Buscador (solo si hay cursos)
+            if (uiState.cursosInscritos.isNotEmpty()) {
+                item {
+                    AnimatedVisibility(
+                        visible = screenVisible,
+                        enter = fadeIn(tween(400)) + expandVertically()
                     ) {
-                        IconButton(
-                            onClick = onNavigateBack,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    color = Color.White.copy(alpha = 0.2f),
-                                    shape = CircleShape
-                                )
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(Modifier.width(16.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Mis Cursos",
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 28.sp,
-                                letterSpacing = 0.5.sp
-                            )
-                            if (uiState.cursosInscritos.isNotEmpty()) {
-                                Text(
-                                    text = "${uiState.cursosInscritos.size} ${if (uiState.cursosInscritos.size == 1) "curso inscrito" else "cursos inscritos"}",
-                                    color = Color.White.copy(alpha = 0.95f),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-
-                    // Buscador
-                    if (uiState.cursosInscritos.isNotEmpty()) {
-                        SearchBar(
+                        SearchBarFigma(
                             searchQuery = searchQuery,
-                            onSearchQueryChange = { searchQuery = it },
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                            onSearchQueryChange = { searchQuery = it }
                         )
                     }
                 }
@@ -181,230 +148,378 @@ fun CursosInscritosScreen(
             // Contenido
             when {
                 uiState.isLoading -> {
-                    LoadingView()
+                    item {
+                        LoadingViewFigma()
+                    }
                 }
 
                 uiState.error != null -> {
-                    ErrorView(
-                        error = uiState.error ?: "",
-                        onRetry = { quizViewModel.cargarCursosInscritos() }
-                    )
+                    item {
+                        ErrorViewFigma(
+                            error = uiState.error ?: "",
+                            onRetry = { quizViewModel.cargarCursosInscritos() }
+                        )
+                    }
                 }
 
                 uiState.cursosInscritos.isEmpty() -> {
-                    EmptyCursosView()
+                    item {
+                        EmptyCursosViewFigma()
+                    }
                 }
 
                 cursosFiltrados.isEmpty() -> {
-                    EmptySearchView(searchQuery = searchQuery)
+                    item {
+                        EmptySearchViewFigma(searchQuery = searchQuery)
+                    }
                 }
 
                 else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(
-                            start = 20.dp,
-                            end = 20.dp,
-                            top = 24.dp,
-                            bottom = 32.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(
-                            items = cursosFiltrados,
-                            key = { it.id ?: it.codigo }
-                        ) { curso ->
-                            CursoInscritoCard(
-                                curso = curso,
-                                onClick = { onCursoClick(curso) }
-                            )
-                        }
+                    itemsIndexed(
+                        items = cursosFiltrados,
+                        key = { _, curso -> curso.id ?: curso.codigo }
+                    ) { index, curso ->
+                        AnimatedCursoCardFigma(
+                            curso = curso,
+                            onClick = { onCursoClick(curso) },
+                            delay = index * 80,
+                            index = index
+                        )
                     }
+                }
+            }
+
+            // Espaciado final
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+// ============================================================================
+// HEADER GREEN FIGMA
+// ============================================================================
+
+@Composable
+fun HeaderGreenFigma(
+    totalCursos: Int,
+    onNavigateBack: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF41C77C),
+                        Color(0xFF5FD99A)
+                    )
+                )
+            )
+            .statusBarsPadding()
+            .padding(top = 16.dp, bottom = 64.dp, start = 20.dp, end = 20.dp)
+    ) {
+        // Burbujas decorativas
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .offset(x = 250.dp, y = (-20).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.1f))
+        )
+        Box(
+            modifier = Modifier
+                .size(128.dp)
+                .offset(x = 64.dp, y = 16.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.1f))
+        )
+
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Botón de atrás
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Iconos en la parte superior
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(36.dp)
+                )
+                Icon(
+                    Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color(0xFFFFC864),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Título
+            Text(
+                text = "Cursos Inscritos",
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                lineHeight = 40.sp
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Subtítulo
+            Text(
+                text = "Aquí están tus cursos activos",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+        }
+    }
+}
+
+// ============================================================================
+// BUSCADOR FIGMA
+// ============================================================================
+
+@Composable
+fun SearchBarFigma(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit
+) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = "Buscar",
+                tint = Color(0xFF717182),
+                modifier = Modifier.size(24.dp)
+            )
+
+            androidx.compose.foundation.text.BasicTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.weight(1f),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 16.sp,
+                    color = Color(0xFF1C1C1E),
+                    fontWeight = FontWeight.Normal
+                ),
+                singleLine = true,
+                decorationBox = { innerTextField ->
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            "Buscar cursos...",
+                            fontSize = 16.sp,
+                            color = Color(0xFFA0A0AB)
+                        )
+                    }
+                    innerTextField()
+                }
+            )
+
+            if (searchQuery.isNotEmpty()) {
+                IconButton(
+                    onClick = { onSearchQueryChange("") },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Clear,
+                        contentDescription = "Limpiar",
+                        tint = Color(0xFF717182),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchBar(
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val keyboardController = LocalSoftwareKeyboardController.current
+// ============================================================================
+// CARD DE CURSO ANIMADO FIGMA
+// ============================================================================
 
-    TextField(
-        value = searchQuery,
-        onValueChange = onSearchQueryChange,
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(16.dp)
-            ),
-        placeholder = {
-            Text(
-                "Buscar cursos...",
-                color = Color.Gray.copy(alpha = 0.6f),
-                fontSize = 15.sp
-            )
-        },
-        leadingIcon = {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = "Buscar",
-                tint = EduRachaColors.Primary,
-                modifier = Modifier.size(24.dp)
-            )
-        },
-        trailingIcon = {
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = { onSearchQueryChange("") }) {
-                    Icon(
-                        Icons.Default.Clear,
-                        contentDescription = "Limpiar",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        },
-        colors = TextFieldDefaults.textFieldColors(
-            containerColor = Color.White,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = EduRachaColors.Primary
-        ),
-        shape = RoundedCornerShape(16.dp),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(
-            onSearch = { keyboardController?.hide() }
+@Composable
+fun AnimatedCursoCardFigma(
+    curso: Curso,
+    onClick: () -> Unit,
+    delay: Int = 0,
+    index: Int = 0
+) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(delay.toLong())
+        visible = true
+    }
+
+    val offsetX by animateDpAsState(
+        targetValue = if (visible) 0.dp else 50.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
         )
     )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(600)
+    )
+
+    Box(
+        modifier = Modifier.graphicsLayer {
+            translationX = offsetX.toPx()
+            this.alpha = alpha
+        }
+    ) {
+        CursoCardFigma(
+            curso = curso,
+            onClick = onClick,
+            index = index
+        )
+    }
 }
 
 @Composable
-fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
-    var isPressed by remember { mutableStateOf(false) }
+fun CursoCardFigma(
+    curso: Curso,
+    onClick: () -> Unit,
+    index: Int = 0
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ), label = ""
+            stiffness = Spring.StiffnessHigh
+        )
     )
+
+    val elevation by animateDpAsState(
+        targetValue = if (isPressed) 4.dp else 8.dp,
+        animationSpec = tween(100)
+    )
+
+    // Gradientes predefinidos que rotan según el índice
+    val gradientes = listOf(
+        listOf(Color(0xFF3C79F5), Color(0xFF6BB9FF)), // Azul
+        listOf(Color(0xFF41C77C), Color(0xFFFFC864)), // Verde-Amarillo
+        listOf(Color(0xFF9C6BFF), Color(0xFFFF7096)), // Morado-Rosa
+        listOf(Color(0xFFFFC864), Color(0xFFFF7096))  // Amarillo-Rosa
+    )
+
+    val gradient = Brush.linearGradient(gradientes[index % gradientes.size])
+
+    // Iconos que rotan según el índice
+    val iconos = listOf(
+        Icons.Outlined.Computer,
+        Icons.Outlined.Code,
+        Icons.Outlined.Storage,
+        Icons.Outlined.Psychology
+    )
+    val icono = iconos[index % iconos.size]
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
             .clickable(
-                onClick = {
-                    isPressed = true
-                    onClick()
-                },
-                indication = null,
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                onClick = onClick,
+                interactionSource = interactionSource,
+                indication = null
             ),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Header del curso con gradiente y animación
+            // Header con gradiente
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary.copy(alpha = 0.95f),
-                                EduRachaColors.Accent.copy(alpha = 0.85f),
-                                EduRachaColors.Secondary.copy(alpha = 0.75f)
-                            )
-                        )
-                    )
+                    .background(gradient)
             ) {
-                AnimatedBackground()
+                // Burbujas decorativas
+                AnimatedBubblesBackgroundSmall()
 
+                // Contenido del header - Logo ARRIBA, Título ABAJO
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // LOGO ARRIBA (con badge de estrella decorativa)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Top
                     ) {
-                        // Badge de código
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color.White.copy(alpha = 0.25f)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = 12.dp,
-                                    vertical = 6.dp
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Box(
+                                modifier = Modifier.padding(12.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.Tag,
+                                    icono,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = curso.codigo,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
+                                    modifier = Modifier.size(48.dp)
                                 )
                             }
                         }
 
-                        // Badge de inscrito
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF4CAF50).copy(alpha = 0.9f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = 12.dp,
-                                    vertical = 6.dp
-                                ),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "Inscrito",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
+                        // Estrella decorativa (como en Figma)
+                        Icon(
+                            Icons.Outlined.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color(0xFFFFC864),
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
 
-                    // Título del curso
+                    // TÍTULO ABAJO
                     Text(
                         text = curso.titulo,
                         fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White,
                         lineHeight = 28.sp,
                         maxLines = 2,
@@ -413,22 +528,63 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                 }
             }
 
-            // Contenido del card
+            // Contenido
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
+                // Descripción
                 if (!curso.descripcion.isNullOrBlank()) {
                     Text(
                         text = curso.descripcion ?: "",
-                        fontSize = 14.sp,
-                        color = EduRachaColors.TextSecondary,
-                        lineHeight = 21.sp,
+                        fontSize = 15.sp,
+                        color = Color(0xFF717182),
+                        lineHeight = 22.sp,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(20.dp))
+                }
+
+                // Contenido programático
+                val temas = curso.getTemasLista()
+                if (temas.isNotEmpty()) {
+                    Text(
+                        "CONTENIDO PROGRAMÁTICO",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFA0A0AB),
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        temas.take(4).forEach { tema ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .offset(y = 7.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF3C79F5))
+                                )
+                                Text(
+                                    tema.titulo,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = Color(0xFF1C1C1E),
+                                    lineHeight = 21.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
                 }
 
                 // Botón de acción
@@ -436,289 +592,92 @@ fun CursoInscritoCard(curso: Curso, onClick: () -> Unit) {
                     onClick = onClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent
+                        containerColor = Color(0xFF3C79F5)
                     ),
-                    contentPadding = PaddingValues(0.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(20.dp),
                     elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp,
-                        pressedElevation = 0.dp
+                        defaultElevation = 2.dp
                     )
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        EduRachaColors.Primary,
-                                        EduRachaColors.Accent
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = Color.White
-                            )
-                            Text(
-                                text = "Comenzar a Practicar",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
+                        Text(
+                            "Comenzar a practicar",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Icon(
+                            Icons.Outlined.Bolt,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
         }
     }
-
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            kotlinx.coroutines.delay(150)
-            isPressed = false
-        }
-    }
 }
 
-@Composable
-fun AnimatedBackground() {
-    val infiniteTransition = rememberInfiniteTransition(label = "")
+// ============================================================================
+// COMPONENTES AUXILIARES
+// ============================================================================
 
-    val rotation by infiniteTransition.animateFloat(
+@Composable
+private fun AnimatedBubblesBackgroundSmall() {
+    val infiniteTransition = rememberInfiniteTransition()
+
+    val bubble1Offset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = 15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(25000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ), label = ""
+            animation = tween(2500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .offset(x = (-25).dp, y = (-25).dp)
-                .rotate(rotation)
-                .background(
-                    color = Color.White.copy(alpha = 0.06f),
-                    shape = RoundedCornerShape(30.dp)
-                )
-        )
-
+        // Burbuja grande
         Box(
             modifier = Modifier
                 .size(80.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 25.dp, y = 40.dp)
-                .rotate(-rotation)
-                .background(
-                    color = Color.White.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(20.dp)
-                )
+                .offset(x = 220.dp, y = (-10).dp)
+                .graphicsLayer {
+                    translationY = bubble1Offset
+                }
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f))
         )
 
+        // Burbuja pequeña
         Box(
             modifier = Modifier
-                .size(60.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 15.dp, y = 20.dp)
-                .rotate(rotation * 0.7f)
-                .background(
-                    color = Color.White.copy(alpha = 0.04f),
-                    shape = CircleShape
-                )
+                .size(50.dp)
+                .offset(x = (-5).dp, y = 20.dp)
+                .graphicsLayer {
+                    translationY = -bubble1Offset * 0.7f
+                }
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.05f))
         )
     }
 }
 
-@Composable
-fun EmptySearchView(searchQuery: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 60.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .background(
-                        color = Color.Gray.copy(alpha = 0.1f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.SearchOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(50.dp),
-                    tint = Color.Gray
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                text = "No se encontraron cursos",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = "No hay cursos que coincidan con \"$searchQuery\"",
-                fontSize = 15.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-        }
-    }
-}
+// ============================================================================
+// ESTADOS VACÍOS Y LOADING
+// ============================================================================
 
 @Composable
-fun EmptyCursosView() {
+fun LoadingViewFigma() {
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 60.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "")
-            val float by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 15f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(2500, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ), label = ""
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .offset(y = float.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    EduRachaColors.Primary.copy(alpha = 0.15f),
-                                    Color.Transparent
-                                )
-                            ),
-                            shape = CircleShape
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    EduRachaColors.Primary,
-                                    EduRachaColors.Accent
-                                )
-                            ),
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.School,
-                        contentDescription = null,
-                        modifier = Modifier.size(55.dp),
-                        tint = Color.White
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Text(
-                text = "No tienes cursos activos",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = EduRachaColors.TextPrimary,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = "Cuando un docente acepte tu solicitud de inscripción, tus cursos aparecerán aquí",
-                fontSize = 15.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = EduRachaColors.Primary.copy(alpha = 0.1f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        tint = EduRachaColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "Solicita acceso a los cursos disponibles en tu institución",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = EduRachaColors.TextPrimary,
-                        lineHeight = 19.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun LoadingView() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent),
+            .fillMaxWidth()
+            .padding(vertical = 60.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -727,119 +686,181 @@ fun LoadingView() {
         ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(50.dp),
-                color = EduRachaColors.Primary,
+                color = Color(0xFF41C77C),
                 strokeWidth = 4.dp
             )
 
             Text(
                 text = "Cargando tus cursos...",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = EduRachaColors.TextSecondary
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF717182)
             )
         }
     }
 }
 
 @Composable
-fun ErrorView(error: String, onRetry: () -> Unit) {
+fun ErrorViewFigma(error: String, onRetry: () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 60.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 60.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(100.dp)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                EduRachaColors.Error.copy(alpha = 0.15f),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = CircleShape
-                    ),
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFE8EE)),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(75.dp)
-                        .background(
-                            color = Color.White,
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.ErrorOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = EduRachaColors.Error
-                    )
-                }
+                Icon(
+                    Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = Color(0xFFFF7096)
+                )
             }
-
-            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Algo salió mal",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = EduRachaColors.TextPrimary
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1C1C1E)
             )
-
-            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = error,
-                fontSize = 15.sp,
-                color = EduRachaColors.TextSecondary,
+                fontSize = 14.sp,
+                color = Color(0xFF717182),
                 textAlign = TextAlign.Center,
-                lineHeight = 22.sp
+                lineHeight = 20.sp
             )
-
-            Spacer(Modifier.height(32.dp))
 
             Button(
                 onClick = onRetry,
                 modifier = Modifier
                     .fillMaxWidth(0.8f)
-                    .height(52.dp),
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = Color(0xFFFF7096)
                 ),
-                shape = RoundedCornerShape(14.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 4.dp,
-                    pressedElevation = 8.dp
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Refresh,
+                        Icons.Outlined.Refresh,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Text(
                         "Reintentar",
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun EmptyCursosViewFigma() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 60.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF0F4FF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.School,
+                    contentDescription = null,
+                    modifier = Modifier.size(60.dp),
+                    tint = Color(0xFF3C79F5)
+                )
+            }
+
+            Text(
+                text = "No tienes cursos activos",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1C1C1E),
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Cuando un docente acepte tu solicitud de inscripción, tus cursos aparecerán aquí",
+                fontSize = 14.sp,
+                color = Color(0xFF717182),
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun EmptySearchViewFigma(searchQuery: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 60.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF7F9FC)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.SearchOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = Color(0xFFA0A0AB)
+                )
+            }
+
+            Text(
+                text = "No se encontraron cursos",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1C1C1E)
+            )
+
+            Text(
+                text = "No hay cursos que coincidan con \"$searchQuery\"",
+                fontSize = 14.sp,
+                color = Color(0xFF717182),
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
         }
     }
 }

@@ -2,7 +2,6 @@ package com.stiven.sos
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -15,32 +14,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.services.VentanaRachaDuolingo
 import com.stiven.sos.services.VentanaRachaPerdida
-import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 /**
  * ========================================
- * ACTIVITY PRINCIPAL DE RESULTADOS
+ * ACTIVITY PRINCIPAL DE RESULTADOS V2
  * ========================================
  */
 class ResultadoQuizActivity : ComponentActivity() {
@@ -78,7 +79,7 @@ class ResultadoQuizActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
-                ResultadoQuizScreen(
+                ResultadoQuizScreenV2(
                     preguntasCorrectas = preguntasCorrectas,
                     preguntasIncorrectas = preguntasIncorrectas,
                     experienciaGanada = experienciaGanada,
@@ -125,12 +126,11 @@ data class ConfettiParticle(
 
 /**
  * ========================================
- * PANTALLA PRINCIPAL DE RESULTADOS
+ * PANTALLA PRINCIPAL DE RESULTADOS V2
  * ========================================
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ResultadoQuizScreen(
+fun ResultadoQuizScreenV2(
     preguntasCorrectas: Int,
     preguntasIncorrectas: Int,
     experienciaGanada: Int,
@@ -158,6 +158,37 @@ fun ResultadoQuizScreen(
     var rachaSubida by remember { mutableStateOf(false) }
 
     val uiState by quizViewModel.uiState.collectAsState()
+
+    // Determinar gradiente y mensaje según resultado
+    val (gradiente, mensaje, emoji) = when {
+        porcentaje >= 90 -> Triple(
+            EduRachaV2Gradients.Green,
+            "¡EXCELENTE TRABAJO!",
+            "🎉"
+        )
+        porcentaje >= 80 -> Triple(
+            EduRachaV2Gradients.Purple,
+            "¡MUY BIEN HECHO!",
+            "🌟"
+        )
+        porcentaje >= 70 -> Triple(
+            EduRachaV2Gradients.Yellow,
+            "¡APROBADO!",
+            "👏"
+        )
+        else -> Triple(
+            EduRachaV2Gradients.Pink,
+            "SIGUE INTENTÁNDOLO",
+            "💪"
+        )
+    }
+
+    val colorResultado = when {
+        porcentaje >= 90 -> EduRachaV2Colors.Success
+        porcentaje >= 80 -> EduRachaV2Colors.Secondary
+        porcentaje >= 70 -> EduRachaV2Colors.Accent
+        else -> EduRachaV2Colors.Pink
+    }
 
     LaunchedEffect(Unit) {
         if (cursoId.isNotEmpty()) {
@@ -195,228 +226,347 @@ fun ResultadoQuizScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (mostrarVentanaRacha && diasRacha > 0) {
-            VentanaRachaDuolingo(
+            VentanaRachaDuolingoV2(
                 diasRacha = diasRacha,
                 onDismiss = { mostrarVentanaRacha = false }
             )
         }
 
         if (mostrarVentanaRachaPerdida) {
-            VentanaRachaPerdida(
+            VentanaRachaPerdidaV2(
                 porcentaje = porcentaje,
                 onDismiss = { mostrarVentanaRachaPerdida = false }
             )
         }
 
-        val colorResultado = when {
-            porcentaje >= 90 -> Color(0xFF58CC02)
-            porcentaje >= 70 -> Color(0xFFFFC800)
-            else -> Color(0xFFFF4B4B)
-        }
+        // Todo hace scroll incluyendo el header
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(EduRachaV2Colors.Background),
+            contentPadding = PaddingValues(bottom = 0.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header con celebración como primer item
+            item {
+                HeaderCelebracionV2(
+                    gradiente = gradiente,
+                    mensaje = mensaje,
+                    emoji = emoji,
+                    porcentaje = porcentaje
+                )
+            }
 
-        val mensajeResultado = when {
-            porcentaje >= 90 -> "EXCELENTE"
-            porcentaje >= 80 -> "MUY BIEN"
-            porcentaje >= 70 -> "APROBADO"
-            else -> "SIGUE PRACTICANDO"
-        }
-
-        Column(modifier = Modifier.fillMaxSize()) {
-            HeaderResultadoDuolingo(
-                colorResultado = colorResultado,
-                mensajeResultado = mensajeResultado,
-                porcentaje = porcentaje
-            )
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFF7F7F7)),
-                    contentPadding = PaddingValues(16.dp),
+            item {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    item {
-                        TarjetaCirculoProgreso(
-                            porcentaje = porcentaje,
-                            preguntasCorrectas = preguntasCorrectas,
-                            totalPreguntas = totalPreguntas,
-                            colorResultado = colorResultado
-                        )
-                    }
-
-                    item {
-                        TarjetaEstadisticasDuolingo(
-                            preguntasCorrectas = preguntasCorrectas,
-                            preguntasIncorrectas = preguntasIncorrectas
-                        )
-                    }
-
-                    item {
-                        TarjetaExperienciaDuolingo(
-                            experienciaGanada = experienciaGanada,
-                            bonificacionRapidez = bonificacionRapidez,
-                            bonificacionPrimeraVez = bonificacionPrimeraVez,
-                            bonificacionTodoCorrecto = bonificacionTodoCorrecto
-                        )
-                    }
-
-                    if (diasRacha > 0) {
-                        item {
-                            TarjetaRachaActual(
-                                diasRacha = diasRacha,
-                                aprobo = aprobo
-                            )
-                        }
-                    }
-
-                    if (modo == "oficial") {
-                        item {
-                            TarjetaVidasDuolingo(
-                                vidasRestantes = vidasRestantes
-                            )
-                        }
-                    }
-
-                    if (aprobo && modo == "oficial") {
-                        item {
-                            TarjetaModoPracticaDuolingo(
-                                onIniciarPractica = onIniciarPractica
-                            )
-                        }
-                    }
-
-                    item {
-                        BotonesAccionDuolingo(
-                            preguntasIncorrectas = preguntasIncorrectas,
-                            onVerRetroalimentacion = onVerRetroalimentacion,
-                            onVolverACursos = onVolverACursos
-                        )
-                    }
-
-                    item { Spacer(Modifier.height(20.dp)) }
-                }
-
-                if (mostrarConfetti) {
-                    ConfettiAnimacionDuolingo()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun HeaderResultadoDuolingo(
-    colorResultado: Color,
-    mensajeResultado: String,
-    porcentaje: Int
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = colorResultado,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 32.dp, horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.25f),
-                modifier = Modifier.size(80.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (porcentaje >= 80)
-                            Icons.Default.CheckCircle
-                        else
-                            Icons.Default.TrendingUp,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp)
+                    TarjetaCirculoProgresoV2(
+                        porcentaje = porcentaje,
+                        preguntasCorrectas = preguntasCorrectas,
+                        totalPreguntas = totalPreguntas,
+                        colorResultado = colorResultado
                     )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TarjetaEstadisticaCompactaV2(
+                        icon = Icons.Outlined.CheckCircle,
+                        valor = "$preguntasCorrectas",
+                        label = "Correctas",
+                        color = EduRachaV2Colors.Success,
+                        modifier = Modifier.weight(1f)
+                    )
 
-            Text(
-                text = mensajeResultado,
-                color = Color.White,
-                fontWeight = FontWeight.Black,
-                fontSize = 32.sp,
-                letterSpacing = 1.sp
-            )
+                    TarjetaEstadisticaCompactaV2(
+                        icon = Icons.Outlined.Cancel,
+                        valor = "$preguntasIncorrectas",
+                        label = "Incorrectas",
+                        color = EduRachaV2Colors.Pink,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    TarjetaExperienciaV2(
+                        experienciaGanada = experienciaGanada,
+                        bonificacionRapidez = bonificacionRapidez,
+                        bonificacionPrimeraVez = bonificacionPrimeraVez,
+                        bonificacionTodoCorrecto = bonificacionTodoCorrecto
+                    )
+                }
+            }
+
+            if (diasRacha > 0) {
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        TarjetaRachaV2(
+                            diasRacha = diasRacha,
+                            aprobo = aprobo
+                        )
+                    }
+                }
+            }
+
+            if (modo == "oficial") {
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        EduRachaV2VidasCard(
+                            vidasActuales = vidasRestantes,
+                            vidasMax = 5,
+                            minutosParaProxima = 30
+                        )
+                    }
+                }
+            }
+
+            if (aprobo && modo == "oficial") {
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        TarjetaModoPracticaV2(
+                            onIniciarPractica = onIniciarPractica
+                        )
+                    }
+                }
+            }
+
+            // Botones de acción - sin padding horizontal para que ocupen todo el ancho
+            item {
+                BotonesAccionV2(
+                    preguntasIncorrectas = preguntasIncorrectas,
+                    onVerRetroalimentacion = onVerRetroalimentacion,
+                    onVolverACursos = onVolverACursos
+                )
+            }
+        }
+
+        // Confetti sobre todo
+        if (mostrarConfetti) {
+            ConfettiAnimacionV2()
         }
     }
 }
 
+/**
+ * ========================================
+ * HEADER DE CELEBRACIÓN V2
+ * ========================================
+ */
 @Composable
-fun TarjetaCirculoProgreso(
+fun HeaderCelebracionV2(
+    gradiente: Brush,
+    mensaje: String,
+    emoji: String,
+    porcentaje: Int
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    gradiente,
+                    shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
+                )
+                .padding(top = 48.dp, bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
+            // Burbujas decorativas animadas (limitadas al header)
+            Box(modifier = Modifier.matchParentSize()) {
+                AnimatedBubblesDecoration(color = Color.White)
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Emoji animado grande
+                EmojiAnimadoGrande(emoji)
+
+                // Mensaje principal
+                Text(
+                    text = mensaje,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    letterSpacing = 1.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 32.sp
+                )
+
+                // Píldora con mensaje motivador
+                PildoraMensajeMotivador(porcentaje)
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+}
+
+@Composable
+fun EmojiAnimadoGrande(emoji: String) {
+    val infiniteTransition = rememberInfiniteTransition(label = "emoji")
+
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rotation"
+    )
+
+    Text(
+        text = emoji,
+        fontSize = 64.sp,
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+            }
+    )
+}
+
+@Composable
+fun PildoraMensajeMotivador(porcentaje: Int) {
+    val mensaje = when {
+        porcentaje >= 90 -> "¡Eres increíble! Sigue así"
+        porcentaje >= 80 -> "Gran trabajo, lo estás logrando"
+        porcentaje >= 70 -> "Buen esfuerzo, sigue mejorando"
+        else -> "No te rindas, tú puedes"
+    }
+
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.White.copy(alpha = 0.25f)
+    ) {
+        Text(
+            text = mensaje,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+        )
+    }
+}
+
+/**
+ * ========================================
+ * TARJETA CÍRCULO DE PROGRESO V2
+ * ========================================
+ */
+@Composable
+fun TarjetaCirculoProgresoV2(
     porcentaje: Int,
     preguntasCorrectas: Int,
     totalPreguntas: Int,
     colorResultado: Color
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
-            CirculoProgresoDuolingo(
+            CirculoProgresoV2(
                 porcentaje = porcentaje,
                 colorResultado = colorResultado
             )
 
-            Text(
-                text = "$preguntasCorrectas de $totalPreguntas correctas",
-                fontSize = 18.sp,
-                color = Color(0xFF4B4B4B),
-                fontWeight = FontWeight.Bold
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "$preguntasCorrectas de $totalPreguntas",
+                    fontSize = 20.sp,
+                    color = EduRachaV2Colors.TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "respuestas correctas",
+                    fontSize = 14.sp,
+                    color = EduRachaV2Colors.TextSecondary
+                )
+            }
         }
     }
 }
 
 @Composable
-fun CirculoProgresoDuolingo(
+fun CirculoProgresoV2(
     porcentaje: Int,
     colorResultado: Color
 ) {
     val porcentajeAnimado by animateFloatAsState(
         targetValue = porcentaje.toFloat(),
-        animationSpec = tween(
-            durationMillis = 1200,
-            easing = FastOutSlowInEasing
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
         ),
         label = "porcentaje"
     )
 
     Box(
-        modifier = Modifier.size(220.dp),
+        modifier = Modifier.size(200.dp),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 20.dp.toPx()
+            val strokeWidth = 16.dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2
 
+            // Fondo del círculo
             drawCircle(
-                color = Color(0xFFE5E5E5),
+                color = EduRachaV2Colors.SoftGray.copy(alpha = 0.3f),
                 radius = radius,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
+            // Arco de progreso con gradiente
             drawArc(
                 color = colorResultado,
                 startAngle = -90f,
@@ -427,13 +577,14 @@ fun CirculoProgresoDuolingo(
             )
         }
 
+        // Porcentaje animado
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = "${porcentajeAnimado.toInt()}%",
-                fontSize = 56.sp,
+                fontSize = 48.sp,
                 fontWeight = FontWeight.Black,
                 color = colorResultado
             )
@@ -441,16 +592,89 @@ fun CirculoProgresoDuolingo(
     }
 }
 
+/**
+ * ========================================
+ * TARJETAS DE ESTADÍSTICAS COMPACTAS V2
+ * ========================================
+ */
 @Composable
-fun TarjetaEstadisticasDuolingo(
-    preguntasCorrectas: Int,
-    preguntasIncorrectas: Int
+fun TarjetaEstadisticaCompactaV2(
+    icon: ImageVector,
+    valor: String,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier
 ) {
-    Card(
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            color.copy(alpha = 0.12f),
+                            Color.White
+                        )
+                    )
+                )
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Text(
+                text = valor,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                color = color
+            )
+
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                color = EduRachaV2Colors.TextSecondary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+/**
+ * ========================================
+ * TARJETA DE EXPERIENCIA V2
+ * ========================================
+ */
+@Composable
+fun TarjetaExperienciaV2(
+    experienciaGanada: Int,
+    bonificacionRapidez: Int,
+    bonificacionPrimeraVez: Int,
+    bonificacionTodoCorrecto: Int
+) {
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
     ) {
         Column(
             modifier = Modifier
@@ -458,116 +682,41 @@ fun TarjetaEstadisticasDuolingo(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text(
-                text = "Resumen",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF3C3C3C)
-            )
-
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            color = Color(0xFF58CC02).copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(EduRachaV2Gradients.Yellow),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        Icons.Outlined.AutoAwesome,
                         contentDescription = null,
-                        tint = Color(0xFF58CC02),
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Text(
-                        text = "$preguntasCorrectas",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF58CC02)
-                    )
-                    Text(
-                        text = "Correctas",
-                        fontSize = 14.sp,
-                        color = Color(0xFF4B4B4B),
-                        fontWeight = FontWeight.Medium
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            color = Color(0xFFFF4B4B).copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Cancel,
-                        contentDescription = null,
-                        tint = Color(0xFFFF4B4B),
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Text(
-                        text = "$preguntasIncorrectas",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFFF4B4B)
-                    )
-                    Text(
-                        text = "Incorrectas",
-                        fontSize = 14.sp,
-                        color = Color(0xFF4B4B4B),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                Text(
+                    text = "Experiencia Ganada",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaV2Colors.TextPrimary
+                )
             }
-        }
-    }
-}
 
-@Composable
-fun TarjetaExperienciaDuolingo(
-    experienciaGanada: Int,
-    bonificacionRapidez: Int,
-    bonificacionPrimeraVez: Int,
-    bonificacionTodoCorrecto: Int
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Experiencia Ganada",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF3C3C3C)
-            )
-
+            // XP Total
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFFFC800).copy(alpha = 0.15f),
+                shape = RoundedCornerShape(20.dp),
+                color = EduRachaV2Colors.Accent.copy(alpha = 0.15f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -575,61 +724,78 @@ fun TarjetaExperienciaDuolingo(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val infiniteTransition = rememberInfiniteTransition(label = "star")
+                        val rotation by infiniteTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(3000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "rotation"
+                        )
+
                         Icon(
-                            Icons.Default.Star,
+                            Icons.Filled.Star,
                             contentDescription = null,
-                            tint = Color(0xFFFFC800),
-                            modifier = Modifier.size(32.dp)
+                            tint = EduRachaV2Colors.Accent,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer { rotationZ = rotation }
                         )
                         Text(
                             text = "Total XP",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3C3C3C)
+                            color = EduRachaV2Colors.TextPrimary
                         )
                     }
                     Text(
                         text = "+$experienciaGanada",
-                        fontSize = 32.sp,
+                        fontSize = 36.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFFFFC800)
+                        color = EduRachaV2Colors.Accent
                     )
                 }
             }
 
+            // Bonificaciones
             if (bonificacionRapidez > 0 || bonificacionPrimeraVez > 0 || bonificacionTodoCorrecto > 0) {
-                Divider(color = Color(0xFFE5E5E5))
-
-                Text(
-                    text = "Bonificaciones",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4B4B4B)
+                Divider(
+                    color = EduRachaV2Colors.SoftGray.copy(alpha = 0.3f),
+                    thickness = 1.dp
                 )
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "🎁 Bonificaciones",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EduRachaV2Colors.TextPrimary
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (bonificacionRapidez > 0) {
-                        FilaBonificacion(
-                            icono = Icons.Default.Speed,
-                            texto = "Velocidad",
+                        FilaBonificacionV2(
+                            icono = Icons.Outlined.Speed,
+                            texto = "Velocidad relámpago",
                             puntos = bonificacionRapidez,
-                            color = Color(0xFF1CB0F6)
+                            color = EduRachaV2Colors.Primary
                         )
                     }
                     if (bonificacionPrimeraVez > 0) {
-                        FilaBonificacion(
-                            icono = Icons.Default.Celebration,
-                            texto = "Primera vez",
+                        FilaBonificacionV2(
+                            icono = Icons.Outlined.Celebration,
+                            texto = "Primera vez perfecto",
                             puntos = bonificacionPrimeraVez,
-                            color = Color(0xFFCE82FF)
+                            color = EduRachaV2Colors.Secondary
                         )
                     }
                     if (bonificacionTodoCorrecto > 0) {
-                        FilaBonificacion(
-                            icono = Icons.Default.EmojiEvents,
-                            texto = "Perfecto",
+                        FilaBonificacionV2(
+                            icono = Icons.Outlined.EmojiEvents,
+                            texto = "100% sin errores",
                             puntos = bonificacionTodoCorrecto,
-                            color = Color(0xFFFFC800)
+                            color = EduRachaV2Colors.Accent
                         )
                     }
                 }
@@ -639,109 +805,138 @@ fun TarjetaExperienciaDuolingo(
 }
 
 @Composable
-fun FilaBonificacion(
+fun FilaBonificacionV2(
     icono: ImageVector,
     texto: String,
     puntos: Int,
     color: Color
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = color.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icono,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = texto,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF3C3C3C)
-            )
-        }
-        Text(
-            text = "+$puntos XP",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Black,
-            color = color
-        )
-    }
-}
-
-@Composable
-fun TarjetaRachaActual(
-    diasRacha: Int,
-    aprobo: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Surface(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (aprobo) Color(0xFFFF9600) else Color(0xFFE5E5E5)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = color.copy(alpha = 0.1f),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconoLlamaAnimado(aprobo = aprobo)
+                Icon(
+                    icono,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    text = texto,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = EduRachaV2Colors.TextPrimary
+                )
+            }
+            Text(
+                text = "+$puntos XP",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                color = color
+            )
+        }
+    }
+}
 
-                Column {
-                    Text(
-                        text = "Racha actual",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (aprobo) Color.White else Color(0xFF4B4B4B)
-                    )
-                    Text(
-                        text = if (aprobo) "Subiste tu racha" else "Mantén tu racha",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (aprobo) Color.White.copy(0.9f) else Color(0xFF777777)
-                    )
-                }
+/**
+ * ========================================
+ * TARJETA DE RACHA V2
+ * ========================================
+ */
+@Composable
+fun TarjetaRachaV2(
+    diasRacha: Int,
+    aprobo: Boolean
+) {
+    val gradiente = if (aprobo) {
+        Brush.horizontalGradient(
+            listOf(
+                Color(0xFFFF6B35),
+                Color(0xFFFF9600)
+            )
+        )
+    } else {
+        Brush.horizontalGradient(
+            listOf(
+                EduRachaV2Colors.SoftGray,
+                EduRachaV2Colors.Background
+            )
+        )
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = if (aprobo) 6.dp else 2.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(gradiente)
+        ) {
+            // Burbujas decorativas
+            if (aprobo) {
+                AnimatedBubblesDecoration(color = Color.White)
             }
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (aprobo) Color.White.copy(alpha = 0.25f) else Color.White
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "$diasRacha días",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    color = if (aprobo) Color.White else Color(0xFFFF9600),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconoLlamaAnimadoV2(aprobo = aprobo)
+
+                    Column {
+                        Text(
+                            text = "🔥 Racha actual",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (aprobo) Color.White else EduRachaV2Colors.TextPrimary
+                        )
+                        Text(
+                            text = if (aprobo) "¡Racha aumentada!" else "Mantén tu racha",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (aprobo) Color.White.copy(0.9f) else EduRachaV2Colors.TextSecondary
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (aprobo) Color.White.copy(alpha = 0.25f) else Color.White
+                ) {
+                    Text(
+                        text = "$diasRacha días",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (aprobo) Color.White else Color(0xFFFF9600),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun IconoLlamaAnimado(aprobo: Boolean) {
+fun IconoLlamaAnimadoV2(aprobo: Boolean) {
     val infiniteTransition = rememberInfiniteTransition(label = "llama")
 
     val scale by infiniteTransition.animateFloat(
@@ -754,180 +949,175 @@ fun IconoLlamaAnimado(aprobo: Boolean) {
         label = "scale"
     )
 
-    Icon(
-        Icons.Default.Whatshot,
-        contentDescription = null,
-        tint = if (aprobo) Color.White else Color(0xFF777777),
-        modifier = Modifier
-            .size(48.dp)
-            .scale(scale)
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = -10f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rotation"
     )
-}
 
-@Composable
-fun TarjetaVidasDuolingo(
-    vidasRestantes: Int
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = Color(0xFFFF4B4B),
-                    modifier = Modifier.size(36.dp)
-                )
-                Column {
-                    Text(
-                        text = "Vidas restantes",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3C3C3C)
-                    )
-                    Text(
-                        text = "Regeneración cada 30 min",
-                        fontSize = 13.sp,
-                        color = Color(0xFF777777)
-                    )
-                }
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                rotationZ = if (aprobo) rotation else 0f
             }
-
-            Text(
-                text = "$vidasRestantes / 5",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFFFF4B4B)
-            )
-        }
+            .clip(CircleShape)
+            .background(if (aprobo) Color.White.copy(alpha = 0.2f) else EduRachaV2Colors.SoftGray),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "🔥",
+            fontSize = 28.sp
+        )
     }
 }
 
+/**
+ * ========================================
+ * TARJETA MODO PRÁCTICA V2
+ * ========================================
+ */
 @Composable
-fun TarjetaModoPracticaDuolingo(
+fun TarjetaModoPracticaV2(
     onIniciarPractica: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFCE82FF)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = 6.dp
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(EduRachaV2Gradients.Purple)
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            AnimatedBubblesDecoration(color = Color.White)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.25f),
-                    modifier = Modifier.size(48.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.FitnessCenter,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.White.copy(alpha = 0.25f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "💪",
+                            fontSize = 32.sp
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Modo Práctica",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "¡Desbloqueado!",
+                            fontSize = 15.sp,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
-                Text(
-                    text = "Modo Práctica Desbloqueado",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
-            }
 
-            Text(
-                text = "Sigue practicando para ganar más experiencia ",
-                fontSize = 15.sp,
-                color = Color.White.copy(alpha = 0.95f),
-                fontWeight = FontWeight.Medium,
-                lineHeight = 22.sp
-            )
-
-            Button(
-                onClick = onIniciarPractica,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White
-                ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 0.dp
-                )
-            ) {
                 Text(
-                    "Seguir Practicando",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFCE82FF)
+                    text = "Sigue practicando este tema para dominar todos los conceptos y ganar más experiencia",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 20.sp
+                )
+
+                EduRachaV2Button(
+                    text = "Seguir Practicando",
+                    onClick = onIniciarPractica,
+                    icon = Icons.Outlined.PlayArrow,
+                    variant = EduRachaV2ButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
 }
 
+/**
+ * ========================================
+ * BOTONES DE ACCIÓN V2
+ * ========================================
+ */
 @Composable
-fun BotonesAccionDuolingo(
+fun BotonesAccionV2(
     preguntasIncorrectas: Int,
     onVerRetroalimentacion: () -> Unit,
     onVolverACursos: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (preguntasIncorrectas > 0) {
             Button(
                 onClick = onVerRetroalimentacion,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1CB0F6)
+                    containerColor = Color.Transparent
                 ),
-                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(16.dp),
                 elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 0.dp
+                    defaultElevation = 4.dp,
+                    pressedElevation = 2.dp
                 )
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            EduRachaV2Gradients.Blue,
+                            shape = RoundedCornerShape(16.dp)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Lightbulb,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        "Ver Retroalimentación",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Lightbulb,
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                            tint = Color.White
+                        )
+                        Text(
+                            "Ver Retroalimentación",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
@@ -936,45 +1126,238 @@ fun BotonesAccionDuolingo(
             onClick = onVolverACursos,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(64.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF58CC02)
+                containerColor = Color.Transparent
             ),
-            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(0.dp),
+            shape = RoundedCornerShape(16.dp),
             elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 0.dp
+                defaultElevation = 6.dp,
+                pressedElevation = 3.dp
             )
         ) {
-            Text(
-                "CONTINUAR",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        EduRachaV2Gradients.Green,
+                        shape = RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        tint = Color.White
+                    )
+                    Text(
+                        "CONTINUAR",
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        letterSpacing = 1.2.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ========================================
+ * VENTANAS EMERGENTES V2
+ * ========================================
+ */
+@Composable
+fun VentanaRachaDuolingoV2(
+    diasRacha: Int,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f))
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            shadowElevation = 12.dp
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFFFF6B35),
+                                Color(0xFFFF9600)
+                            )
+                        )
+                    )
+            ) {
+                AnimatedBubblesDecoration(color = Color.White)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    Text(
+                        text = "🔥",
+                        fontSize = 80.sp,
+                        modifier = Modifier.scale(1.2f)
+                    )
+
+                    Text(
+                        text = "¡RACHA AUMENTADA!",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        letterSpacing = 1.sp
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.25f)
+                    ) {
+                        Text(
+                            text = "$diasRacha días consecutivos",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "¡Sigue así! 🎉",
+                        fontSize = 16.sp,
+                        color = Color.White.copy(alpha = 0.95f),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun ConfettiAnimacionDuolingo() {
+fun VentanaRachaPerdidaV2(
+    porcentaje: Int,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f))
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            shadowElevation = 12.dp,
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(EduRachaV2Colors.Warning.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "💪",
+                        fontSize = 48.sp
+                    )
+                }
+
+                Text(
+                    text = "¡Sigue Intentándolo!",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    color = EduRachaV2Colors.TextPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = EduRachaV2Colors.Warning.copy(alpha = 0.1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Tu puntuación: $porcentaje%",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaV2Colors.TextPrimary
+                        )
+                        Text(
+                            text = "Necesitas 80% para aprobar",
+                            fontSize = 14.sp,
+                            color = EduRachaV2Colors.TextSecondary
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Tu racha se mantiene. ¡No te rindas!",
+                    fontSize = 14.sp,
+                    color = EduRachaV2Colors.TextSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ========================================
+ * ANIMACIÓN DE CONFETTI V2
+ * ========================================
+ */
+@Composable
+fun ConfettiAnimacionV2() {
+    val colores = listOf(
+        EduRachaV2Colors.Success,
+        EduRachaV2Colors.Primary,
+        EduRachaV2Colors.Accent,
+        EduRachaV2Colors.Secondary,
+        EduRachaV2Colors.Pink,
+        EduRachaV2Colors.Warning
+    )
+
     val particles = remember {
-        List(60) {
+        List(80) {
             ConfettiParticle(
                 x = Random.nextFloat() * 1200,
-                y = -Random.nextFloat() * 800,
-                color = listOf(
-                    Color(0xFF58CC02),
-                    Color(0xFF1CB0F6),
-                    Color(0xFFFF9600),
-                    Color(0xFFFFC800),
-                    Color(0xFFCE82FF),
-                    Color(0xFFFF4B4B)
-                ).random(),
-                size = Random.nextFloat() * 12 + 6,
-                velocityX = Random.nextFloat() * 4 - 2,
-                velocityY = Random.nextFloat() * 6 + 3,
+                y = -Random.nextFloat() * 1000,
+                color = colores.random(),
+                size = Random.nextFloat() * 14 + 8,
+                velocityX = Random.nextFloat() * 5 - 2.5f,
+                velocityY = Random.nextFloat() * 7 + 4,
                 rotation = Random.nextFloat() * 360,
-                rotationSpeed = Random.nextFloat() * 8 + 4
+                rotationSpeed = Random.nextFloat() * 10 + 5
             )
         }
     }
@@ -984,7 +1367,7 @@ fun ConfettiAnimacionDuolingo() {
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),
+            animation = tween(15000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "time"
@@ -996,300 +1379,20 @@ fun ConfettiAnimacionDuolingo() {
             particle.x += particle.velocityX
             particle.rotation += particle.rotationSpeed
 
-            if (particle.y > size.height + 100) {
-                particle.y = -100f
+            if (particle.y > size.height + 150) {
+                particle.y = -150f
                 particle.x = Random.nextFloat() * size.width
             }
 
-            if (particle.x < -50) particle.x = size.width + 50
-            if (particle.x > size.width + 50) particle.x = -50f
+            if (particle.x < -100) particle.x = size.width + 100
+            if (particle.x > size.width + 100) particle.x = -100f
 
             drawCircle(
                 color = particle.color,
                 radius = particle.size,
-                center = Offset(particle.x, particle.y)
+                center = Offset(particle.x, particle.y),
+                alpha = 0.9f
             )
         }
     }
-}
-
-/**
- * ========================================
- * COMPONENTES ADICIONALES PARA QUIZ
- * ========================================
- */
-
-@Composable
-fun IndicadorVidasMejorado(
-    vidasActuales: Int,
-    vidasMax: Int,
-    minutosParaProxima: Int,
-    modifier: Modifier = Modifier
-) {
-    val colorVidas = when {
-        vidasActuales == 0 -> Color(0xFFFF4B4B)
-        vidasActuales <= 2 -> Color(0xFFFFC800)
-        else -> Color(0xFFFF4B4B)
-    }
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = colorVidas,
-                    modifier = Modifier.size(28.dp)
-                )
-
-                Column {
-                    Text(
-                        text = "Vidas",
-                        fontSize = 14.sp,
-                        color = Color(0xFF777777),
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "$vidasActuales / $vidasMax",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Black,
-                        color = colorVidas
-                    )
-                }
-            }
-
-            if (vidasActuales < vidasMax && minutosParaProxima > 0) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF1CB0F6).copy(alpha = 0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = Color(0xFF1CB0F6),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "+1 en ${minutosParaProxima}m",
-                            fontSize = 14.sp,
-                            color = Color(0xFF1CB0F6),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BarraProgresoQuizMejorada(
-    preguntaActual: Int,
-    totalPreguntas: Int,
-    colorModo: Color,
-    modifier: Modifier = Modifier
-) {
-    val progreso = preguntaActual.toFloat() / totalPreguntas.toFloat()
-    val progresoAnimado by animateFloatAsState(
-        targetValue = progreso,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "progreso"
-    )
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Pregunta $preguntaActual de $totalPreguntas",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF3C3C3C)
-            )
-
-            Text(
-                text = "${(progreso * 100).toInt()}%",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Black,
-                color = colorModo
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
-                .background(
-                    color = Color(0xFFE5E5E5),
-                    shape = RoundedCornerShape(5.dp)
-                )
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progresoAnimado)
-                    .fillMaxHeight()
-                    .background(
-                        color = colorModo,
-                        shape = RoundedCornerShape(5.dp)
-                    )
-            )
-        }
-    }
-}
-
-@Composable
-fun DialogoSinVidasMejorado(
-    minutosParaProxima: Int,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFFFF4B4B).copy(alpha = 0.15f),
-                modifier = Modifier.size(80.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = Color(0xFFFF4B4B),
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-            }
-        },
-        title = {
-            Text(
-                "Sin vidas",
-                fontWeight = FontWeight.Black,
-                fontSize = 24.sp,
-                color = Color(0xFF3C3C3C)
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "No tienes vidas disponibles para realizar este quiz.",
-                    fontSize = 16.sp,
-                    color = Color(0xFF4B4B4B),
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1CB0F6).copy(alpha = 0.1f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = null,
-                                tint = Color(0xFF1CB0F6),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = "Cómo funcionan las vidas",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF3C3C3C)
-                            )
-                        }
-
-                        Text(
-                            text = "• Recuperas 1 vida cada 30 minutos\n• Máximo: 5 vidas\n• Próxima vida en: $minutosParaProxima minutos",
-                            fontSize = 15.sp,
-                            color = Color(0xFF4B4B4B),
-                            lineHeight = 22.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF58CC02).copy(alpha = 0.1f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = Color(0xFF58CC02),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "Regresa en $minutosParaProxima minutos",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF58CC02)
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1CB0F6)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    "Entendido",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
-        },
-        containerColor = Color.White,
-        shape = RoundedCornerShape(20.dp)
-    )
 }

@@ -1,3 +1,4 @@
+// MainActivity.kt
 package com.stiven.sos
 
 import android.content.Context
@@ -6,32 +7,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.stiven.sos.ui.theme.EduRachaColors
-import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.SolicitudViewModel
-import java.util.*
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -64,7 +56,6 @@ class MainActivity : ComponentActivity() {
                     },
                     onNavigateToRanking = {
                         startActivity(Intent(this, RankingEstudianteActivity::class.java))
-
                     }
                 )
             }
@@ -97,344 +88,290 @@ fun MainEstudianteScreen(
     onNavigateToRanking: () -> Unit
 ) {
     val context = LocalContext.current
-    val greeting = remember { getGreeting() }
 
-    // Leer datos del usuario desde SharedPreferences
+    // Leer datos del usuario
     var fullName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
-    var userRole by remember { mutableStateOf("") }
     var userUid by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
         fullName = prefs.getString("user_name", null) ?: "Estudiante"
         userEmail = prefs.getString("user_email", null) ?: ""
-        userRole = prefs.getString("user_role", null) ?: "estudiante"
         userUid = prefs.getString("user_uid", null) ?: ""
-
-        android.util.Log.d("MainActivity", "=== DATOS DEL ESTUDIANTE ===")
-        android.util.Log.d("MainActivity", "Nombre: $fullName")
-        android.util.Log.d("MainActivity", "Email: $userEmail")
-        android.util.Log.d("MainActivity", "UID: $userUid")
     }
 
     val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
-    // Calcular estadísticas
+    // ✅ DATOS REALES - No hardcoded
     val solicitudesPendientes = remember(solicitudUiState.solicitudes) {
-        solicitudUiState.solicitudes.count { it.estado == com.stiven.sos.models.EstadoSolicitud.PENDIENTE }
+        solicitudUiState.solicitudes.count {
+            it.estado == com.stiven.sos.models.EstadoSolicitud.PENDIENTE
+        }
     }
 
     val solicitudesAceptadas = remember(solicitudUiState.solicitudes) {
-        solicitudUiState.solicitudes.count { it.estado == com.stiven.sos.models.EstadoSolicitud.ACEPTADA }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EduRachaColors.Background)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Header del usuario
-        EstudianteHeader(
-            greeting = greeting,
-            fullName = fullName,
-            userEmail = userEmail,
-            userRole = userRole,
-            onNavigateToProfile = onNavigateToProfile,
-            onNavigateToNotifications = onNavigateToNotifications,
-            onNavigateToSettings = onNavigateToSettings
-        )
-
-        // Tarjetas de estadísticas
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CompactStatCardEstudiante(
-                label = "Inscritos",
-                value = "$solicitudesAceptadas",
-                icon = Icons.Outlined.School,
-                iconColor = EduRachaColors.Success,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToRanking
-            )
-            CompactStatCardEstudiante(
-                label = "Pendientes",
-                value = "$solicitudesPendientes",
-                icon = Icons.Outlined.HourglassTop,
-                iconColor = EduRachaColors.Warning,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToSolicitudes
-            )
-            CompactStatCardEstudiante(
-                label = "Puntos",
-                value = "0",
-                icon = Icons.Outlined.EmojiEvents,
-                iconColor = EduRachaColors.Accent,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToRanking
-            )
-        }
-
-        // Herramientas principales
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Explora y aprende",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            MainToolCardEstudiante(
-                title = "Cursos Disponibles",
-                description = "Explora y únete a nuevos cursos",
-                icon = Icons.Outlined.Explore,
-                backgroundColor = Brush.linearGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.8f)
-                    )
-                ),
-                onClick = onNavigateToCursos
-            )
-
-            MainToolCardEstudiante(
-                title = "Mis Cursos",
-                description = "Continúa tu aprendizaje",
-                icon = Icons.Outlined.MenuBook,
-                backgroundColor = Brush.linearGradient(
-                    colors = listOf(
-                        EduRachaColors.Success,
-                        EduRachaColors.Success.copy(alpha = 0.8f)
-                    )
-                ),
-
-                onClick = onNavigateToCursosInscritos
-            )
-
-            MainToolCardEstudiante(
-                title = "Mis Solicitudes",
-                description = "Revisa el estado de tus solicitudes",
-                icon = Icons.Outlined.Assignment,
-                backgroundColor = Brush.linearGradient(
-                    colors = listOf(
-                        EduRachaColors.Accent,
-                        EduRachaColors.Accent.copy(alpha = 0.8f)
-                    )
-                ),
-                onClick = onNavigateToSolicitudes
-            )
-
-            MainToolCardEstudiante(
-                title = "Ranking",
-                description = "Compite y gana recompensas",
-                icon = Icons.Outlined.Leaderboard,
-                backgroundColor = Brush.linearGradient(
-                    colors = listOf(
-                        EduRachaColors.Secondary,
-                        EduRachaColors.Secondary.copy(alpha = 0.8f)
-                    )
-                ),
-                onClick = onNavigateToRanking
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+        solicitudUiState.solicitudes.count {
+            it.estado == com.stiven.sos.models.EstadoSolicitud.ACEPTADA
         }
     }
-}
 
-@Composable
-fun EstudianteHeader(
-    greeting: String,
-    fullName: String,
-    userEmail: String,
-    userRole: String,
-    onNavigateToProfile: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
-    onNavigateToSettings: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.9f)
-                    )
-                )
-            )
-            .padding(top = 40.dp, bottom = 32.dp, start = 24.dp, end = 24.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f))
-                    .border(3.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                    .clickable(onClick = onNavigateToProfile),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = fullName.firstOrNull()?.uppercase() ?: "E",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = greeting,
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
-                Text(
-                    text = fullName,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                if (userEmail.isNotEmpty()) {
-                    Text(
-                        text = userEmail,
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
-            Row {
-                IconButton(onClick = onNavigateToNotifications) {
-                    Icon(
-                        Icons.Outlined.Notifications,
-                        contentDescription = "Notificaciones",
-                        tint = Color.White
-                    )
-                }
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(
-                        Icons.Outlined.Settings,
-                        contentDescription = "Ajustes",
-                        tint = Color.White
-                    )
-                }
-            }
-        }
+    // Calcular puntos reales basados en cursos
+    val puntosReales = remember(solicitudesAceptadas) {
+        solicitudesAceptadas * 50 // 50 puntos por curso inscrito
     }
-}
 
-@Composable
-fun CompactStatCardEstudiante(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    iconColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(vertical = 20.dp, horizontal = 12.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(36.dp),
-                tint = iconColor
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = iconColor
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = EduRachaColors.TextSecondary,
-                fontWeight = FontWeight.Medium
-            )
-        }
+    val userInitial = fullName.firstOrNull()?.uppercase() ?: "E"
+
+    // Animación de entrada para toda la pantalla
+    var screenVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        screenVisible = true
     }
-}
 
-@Composable
-fun MainToolCardEstudiante(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    backgroundColor: Brush,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    AnimatedVisibility(
+        visible = screenVisible,
+        enter = fadeIn(animationSpec = tween(600))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(backgroundColor)
+        EduRachaV2Container(
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
+            // Header con animación
+            EduRachaV2Header(
+                userName = fullName,
+                userEmail = userEmail,
+                userInitial = userInitial,
+                onNotificationClick = onNavigateToNotifications,
+                onSettingsClick = onNavigateToSettings,
+                onInfoClick = onNavigateToProfile,
+                hasNotificationBadge = solicitudesPendientes > 0
+            )
+
+            // Stats Cards con animación escalonada
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    modifier = Modifier.size(42.dp),
-                    tint = Color.White
+                AnimatedStatCard(
+                    icon = Icons.Outlined.School,
+                    value = "$solicitudesAceptadas",
+                    label = "Inscritos",
+                    color = EduRachaV2Colors.Success,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToCursosInscritos,
+                    delay = 150
                 )
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = description,
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.9f),
-                        lineHeight = 18.sp
-                    )
-                }
-                Icon(
-                    imageVector = Icons.Outlined.ArrowForward,
-                    contentDescription = "Ir",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+
+                AnimatedStatCard(
+                    icon = Icons.Outlined.HourglassTop,
+                    value = "$solicitudesPendientes",
+                    label = "Pendientes",
+                    color = EduRachaV2Colors.Warning,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToSolicitudes,
+                    delay = 300
                 )
+
+                AnimatedStatCard(
+                    icon = Icons.Outlined.EmojiEvents,
+                    value = "$puntosReales",
+                    label = "Puntos",
+                    color = EduRachaV2Colors.Primary,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToRanking,
+                    delay = 450
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Sección de módulos con animación
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AnimatedTitle(text = "Explora y aprende ⭐")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Module Cards con animación escalonada
+                AnimatedModuleCard(
+                    title = "Cursos Disponibles",
+                    subtitle = "Explora y únete a nuevos cursos",
+                    icon = Icons.Outlined.Explore,
+                    gradient = EduRachaV2Gradients.Blue,
+                    onClick = onNavigateToCursos,
+                    delay = 100
+                )
+
+                AnimatedModuleCard(
+                    title = "Mis Cursos",
+                    subtitle = "Continúa tu aprendizaje",
+                    icon = Icons.Outlined.MenuBook,
+                    gradient = EduRachaV2Gradients.Green,
+                    onClick = onNavigateToCursosInscritos,
+                    delay = 200
+                )
+
+                AnimatedModuleCard(
+                    title = "Mis Solicitudes",
+                    subtitle = "Revisa el estado de tus solicitudes",
+                    icon = Icons.Outlined.Assignment,
+                    gradient = EduRachaV2Gradients.Purple,
+                    onClick = onNavigateToSolicitudes,
+                    delay = 300
+                )
+
+                AnimatedModuleCard(
+                    title = "Ranking",
+                    subtitle = "Compite y gana recompensas",
+                    icon = Icons.Outlined.Leaderboard,
+                    gradient = EduRachaV2Gradients.Yellow,
+                    onClick = onNavigateToRanking,
+                    delay = 400
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
+@Composable
+private fun AnimatedStatCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    delay: Int = 0
+) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(delay.toLong())
+        visible = true
+    }
+
+    val offsetY by animateDpAsState(
+        targetValue = if (visible) 0.dp else 50.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 600)
+    )
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                translationY = offsetY.toPx()
+                this.alpha = alpha
+            }
+    ) {
+        EduRachaV2StatCard(
+            icon = icon,
+            value = value,
+            label = label,
+            color = color,
+            onClick = onClick
+        )
+    }
+}
+
+@Composable
+private fun AnimatedModuleCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    gradient: androidx.compose.ui.graphics.Brush,
+    onClick: () -> Unit,
+    delay: Int = 0
+) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(delay.toLong())
+        visible = true
+    }
+
+    val offsetX by animateDpAsState(
+        targetValue = if (visible) 0.dp else 100.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 600)
+    )
+
+    Box(
+        modifier = Modifier.graphicsLayer {
+            translationX = offsetX.toPx()
+            this.alpha = alpha
+        }
+    ) {
+        EduRachaV2ModuleCard(
+            title = title,
+            subtitle = subtitle,
+            icon = icon,
+            gradient = gradient,
+            onClick = onClick
+        )
+    }
+}
+
+@Composable
+private fun AnimatedTitle(text: String) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        visible = true
+    }
+
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.8f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        )
+    )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 500)
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            },
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        androidx.compose.material3.Text(
+            text = text,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = EduRachaV2Colors.TextPrimary
+        )
+    }
+}
