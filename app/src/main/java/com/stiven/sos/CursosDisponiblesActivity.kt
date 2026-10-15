@@ -1,5 +1,7 @@
 package com.stiven.sos
-
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.DialogProperties
 import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
@@ -946,6 +948,7 @@ fun DialogoSolicitudFigma(
     onConfirm: () -> Unit
 ) {
     var selectedPredefined by remember { mutableStateOf<String?>(null) }
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
 
     val mensajesPredefinidos = listOf(
         "Estoy muy interesado en aprender sobre este tema y creo que este curso me ayudará en mi formación académica.",
@@ -953,19 +956,22 @@ fun DialogoSolicitudFigma(
         "Este curso es fundamental para mi carrera y me comprometo a participar activamente."
     )
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .fillMaxWidth(0.94f)
+                .heightIn(max = screenHeight * 0.92f)
+                .imePadding(),
             shape = RoundedCornerShape(24.dp),
             color = Color.White,
             shadowElevation = 8.dp
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Header
+            Column(modifier = Modifier.fillMaxWidth()) {
+
+                // Header (fijo)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -977,7 +983,7 @@ fun DialogoSolicitudFigma(
                                 )
                             )
                         )
-                        .padding(24.dp)
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1012,10 +1018,11 @@ fun DialogoSolicitudFigma(
                     }
                 }
 
-                // Contenido
+                // Contenido (con scroll)
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
@@ -1028,10 +1035,11 @@ fun DialogoSolicitudFigma(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                modifier = Modifier.size(60.dp),
+                                modifier = Modifier.size(64.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 color = Color(0xFFE8E5F5)
                             ) {
@@ -1039,7 +1047,7 @@ fun DialogoSolicitudFigma(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("🎓", fontSize = 32.sp)
+                                    Text("🎓", fontSize = 34.sp)
                                 }
                             }
 
@@ -1049,13 +1057,13 @@ fun DialogoSolicitudFigma(
                             ) {
                                 Text(
                                     curso.titulo,
-                                    fontSize = 16.sp,
+                                    fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF1C1C1E)
                                 )
                                 Text(
                                     curso.codigo,
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color(0xFF3C79F5)
                                 )
@@ -1066,7 +1074,7 @@ fun DialogoSolicitudFigma(
                     // Mensajes predefinidos
                     Text(
                         "Selecciona un mensaje:",
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF717182)
                     )
@@ -1087,7 +1095,7 @@ fun DialogoSolicitudFigma(
                     // Campo de texto personalizado
                     Text(
                         "O escribe tu mensaje:",
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF717182)
                     )
@@ -1108,55 +1116,57 @@ fun DialogoSolicitudFigma(
                             unfocusedBorderColor = Color(0xFFE0E0E0)
                         )
                     )
+                }
 
-                    // Botones
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Botones (fijos abajo)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFFE0E0E0))
                     ) {
-                        OutlinedButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.5.dp, Color(0xFFE0E0E0))
-                        ) {
-                            Text(
-                                "Cancelar",
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF717182)
-                            )
-                        }
+                        Text(
+                            "Cancelar",
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF717182)
+                        )
+                    }
 
-                        Button(
-                            onClick = onConfirm,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF3C79F5)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Send,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "Enviar",
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3C79F5)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Send,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Enviar",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
     }
 }
-
 @Composable
 fun MensajePredefinidoChip(
     message: String,
