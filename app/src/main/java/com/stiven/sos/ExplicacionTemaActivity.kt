@@ -1,5 +1,11 @@
 package com.stiven.sos
 
+import com.stiven.sos.ui.theme.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -85,7 +91,9 @@ class ExplicacionTemaActivity : ComponentActivity() {
 }
 
 // ============================================================================
-// PANTALLA PRINCIPAL
+// PANTALLA PRINCIPAL — Explicación interactiva (diseño Nexo)
+// Cada sección es una tarjeta: el estudiante revela las ideas una a una y
+// responde un mini reto de "completa la idea" antes de avanzar.
 // ============================================================================
 
 @Composable
@@ -98,17 +106,35 @@ fun ExplicacionTemaScreen(
     onNavigateBack: () -> Unit,
     onIniciarQuiz: (String) -> Unit
 ) {
+    val p = LocalNexo.current
+    val context = LocalContext.current
     val uiState by quizViewModel.uiState.collectAsState()
 
-    // Dividir explicación en secciones
+    // Dividir explicación en secciones (misma regla de siempre: párrafos separados por línea en blanco)
     val secciones = remember(temaExplicacion) {
-        temaExplicacion.split("\n\n")
-            .map { it.trim() }
+        temaExplicacion.replace("\r\n", "\n").split(Regex("\n\\s*\n"))
+            .map { limpiarMarkdown(it) }
             .filter { it.isNotEmpty() }
     }
 
     var seccionesCompletadas by remember { mutableStateOf(setOf<Int>()) }
     val todasCompletadas = seccionesCompletadas.size == secciones.size
+
+    // Regla: la explicación es obligatoria solo la primera vez. Si ya leyó esta misma versión,
+    // queda como repaso opcional; si el docente la cambió, se vuelve a pedir. null = consultando.
+    var yaLeida by remember { mutableStateOf<Boolean?>(null) }
+    var explicacionCambio by remember { mutableStateOf(false) }
+    LaunchedEffect(cursoId, temaId) {
+        try {
+            val r = com.stiven.sos.api.ApiClient.apiService.estadoExplicacion(cursoId, temaId)
+            val cuerpo = if (r.isSuccessful) r.body() else null
+            yaLeida = cuerpo?.get("vista") == true
+            explicacionCambio = cuerpo?.get("cambio") == true
+        } catch (e: Exception) {
+            yaLeida = false
+        }
+    }
+    val repasoOpcional = yaLeida == true && !todasCompletadas
 
     val aproboQuizOficial = uiState.porcentajeQuizOficial >= 80
     val enCooldown = uiState.yaResolviHoy && aproboQuizOficial
@@ -118,219 +144,244 @@ fun ExplicacionTemaScreen(
 
     var seccionActual by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
-    // Expresión de la mascota según progreso
-    val expresionBuho = when {
-        todasCompletadas -> OwlExpression.HAPPY
-        seccionesCompletadas.size >= secciones.size / 2 -> OwlExpression.EXCITED
-        seccionesCompletadas.isEmpty() -> OwlExpression.CURIOUS
-        else -> OwlExpression.FOCUSED
-    }
+    // Lector de voz (opcional, sin permisos)
+    val lector = rememberLectorVoz()
 
     // Marcar explicación como vista cuando se completan todas las secciones
     LaunchedEffect(todasCompletadas) {
         if (todasCompletadas) {
-            quizViewModel.marcarExplicacionVista(temaId) {}
+            quizViewModel.marcarExplicacionVista(temaId, cursoId) {}
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EduRachaV2Colors.Background)
-    ) {
-        // TODO ES SCROLLABLE INCLUYENDO EL HEADER
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 100.dp)
-        ) {
-            // HEADER SIMPLE CON TÍTULO Y BURBUJAS
-            item {
-                HeaderConBurbujas(
-                    titulo = temaTitulo,
-                    cantidadSecciones = secciones.size,
-                    onNavigateBack = onNavigateBack
-                )
-            }
+    LaunchedEffect(Unit) {
+        com.stiven.sos.services.GestorSonidos.inicializar(context)
+    }
 
-            // INDICADORES DE PROGRESO
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    IndicadoresProgreso(
-                        total = secciones.size,
-                        seccionActual = seccionActual,
-                        seccionesCompletadas = seccionesCompletadas,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                    )
+    FondoNexo(conCuadricula = false) {
+        Column(Modifier.fillMaxSize()) {
+            EncabezadoNexo(
+                titulo = temaTitulo,
+                subtitulo = "Explicación interactiva",
+                onVolver = {
+                    lector.detener()
+                    onNavigateBack()
+                },
+                acciones = {
+                    if (secciones.isNotEmpty() && lector.disponible) {
+                        BotonIconoNexo(
+                            icono = if (lector.hablando) Icons.Default.StopCircle else Icons.Default.VolumeUp,
+                            descripcion = if (lector.hablando) "Detener lectura" else "Escuchar esta tarjeta",
+                            color = p.iaTexto,
+                            onClick = {
+                                if (lector.hablando) lector.detener()
+                                else lector.leer(secciones.getOrNull(seccionActual) ?: "")
+                            }
+                        )
+                    }
+                }
+            )
 
-                    // MASCOTA BÚHO ANIMADA
-                    MascotaBuho(
-                        expresion = expresionBuho,
-                        mensaje = obtenerMensajeBuho(seccionesCompletadas.size, secciones.size, todasCompletadas),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                    )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                if (repasoOpcional) {
+                    item {
+                        FilaNexo(
+                            icono = Icons.Default.CheckCircle,
+                            color = p.accionTexto,
+                            titulo = "Ya leíste esta explicación",
+                            subtitulo = "Repasarla es opcional. Puedes ir directo al quiz o revisar las tarjetas abajo.",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    item {
+                        QuizOficialCard(
+                            aproboQuizOficial = aproboQuizOficial,
+                            porcentajeObtenido = uiState.porcentajeQuizOficial,
+                            enCooldown = enCooldown,
+                            horasRestantes = uiState.horasParaNuevoQuiz,
+                            minutosRestantes = uiState.minutosParaNuevoQuiz,
+                            sinVidas = uiState.sinVidas,
+                            onIniciar = {
+                                lector.detener()
+                                onIniciarQuiz("oficial")
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    if (yaResolviHoy && aproboQuizOficial) {
+                        item {
+                            QuizPracticaCard(
+                                sinVidas = uiState.sinVidas,
+                                onIniciar = {
+                                    lector.detener()
+                                    onIniciarQuiz("practica")
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (secciones.isEmpty()) {
+                    item {
+                        EstadoVacioNexo(
+                            titulo = "Sin explicación",
+                            mensaje = "Tu docente aún no ha publicado la explicación de este tema. Puedes ir directo al quiz."
+                        )
+                    }
+                } else {
+                    item {
+                        IndicadoresProgreso(
+                            total = secciones.size,
+                            seccionActual = seccionActual,
+                            seccionesCompletadas = seccionesCompletadas,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    item {
+                        GloboRobi(
+                            titulo = "ROBI",
+                            mensaje = obtenerMensajeBuho(seccionesCompletadas.size, secciones.size, todasCompletadas),
+                            expresion = when {
+                                todasCompletadas -> ExpresionRobi.CELEBRA
+                                seccionesCompletadas.isEmpty() -> ExpresionRobi.SALUDA
+                                else -> ExpresionRobi.FELIZ
+                            },
+                            tamanoRobi = 64.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    item {
+                        key(seccionActual) {
+                            StoryCard(
+                                numero = seccionActual + 1,
+                                total = secciones.size,
+                                contenido = secciones[seccionActual.coerceIn(0, secciones.size - 1)],
+                                todas = secciones,
+                                completada = seccionesCompletadas.contains(seccionActual),
+                                onCompletar = {
+                                    seccionesCompletadas = seccionesCompletadas + seccionActual
+                                    com.stiven.sos.services.GestorSonidos.reproducir(
+                                        context, com.stiven.sos.services.GestorSonidos.Sonido.AVANCE
+                                    )
+                                    scope.launch {
+                                        delay(700)
+                                        if (seccionActual < secciones.size - 1) {
+                                            lector.detener()
+                                            seccionActual++
+                                        } else {
+                                            listState.animateScrollToItem(3)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (todasCompletadas) {
+                    item {
+                        CardTemaCompletadoModerno(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    item {
+                        QuizOficialCard(
+                            aproboQuizOficial = aproboQuizOficial,
+                            porcentajeObtenido = uiState.porcentajeQuizOficial,
+                            enCooldown = enCooldown,
+                            horasRestantes = uiState.horasParaNuevoQuiz,
+                            minutosRestantes = uiState.minutosParaNuevoQuiz,
+                            sinVidas = uiState.sinVidas,
+                            onIniciar = {
+                                lector.detener()
+                                onIniciarQuiz("oficial")
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    if (yaResolviHoy && aproboQuizOficial) {
+                        item {
+                            QuizPracticaCard(
+                                sinVidas = uiState.sinVidas,
+                                onIniciar = {
+                                    lector.detener()
+                                    onIniciarQuiz("practica")
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                } else if (!repasoOpcional) {
+                    item {
+                        FilaNexo(
+                            icono = Icons.Default.Lock,
+                            color = p.textoSuave,
+                            titulo = if (explicacionCambio) "Explicación actualizada" else "Quiz bloqueado",
+                            subtitulo = if (explicacionCambio)
+                                "Tu docente cambió esta explicación. Léela de nuevo para desbloquear el quiz."
+                            else "Completa las ${secciones.size} tarjetas para desbloquearlo",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
                 }
             }
 
-            // TARJETA STORY ACTUAL
-            item {
-                StoryCard(
-                    numero = seccionActual + 1,
-                    contenido = secciones[seccionActual],
-                    completada = seccionesCompletadas.contains(seccionActual),
-                    onCompletar = {
-                        seccionesCompletadas = seccionesCompletadas + seccionActual
-                        // Transición más rápida (600ms)
-                        scope.launch {
-                            delay(600)
-                            if (seccionActual < secciones.size - 1) {
+            // Navegación inferior entre tarjetas
+            if (secciones.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(p.superficie)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val puedeAvanzar = (seccionesCompletadas.contains(seccionActual) || yaLeida == true) &&
+                        seccionActual < secciones.size - 1
+                    BotonNexo(
+                        texto = "Anterior",
+                        onClick = {
+                            if (seccionActual > 0) {
+                                lector.detener()
+                                seccionActual--
+                            }
+                        },
+                        habilitado = seccionActual > 0,
+                        tipo = TipoBoton.SECUNDARIO,
+                        icono = Icons.Default.ArrowBack,
+                        alto = 50.dp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "${seccionActual + 1}/${secciones.size}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = p.texto
+                    )
+                    BotonNexo(
+                        texto = "Siguiente",
+                        onClick = {
+                            if (puedeAvanzar) {
+                                lector.detener()
                                 seccionActual++
                             }
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
-
-            // CARDS DE QUIZ (solo si todas completadas)
-            if (todasCompletadas) {
-                // Card de completado
-                item {
-                    CardTemaCompletadoModerno(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                    )
-                }
-
-                // Quiz Oficial Card
-                item {
-                    QuizOficialCard(
-                        aproboQuizOficial = aproboQuizOficial,
-                        porcentajeObtenido = uiState.porcentajeQuizOficial,
-                        enCooldown = enCooldown,
-                        horasRestantes = uiState.horasParaNuevoQuiz,
-                        minutosRestantes = uiState.minutosParaNuevoQuiz,
-                        sinVidas = uiState.sinVidas,
-                        onIniciar = { onIniciarQuiz("oficial") },
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                    )
-                }
-
-                // Quiz Práctica Card - SOLO SI YA RESOLVIÓ HOY
-                if (yaResolviHoy && aproboQuizOficial) {
-                    item {
-                        QuizPracticaCard(
-                            sinVidas = uiState.sinVidas,
-                            onIniciar = { onIniciarQuiz("practica") },
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                        )
-                    }
-                }
-            } else {
-                // Mensaje de bloqueo
-                item {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White,
-                        shadowElevation = 4.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = EduRachaV2Colors.TextSecondary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Column {
-                                Text(
-                                    "Quiz bloqueado",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EduRachaV2Colors.TextPrimary
-                                )
-                                Text(
-                                    "Lee todas las secciones para desbloquear",
-                                    fontSize = 14.sp,
-                                    color = EduRachaV2Colors.TextSecondary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // BOTONES DE NAVEGACIÓN FIJOS EN LA PARTE INFERIOR
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter),
-            color = EduRachaV2Colors.Background,
-            shadowElevation = 8.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Anterior
-                IconButton(
-                    onClick = { if (seccionActual > 0) seccionActual-- },
-                    enabled = seccionActual > 0,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(
-                            if (seccionActual > 0) EduRachaV2Colors.Primary
-                            else EduRachaV2Colors.SoftGray,
-                            CircleShape
-                        )
-                ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Anterior",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Texto indicador
-                Text(
-                    "${seccionActual + 1} / ${secciones.size}",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
-
-                // Siguiente
-                IconButton(
-                    onClick = {
-                        if (seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1) {
-                            seccionActual++
-                        }
-                    },
-                    enabled = seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(
-                            if (seccionesCompletadas.contains(seccionActual) && seccionActual < secciones.size - 1)
-                                EduRachaV2Colors.Primary
-                            else EduRachaV2Colors.SoftGray,
-                            CircleShape
-                        )
-                ) {
-                    Icon(
-                        Icons.Default.ArrowForward,
-                        contentDescription = "Siguiente",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        },
+                        habilitado = puedeAvanzar,
+                        tipo = TipoBoton.MARCA,
+                        icono = Icons.Default.ArrowForward,
+                        alto = 50.dp,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -339,142 +390,7 @@ fun ExplicacionTemaScreen(
 }
 
 // ============================================================================
-// HEADER CON BURBUJAS - COMPACTO
-// ============================================================================
-
-@Composable
-fun HeaderConBurbujas(
-    titulo: String,
-    cantidadSecciones: Int,
-    onNavigateBack: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .background(EduRachaV2Gradients.Purple)
-            .statusBarsPadding()
-    ) {
-        // Burbujas decorativas animadas
-        Box(modifier = Modifier.fillMaxSize()) {
-            val infiniteTransition = rememberInfiniteTransition(label = "bubbles")
-
-            val bubble1Offset by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 10f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(2000, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "bubble1"
-            )
-
-            // Burbuja grande
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .offset(x = 250.dp, y = (-10).dp)
-                    .graphicsLayer { translationY = bubble1Offset }
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
-            )
-
-            // Burbuja mediana
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .offset(x = 200.dp, y = 60.dp)
-                    .graphicsLayer { translationY = -bubble1Offset * 0.7f }
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = 0.06f))
-            )
-
-            // Burbuja pequeña
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .offset(x = 20.dp, y = 30.dp)
-                    .graphicsLayer { translationY = bubble1Offset * 0.5f }
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.05f))
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Botón back
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color.White.copy(0.2f), CircleShape)
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Column {
-                // Ícono de libro
-                Icon(
-                    Icons.Default.MenuBook,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp)
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                // Título
-                Text(
-                    titulo,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    lineHeight = 28.sp,
-                    maxLines = 2
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                // Badge de secciones
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color.White.copy(0.2f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Circle,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(6.dp)
-                        )
-                        Text(
-                            "$cantidadSecciones secciones",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// INDICADORES DE PROGRESO
+// PROGRESO SEGMENTADO
 // ============================================================================
 
 @Composable
@@ -484,344 +400,238 @@ fun IndicadoresProgreso(
     seccionesCompletadas: Set<Int>,
     modifier: Modifier = Modifier
 ) {
+    val p = LocalNexo.current
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "${seccionesCompletadas.size} de $total tarjetas completadas" },
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        repeat(total) { index ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        when {
-                            seccionesCompletadas.contains(index) -> EduRachaV2Colors.Success
-                            index == seccionActual -> EduRachaV2Colors.Primary
-                            else -> EduRachaV2Colors.SoftGray
-                        }
-                    )
+        repeat(total) { i ->
+            val color by animateColorAsState(
+                targetValue = when {
+                    seccionesCompletadas.contains(i) -> p.accion
+                    i == seccionActual -> p.marca
+                    else -> p.borde
+                },
+                label = "segmento"
             )
-        }
-    }
-}
-
-// ============================================================================
-// MASCOTA BÚHO
-// ============================================================================
-
-enum class OwlExpression {
-    CURIOUS, FOCUSED, EXCITED, HAPPY
-}
-
-@Composable
-fun MascotaBuho(
-    expresion: OwlExpression,
-    mensaje: String,
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "owl")
-
-    val bounce by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = -8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bounce"
-    )
-
-    val blink by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 3000
-                1f at 0
-                1f at 2800
-                0.3f at 2850
-                1f at 2900
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "blink"
-    )
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Búho animado
             Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .offset(y = bounce.dp)
-            ) {
-                Text(
-                    text = when (expresion) {
-                        OwlExpression.CURIOUS -> "🦉"
-                        OwlExpression.FOCUSED -> "🦉"
-                        OwlExpression.EXCITED -> "🦉"
-                        OwlExpression.HAPPY -> "🎉"
-                    },
-                    fontSize = 60.sp,
-                    modifier = Modifier.graphicsLayer {
-                        scaleY = blink
-                    }
-                )
-            }
-
-            // Mensaje
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    when (expresion) {
-                        OwlExpression.CURIOUS -> "¡Empecemos!"
-                        OwlExpression.FOCUSED -> "¡Vas bien!"
-                        OwlExpression.EXCITED -> "¡Casi terminas!"
-                        OwlExpression.HAPPY -> "¡Excelente!"
-                    },
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary
-                )
-                Text(
-                    mensaje,
-                    fontSize = 14.sp,
-                    color = EduRachaV2Colors.TextSecondary,
-                    lineHeight = 20.sp
-                )
-            }
+                Modifier
+                    .weight(1f)
+                    .height(if (i == seccionActual) 10.dp else 8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
         }
     }
 }
 
 fun obtenerMensajeBuho(completadas: Int, total: Int, todasCompletadas: Boolean): String {
     return when {
-        todasCompletadas -> "¡Has leído todo! Ahora puedes hacer el quiz 🎯"
-        completadas == 0 -> "Lee cada sección usando los botones de navegación"
-        completadas < total / 2 -> "Continúa leyendo, estás aprendiendo mucho"
-        else -> "Solo te faltan ${total - completadas} secciones más"
+        todasCompletadas -> "¡Leíste todo! Ya puedes hacer el quiz."
+        completadas == 0 -> "Revela cada idea y responde el mini reto para avanzar."
+        completadas >= total / 2 -> "Vas por la mitad. Sigue así."
+        else -> "Buen comienzo. Te faltan ${total - completadas} tarjetas."
     }
 }
 
 // ============================================================================
-// STORY CARD
+// MINI RETO "COMPLETA LA IDEA" (se genera localmente a partir del texto)
+// ============================================================================
+
+data class RetoCompletar(val frase: String, val respuesta: String, val opciones: List<String>)
+
+private val PALABRAS_COMUNES = setOf(
+    "además", "también", "cuando", "porque", "entonces", "mientras", "algunos", "algunas", "otros", "otras",
+    "puede", "pueden", "tiene", "tienen", "sobre", "entre", "desde", "hasta", "donde", "cuales", "cualquier",
+    "siempre", "nuestro", "nuestra", "ejemplo", "través", "durante", "aunque", "después", "antes", "mismo",
+    "misma", "manera", "forma", "parte", "estos", "estas", "aquellos", "aquellas", "ningún", "ninguna",
+    "muchos", "muchas", "cuanto", "debemos", "hacemos", "importante", "siguiente", "general", "ahora"
+)
+
+private fun palabrasClave(texto: String): List<String> =
+    Regex("\\p{L}{6,}").findAll(texto).map { it.value }
+        .filter { it.lowercase() !in PALABRAS_COMUNES }
+        .toList()
+
+fun generarReto(seccion: String, todas: List<String>, semilla: Int): RetoCompletar? {
+    val frases = seccion.split(Regex("(?<=[.!?])\\s+")).map { it.trim() }.filter { it.length > 25 }
+    if (frases.isEmpty()) return null
+    val rnd = kotlin.random.Random(semilla * 31 + seccion.length)
+    val candidatas = frases.flatMap { f -> palabrasClave(f).map { f to it } }
+    if (candidatas.isEmpty()) return null
+    // Preferir palabras largas (suelen ser los conceptos)
+    val top = candidatas.sortedByDescending { it.second.length }.take(4)
+    val (frase, respuesta) = top[rnd.nextInt(top.size)]
+    val distractores = todas.flatMap { palabrasClave(it) }
+        .map { it.lowercase() }
+        .distinct()
+        .filter { it != respuesta.lowercase() }
+        .shuffled(rnd)
+        .take(2)
+    if (distractores.size < 2) return null
+    val opciones = (distractores + respuesta.lowercase()).shuffled(rnd)
+    val oculta = frase.replaceFirst(respuesta, "_____")
+    return RetoCompletar(oculta, respuesta.lowercase(), opciones)
+}
+
+// ============================================================================
+// TARJETA INTERACTIVA
 // ============================================================================
 
 @Composable
 fun StoryCard(
     numero: Int,
+    total: Int,
     contenido: String,
+    todas: List<String>,
     completada: Boolean,
     onCompletar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White,
-        shadowElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(28.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = EduRachaV2Colors.Secondary.copy(0.15f)
-                ) {
-                    Text(
-                        "Parte $numero",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaV2Colors.Secondary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
+    val p = LocalNexo.current
+    val context = LocalContext.current
+    val ideas = remember(contenido) {
+        contenido.split(Regex("(?<=[.!?])\\s+|\\n")).map { it.trim() }.filter { it.isNotEmpty() }
+            .ifEmpty { listOf(contenido) }
+    }
+    val reto = remember(contenido) { generarReto(contenido, todas, numero) }
+    var reveladas by remember { mutableStateOf(if (completada) ideas.size else 1) }
+    var elegida by remember { mutableStateOf<String?>(null) }
+    var acerto by remember { mutableStateOf(completada) }
+    val sacudida = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val todoRevelado = reveladas >= ideas.size
 
-                if (completada) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Completado",
-                        tint = EduRachaV2Colors.Success,
-                        modifier = Modifier.size(28.dp)
+    TarjetaNexo(
+        modifier = modifier.fillMaxWidth(),
+        acento = if (completada) p.accion else p.marca,
+        padding = 18.dp
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "TARJETA $numero DE $total",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = p.marcaTexto,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.weight(1f)
+            )
+            if (completada) {
+                ChipNexo(texto = "Completada", color = p.accionTexto, icono = Icons.Default.CheckCircle)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Ideas reveladas una por una
+        ideas.take(reveladas).forEachIndexed { i, idea ->
+            var visible by remember { mutableStateOf(completada || i == 0) }
+            LaunchedEffect(Unit) { visible = true }
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(350)) + expandVertically(tween(350))
+            ) {
+                Row(Modifier.padding(vertical = 5.dp)) {
+                    Box(
+                        Modifier
+                            .padding(top = 7.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (i == reveladas - 1 && !todoRevelado) p.marca else p.ia)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        idea,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.texto,
+                        lineHeight = 25.sp
                     )
                 }
             }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(14.dp))
 
-            // Contenido - TEXTO NEGRO Y MÁS GRANDE
-            Text(
-                contenido,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Normal,
-                color = Color.Black,
-                lineHeight = 28.sp
-            )
+        when {
+            completada -> Unit
 
-            Spacer(Modifier.height(24.dp))
+            !todoRevelado -> {
+                BotonNexo(
+                    texto = "Revelar siguiente idea (${reveladas}/${ideas.size})",
+                    onClick = { reveladas++ },
+                    tipo = TipoBoton.MARCA,
+                    icono = Icons.Default.AutoAwesome,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-            // Botón completar
-            if (!completada) {
-                Button(
-                    onClick = onCompletar,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EduRachaV2Colors.Success
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(vertical = 18.dp)
+            reto != null && !acerto -> {
+                // Mini reto antes de avanzar
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer { translationX = sacudida.value * density }
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(p.ia.copy(alpha = 0.10f))
+                        .border(1.dp, p.ia.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
                 ) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Marcar como leído",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = EduRachaV2Colors.Success.copy(0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 18.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = EduRachaV2Colors.Success,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            "Sección completada",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaV2Colors.Success
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = p.iaTexto, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("RETO DE ROBI · COMPLETA LA IDEA", fontSize = 12.sp, fontWeight = FontWeight.Black, color = p.iaTexto, letterSpacing = 0.8.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(reto.frase, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = p.texto, lineHeight = 23.sp)
+                    Spacer(Modifier.height(10.dp))
+                    reto.opciones.forEach { opcion ->
+                        val esElegida = elegida == opcion
+                        val colorBorde = when {
+                            esElegida && opcion == reto.respuesta -> p.accion
+                            esElegida -> p.error
+                            else -> p.borde
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(p.superficie)
+                                .border(2.dp, colorBorde, RoundedCornerShape(12.dp))
+                                .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                                    elegida = opcion
+                                    if (opcion == reto.respuesta) {
+                                        acerto = true
+                                        com.stiven.sos.services.GestorSonidos.reproducir(context, com.stiven.sos.services.GestorSonidos.Sonido.CORRECTO)
+                                        onCompletar()
+                                    } else {
+                                        com.stiven.sos.services.GestorSonidos.reproducir(context, com.stiven.sos.services.GestorSonidos.Sonido.ERROR)
+                                        scope.launch {
+                                            for (x in listOf(10f, -10f, 6f, -6f, 0f)) sacudida.animateTo(x, tween(55))
+                                        }
+                                    }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                        ) {
+                            Text(opcion, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = p.texto)
+                        }
+                    }
+                    if (elegida != null && elegida != reto.respuesta) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Casi. Vuelve a leer la tarjeta e inténtalo otra vez.", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = p.errorTexto)
                     }
                 }
             }
-        }
-    }
-}
 
-// ============================================================================
-// CARD DE TEMA COMPLETADO MODERNO
-// ============================================================================
-
-@Composable
-fun CardTemaCompletadoModerno(
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.Transparent,
-        shadowElevation = 8.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFFF7096),
-                            Color(0xFFFF5277)
-                        )
-                    )
-                )
-        ) {
-            // Burbujas decorativas
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .offset(x = 250.dp, y = (-20).dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.1f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .offset(x = 20.dp, y = 100.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Emoji animado
-                val infiniteTransition = rememberInfiniteTransition(label = "trophy")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.15f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "scale"
-                )
-
-                Text(
-                    "🏆",
-                    fontSize = 80.sp,
-                    modifier = Modifier
-                        .scale(scale)
-                        .padding(bottom = 16.dp)
-                )
-
-                Text(
-                    "¡Tema Completado!",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    "Has leído todas las secciones. ¡Es hora de poner a prueba tus conocimientos!",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(0.95f),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
+            else -> {
+                BotonNexo(
+                    texto = "Lo entendí",
+                    onClick = onCompletar,
+                    tipo = TipoBoton.ACCION,
+                    icono = Icons.Default.Check,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -829,8 +639,23 @@ fun CardTemaCompletadoModerno(
 }
 
 // ============================================================================
-// CARD QUIZ OFICIAL MEJORADA
+// TARJETAS FINALES
 // ============================================================================
+
+@Composable
+fun CardTemaCompletadoModerno(modifier: Modifier = Modifier) {
+    val p = LocalNexo.current
+    TarjetaNexo(modifier = modifier.fillMaxWidth(), acento = p.accion) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InsigniaNexo(Icons.Default.EmojiEvents, p.racha, tamano = 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("¡Explicación completada!", fontSize = 18.sp, fontWeight = FontWeight.Black, color = p.texto)
+                Text("Ahora demuestra lo que aprendiste.", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
+            }
+        }
+    }
+}
 
 @Composable
 fun QuizOficialCard(
@@ -843,163 +668,41 @@ fun QuizOficialCard(
     onIniciar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val p = LocalNexo.current
     val puedeIniciar = !sinVidas && !enCooldown
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.Transparent,
-        shadowElevation = 8.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFFF6B9D),
-                            Color(0xFFFF5277)
-                        )
-                    )
-                )
-        ) {
-            // Burbujas decorativas
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .offset(x = 220.dp, y = (-30).dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.1f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .offset(x = 280.dp, y = 60.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(28.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🏆", fontSize = 32.sp)
-                        }
-
-                        Column {
-                            Text(
-                                "Quiz Oficial",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                            Text(
-                                "Demuestra tu conocimiento",
-                                fontSize = 13.sp,
-                                color = Color.White.copy(0.9f)
-                            )
-                        }
-                    }
-
-                    // Badge de estado
-                    if (aproboQuizOficial) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Color.White.copy(0.3f)
-                        ) {
-                            Text(
-                                "$porcentajeObtenido%",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // Características
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CaracteristicaQuiz(
-                        icono = "⭐",
-                        texto = "Afecta tu racha diaria"
-                    )
-                    CaracteristicaQuiz(
-                        icono = "💎",
-                        texto = "Gana experiencia y progreso"
-                    )
-                    if (enCooldown) {
-                        CaracteristicaQuiz(
-                            icono = "⏰",
-                            texto = "Próximo intento: ${horasRestantes}h ${minutosRestantes}m"
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                // Botón
-                Button(
-                    onClick = onIniciar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = puedeIniciar,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        disabledContainerColor = Color.White.copy(0.3f)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp
-                    )
-                ) {
-                    Icon(
-                        if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = if (puedeIniciar) Color(0xFFFF5277) else Color(0xFF9CA3AF),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        when {
-                            enCooldown -> "En cooldown"
-                            sinVidas -> "Sin energía"
-                            else -> "Comenzar Quiz"
-                        },
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (puedeIniciar) Color(0xFFFF5277) else Color(0xFF9CA3AF)
-                    )
-                }
+    TarjetaNexo(modifier = modifier.fillMaxWidth(), acento = p.marca) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InsigniaNexo(Icons.Default.Quiz, p.marca, tamano = 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Quiz oficial", fontSize = 18.sp, fontWeight = FontWeight.Black, color = p.texto)
+                Text("Demuestra tu conocimiento", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
+            }
+            if (aproboQuizOficial) {
+                ChipNexo(texto = "$porcentajeObtenido%", color = p.accionTexto, icono = Icons.Default.CheckCircle)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        CaracteristicaQuiz(icono = Icons.Default.LocalFireDepartment, color = p.racha, texto = "Cuenta para tu racha diaria")
+        CaracteristicaQuiz(icono = Icons.Default.Bolt, color = p.ia, texto = "Gana experiencia y progreso")
+        if (enCooldown) {
+            CaracteristicaQuiz(icono = Icons.Default.Schedule, color = p.marca, texto = "Próximo intento: ${horasRestantes}h ${minutosRestantes}m")
+        }
+        Spacer(Modifier.height(14.dp))
+        BotonNexo(
+            texto = when {
+                enCooldown -> "Disponible más tarde"
+                sinVidas -> "Sin vidas"
+                else -> "Comenzar quiz"
+            },
+            onClick = onIniciar,
+            habilitado = puedeIniciar,
+            tipo = TipoBoton.ACCION,
+            icono = if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
-
-// ============================================================================
-// CARD QUIZ PRÁCTICA MEJORADA
-// ============================================================================
 
 @Composable
 fun QuizPracticaCard(
@@ -1007,152 +710,107 @@ fun QuizPracticaCard(
     onIniciar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val p = LocalNexo.current
     val puedeIniciar = !sinVidas
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.Transparent,
-        shadowElevation = 8.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF3B82F6),
-                            Color(0xFF2563EB)
-                        )
-                    )
-                )
-        ) {
-            // Burbujas decorativas
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .offset(x = 240.dp, y = (-20).dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.1f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(70.dp)
-                    .offset(x = 20.dp, y = 80.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(28.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("💪", fontSize = 32.sp)
-                    }
-
-                    Column {
-                        Text(
-                            "Modo Práctica",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            "Refuerza tu aprendizaje",
-                            fontSize = 13.sp,
-                            color = Color.White.copy(0.9f)
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // Características
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CaracteristicaQuiz(
-                        icono = "🎯",
-                        texto = "Practica sin límites"
-                    )
-                    CaracteristicaQuiz(
-                        icono = "💎",
-                        texto = "Gana XP sin afectar tu racha"
-                    )
-
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                // Botón
-                Button(
-                    onClick = onIniciar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = puedeIniciar,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        disabledContainerColor = Color.White.copy(0.3f)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp
-                    )
-                ) {
-                    Icon(
-                        if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = if (puedeIniciar) Color(0xFF2563EB) else Color(0xFF9CA3AF),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        if (sinVidas) "Sin energía" else "Comenzar Práctica",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (puedeIniciar) Color(0xFF2563EB) else Color(0xFF9CA3AF)
-                    )
-                }
+    TarjetaNexo(modifier = modifier.fillMaxWidth(), acento = p.ia) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InsigniaNexo(Icons.Default.FitnessCenter, p.ia, tamano = 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Modo práctica", fontSize = 18.sp, fontWeight = FontWeight.Black, color = p.texto)
+                Text("Refuerza tu aprendizaje", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        CaracteristicaQuiz(icono = Icons.Default.AllInclusive, color = p.marca, texto = "Practica sin límites")
+        CaracteristicaQuiz(icono = Icons.Default.Bolt, color = p.ia, texto = "Gana XP sin afectar tu racha")
+        Spacer(Modifier.height(14.dp))
+        BotonNexo(
+            texto = if (sinVidas) "Sin vidas" else "Comenzar práctica",
+            onClick = onIniciar,
+            habilitado = puedeIniciar,
+            tipo = TipoBoton.IA,
+            icono = if (puedeIniciar) Icons.Default.PlayArrow else Icons.Default.Lock,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
-
-// ============================================================================
-// COMPONENTE AUXILIAR - CARACTERÍSTICA QUIZ
-// ============================================================================
 
 @Composable
 fun CaracteristicaQuiz(
-    icono: String,
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
     texto: String
 ) {
+    val p = LocalNexo.current
     Row(
+        modifier = Modifier.padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            icono,
-            fontSize = 20.sp
-        )
-        Text(
-            texto,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.White.copy(0.95f)
-        )
+        Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+        Text(texto, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.texto)
     }
 }
+
+// ============================================================================
+// LECTOR DE VOZ (TextToSpeech del sistema)
+// ============================================================================
+
+class LectorVoz {
+    var disponible by mutableStateOf(false)
+    var hablando by mutableStateOf(false)
+    internal var tts: android.speech.tts.TextToSpeech? = null
+
+    fun leer(texto: String) {
+        val motor = tts ?: return
+        if (!disponible || texto.isBlank()) return
+        hablando = true
+        motor.speak(texto, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "explicacion")
+    }
+
+    fun detener() {
+        tts?.stop()
+        hablando = false
+    }
+}
+
+@Composable
+fun rememberLectorVoz(): LectorVoz {
+    val context = LocalContext.current
+    val lector = remember { LectorVoz() }
+    DisposableEffect(Unit) {
+        var motor: android.speech.tts.TextToSpeech? = null
+        motor = android.speech.tts.TextToSpeech(context.applicationContext) { estado ->
+            if (estado == android.speech.tts.TextToSpeech.SUCCESS) {
+                val r = motor?.setLanguage(java.util.Locale("es", "ES"))
+                lector.disponible = r != android.speech.tts.TextToSpeech.LANG_MISSING_DATA &&
+                        r != android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
+                motor?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) { lector.hablando = false }
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) { lector.hablando = false }
+                })
+            }
+        }
+        lector.tts = motor
+        onDispose {
+            motor?.stop()
+            motor?.shutdown()
+            lector.tts = null
+        }
+    }
+    return lector
+}
+
+/** Quita marcas de Markdown que a veces devuelve la IA (negritas, títulos, viñetas, código). */
+fun limpiarMarkdown(texto: String): String =
+    texto.lines().joinToString("\n") { linea ->
+        linea.trim()
+            .replace(Regex("^#{1,6}\\s*"), "")
+            .replace(Regex("^[-*+]\\s+"), "• ")
+            .replace("**", "")
+            .replace("__", "")
+            .replace("`", "")
+    }.trim()

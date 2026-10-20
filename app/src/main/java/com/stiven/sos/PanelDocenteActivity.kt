@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.EstadoPregunta
+import com.stiven.sos.ui.admin.EstadoChip
 import com.stiven.sos.ui.theme.EduRachaColors
+import ui.theme.AdminDS
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.CursoViewModel
 import com.stiven.sos.viewmodel.PreguntaViewModel
@@ -41,13 +44,8 @@ class PanelDocenteActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        cargarDatos()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        cargarDatos()
-
+        // Trae el tema/sonidos guardados en el perfil (si el usuario cambió de celular)
+        com.stiven.sos.services.SincronizadorPreferencias.descargar(this)
         setContent {
             EduRachaTheme {
                 PanelDocenteScreen(
@@ -68,6 +66,13 @@ class PanelDocenteActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Solo onResume recarga: onCreate ya no dispara carga, se evita la
+        // doble solicitud inicial (una de onCreate y otra de onResume).
+        cargarDatos()
     }
 
     private fun cargarDatos() {
@@ -120,19 +125,13 @@ fun PanelDocenteScreen(
     var userRole by remember { mutableStateOf("") }
     var userUid by remember { mutableStateOf("") }
 
-    // Leer datos desde SharedPreferences
+    // Leer datos desde SharedPreferences (sin registrar PII en logs)
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
         fullName = prefs.getString("user_name", null) ?: "Usuario"
         userEmail = prefs.getString("user_email", null) ?: ""
         userRole = prefs.getString("user_role", null) ?: "estudiante"
         userUid = prefs.getString("user_uid", null) ?: ""
-
-        android.util.Log.d("PanelDocente", "=== LEYENDO DATOS DEL USUARIO ===")
-        android.util.Log.d("PanelDocente", "Nombre completo: $fullName")
-        android.util.Log.d("PanelDocente", "Email: $userEmail")
-        android.util.Log.d("PanelDocente", "Rol: $userRole")
-        android.util.Log.d("PanelDocente", "UID: $userUid")
     }
 
     val cursoUiState by cursoViewModel.uiState.collectAsState()
@@ -157,139 +156,208 @@ fun PanelDocenteScreen(
     // Cargar estudiantes totales cuando haya cursos disponibles
     LaunchedEffect(cursoUiState.cursos) {
         if (cursoUiState.cursos.isNotEmpty()) {
-            android.util.Log.d("PanelDocente", " Cargando estudiantes de ${cursoUiState.cursos.size} cursos")
             cursoViewModel.cargarEstudiantesTotales()
         }
     }
 
     //  Calcular el total de estudiantes únicos
     val totalEstudiantes = remember(cursoUiState.estudiantesPorCurso) {
-        val todosEstudiantes = cursoUiState.estudiantesPorCurso.values.flatten()
-        val estudiantesUnicos = todosEstudiantes.map { it.uid }.toSet()
-
-        android.util.Log.d("PanelDocente", " Total estudiantes únicos: ${estudiantesUnicos.size}")
-        android.util.Log.d("PanelDocente", " Total asignaciones: ${todosEstudiantes.size}")
-
-        estudiantesUnicos.size
+        cursoUiState.estudiantesPorCurso.values.flatten().map { it.uid }.toSet().size
     }
 
-    LaunchedEffect(preguntasUiState.preguntas) {
-        android.util.Log.d("PanelDocente", "Total preguntas cargadas: ${preguntasUiState.preguntas.size}")
-        val pendientes = preguntasUiState.preguntas.count { it.estado == EstadoPregunta.PENDIENTE_REVISION }
-        android.util.Log.d("PanelDocente", "Preguntas realmente pendientes: $pendientes")
-    }
+    val cursosError = cursoUiState.error
+    val cursosCargando = cursoUiState.isLoading && cursoUiState.cursos.isEmpty()
+    val preguntasError = preguntasUiState.error
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EduRachaColors.Background)
-            .verticalScroll(rememberScrollState())
-    ) {
-        UserHeader(
-            greeting = greeting,
-            fullName = fullName,
-            userEmail = userEmail,
-            userRole = userRole,
-            onNavigateToProfile = onNavigateToProfile,
-            onNavigateToNotifications = onNavigateToNotifications,
-            onNavigateToSettings = onNavigateToSettings
+    fun recargarTodo() {
+        cursoViewModel.obtenerCursos()
+        preguntasViewModel.cargarPreguntas(
+            cursoId = null,
+            estado = EstadoPregunta.PENDIENTE_REVISION
         )
+    }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CompactStatCard(
-                label = "Cursos",
-                value = "$totalCursos",
-                icon = Icons.Outlined.MenuBook,
-                iconColor = EduRachaColors.Primary,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToCourses
-            )
-            CompactStatCard(
-                label = "Pendientes",
-                value = "$preguntasPendientes",
-                icon = Icons.Outlined.HourglassTop,
-                iconColor = EduRachaColors.Warning,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToValidation
-            )
-            CompactStatCard(
-                label = "Estudiantes",
-                value = if (cursoUiState.isLoadingEstudiantes) "..." else "$totalEstudiantes",
-                icon = Icons.Outlined.Groups,
-                iconColor = EduRachaColors.Success,
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToStudents
-            )
-        }
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
 
+    com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = "Herramientas principales",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary,
-                modifier = Modifier.padding(bottom = 4.dp)
+            UserHeader(
+                totalCursos = totalCursos,
+                preguntasPendientes = preguntasPendientes,
+                greeting = greeting,
+                fullName = fullName,
+                userEmail = userEmail,
+                userRole = userRole,
+                onNavigateToProfile = onNavigateToProfile,
+                onNavigateToNotifications = onNavigateToNotifications,
+                onNavigateToSettings = onNavigateToSettings
             )
-            MainToolCard(
-                title = "Crear Curso",
-                description = "Sube tu plan de aula y configura el curso",
-                icon = Icons.Outlined.Add,
-                backgroundColor = EduRachaColors.Primary,
-                onClick = onNavigateToCreateCourse
-            )
-            MainToolCard(
-                title = "Validación de preguntas",
-                description = "Revisa y aprueba preguntas generadas",
-                icon = Icons.Outlined.CheckCircle,
-                backgroundColor = EduRachaColors.Accent,
-                onClick = onNavigateToValidation
-            )
-            MainToolCard(
-                title = "Gestión de Explicaciones",
-                description = "Revisa y valida explicaciones generadas por IA",
-                icon = Icons.Outlined.Description,
-                backgroundColor = Color(0xFF10B981),
-                onClick = onNavigateToExplicaciones
-            )
-            MainToolCard(
-                title = "Crear Pregunta",
-                description = "Crea preguntas manualmente o genera con IA",
-                icon = Icons.Outlined.QuestionAnswer,
-                backgroundColor = Color(0xFF8B5CF6),
-                onClick = onNavigateToCreateQuestion
-            )
-            MainToolCard(
-                title = "Preguntas Revisadas",
-                description = "Ver historial de preguntas aprobadas y rechazadas ($preguntasAprobadas aprobadas, $preguntasRechazadas rechazadas)",
-                icon = Icons.Outlined.History,
-                backgroundColor = Color(0xFF6366F1),
-                onClick = onNavigateToReviewedQuestions
-            )
-            MainToolCard(
-                title = "Reportes",
-                description = "Visualiza estadísticas de participación",
-                icon = Icons.Outlined.BarChart,
-                backgroundColor = EduRachaColors.Secondary,
-                onClick = onNavigateToReports
-            )
-            MainToolCard(
-                title = "Gestión de Grupos",
-                description = "Organiza y asigna estudiantes a cursos",
-                icon = Icons.Outlined.GroupAdd,
-                backgroundColor = EduRachaColors.Success,
-                onClick = onNavigateToGroups
-            )
-            Spacer(modifier = Modifier.height(20.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Asistente IA (Robi) — acceso directo a crear preguntas con IA
+                com.stiven.sos.ui.theme.TarjetaNexo(
+                    modifier = Modifier.fillMaxWidth(),
+                    acento = nx.ia,
+                    padding = 16.dp
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.stiven.sos.ui.theme.RobiNeo(
+                            tamano = 76.dp,
+                            expresion = if (preguntasPendientes > 0) com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                            else com.stiven.sos.ui.theme.ExpresionRobi.FELIZ
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "ASISTENTE IA",
+                                color = nx.iaTexto,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.2.sp
+                            )
+                            Text(
+                                when {
+                                    preguntasPendientes > 0 -> "Tienes $preguntasPendientes ${if (preguntasPendientes == 1) "pregunta" else "preguntas"} esperando revisión."
+                                    totalCursos > 0 -> "Todo al día. ¿Generamos nuevas preguntas para tus cursos?"
+                                    else -> "Crea tu primer curso y yo te ayudo con las preguntas."
+                                },
+                                color = nx.texto,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    com.stiven.sos.ui.theme.BotonNexo(
+                        texto = if (preguntasPendientes > 0) "Revisar preguntas" else "Crear pregunta con IA",
+                        onClick = if (preguntasPendientes > 0) onNavigateToValidation else onNavigateToCreateQuestion,
+                        tipo = com.stiven.sos.ui.theme.TipoBoton.IA,
+                        icono = if (preguntasPendientes > 0) Icons.Outlined.FactCheck else Icons.Outlined.AutoAwesome,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AdminStatCard(
+                        titulo = "Cursos",
+                        valor = if (cursosCargando) "…" else "$totalCursos",
+                        icon = Icons.Outlined.MenuBook,
+                        acento = nx.marca,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToCourses
+                    )
+                    AdminStatCard(
+                        titulo = "Pendientes",
+                        valor = if (preguntasUiState.isLoading && preguntasUiState.preguntas.isEmpty()) "…"
+                        else "$preguntasPendientes",
+                        icon = Icons.Outlined.HourglassTop,
+                        acento = nx.racha,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToValidation
+                    )
+                    AdminStatCard(
+                        titulo = "Estudiantes",
+                        valor = if (cursoUiState.isLoadingEstudiantes) "…" else "$totalEstudiantes",
+                        icon = Icons.Outlined.Groups,
+                        acento = nx.accion,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToStudents
+                    )
+                }
+
+                // Estados de error con reintento (solo si no hay datos que mostrar)
+                if (cursosError != null && cursoUiState.cursos.isEmpty()) {
+                    AdminErrorBanner(
+                        mensaje = "No se pudieron cargar los cursos: $cursosError",
+                        onRetry = { recargarTodo() }
+                    )
+                }
+                if (preguntasError != null && preguntasUiState.preguntas.isEmpty()) {
+                    AdminErrorBanner(
+                        mensaje = "No se pudieron cargar las preguntas: $preguntasError",
+                        onRetry = { recargarTodo() }
+                    )
+                }
+                if (!cursosCargando && cursoUiState.cursos.isEmpty() && cursosError == null) {
+                    AdminEmptyState("Aún no tienes cursos. Crea el primero con “Crear curso”.")
+                }
+
+                AdminSeccionTitulo("Contenido académico")
+                AdminToolRow(
+                    title = "Crear curso",
+                    description = "Plan de aula, duración y temas",
+                    icon = Icons.Outlined.Add,
+                    acento = nx.marca,
+                    onClick = onNavigateToCreateCourse
+                )
+                AdminToolRow(
+                    title = "Crear pregunta",
+                    description = "Manual o generada con IA",
+                    icon = Icons.Outlined.QuestionAnswer,
+                    acento = nx.ia,
+                    onClick = onNavigateToCreateQuestion
+                )
+                AdminToolRow(
+                    title = "Validar preguntas",
+                    description = if (preguntasPendientes > 0) "$preguntasPendientes por revisar"
+                    else "Revisa y aprueba preguntas",
+                    icon = Icons.Outlined.CheckCircle,
+                    acento = nx.accion,
+                    badge = if (preguntasPendientes > 0) "$preguntasPendientes" else null,
+                    onClick = onNavigateToValidation
+                )
+                AdminToolRow(
+                    title = "Explicaciones",
+                    description = "Valida explicaciones generadas por IA",
+                    icon = Icons.Outlined.Description,
+                    acento = nx.marcaSombra,
+                    onClick = onNavigateToExplicaciones
+                )
+                AdminToolRow(
+                    title = "Preguntas revisadas",
+                    description = "$preguntasAprobadas aprobadas · $preguntasRechazadas rechazadas",
+                    icon = Icons.Outlined.History,
+                    acento = nx.error,
+                    onClick = onNavigateToReviewedQuestions
+                )
+
+                AdminSeccionTitulo("Gestión")
+                AdminToolRow(
+                    title = "Mis cursos",
+                    description = "Ver, editar y gestionar cursos",
+                    icon = Icons.Outlined.MenuBook,
+                    acento = nx.marca,
+                    onClick = onNavigateToCourses
+                )
+                AdminToolRow(
+                    title = "Reportes",
+                    description = "Estadísticas de participación",
+                    icon = Icons.Outlined.BarChart,
+                    acento = nx.racha,
+                    onClick = onNavigateToReports
+                )
+                AdminToolRow(
+                    title = "Grupos",
+                    description = "Organiza y asigna estudiantes",
+                    icon = Icons.Outlined.GroupAdd,
+                    acento = nx.iaSombra,
+                    onClick = onNavigateToGroups
+                )
+                Spacer(modifier = Modifier.navigationBarsPadding().height(16.dp))
+            }
         }
     }
 }
@@ -302,81 +370,65 @@ fun UserHeader(
     userRole: String,
     onNavigateToProfile: () -> Unit,
     onNavigateToNotifications: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    totalCursos: Int = 0,
+    preguntasPendientes: Int = 0
 ) {
-    Box(
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
-            .padding(top = 40.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Primary.copy(alpha = 0.1f))
-                    .border(2.dp, EduRachaColors.Primary, CircleShape)
-                    .clickable(onClick = onNavigateToProfile),
-                contentAlignment = Alignment.Center
-            ) {
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.weight(1f)) {
+                Text("edu", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.texto)
+                Text("racha", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.marcaTexto)
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = fullName.firstOrNull()?.uppercase() ?: "U",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.Primary
+                    "DOCENTE",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                    color = nx.iaTexto,
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(nx.ia.copy(alpha = 0.16f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
+            IconButton(onClick = onNavigateToNotifications) {
+                Icon(Icons.Outlined.Notifications, contentDescription = "Notificaciones", tint = nx.texto)
+            }
+            IconButton(onClick = onNavigateToSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "Ajustes", tint = nx.texto)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stiven.sos.ui.theme.AvatarNexo(
+                nombre = fullName,
+                color = nx.ia,
+                tamano = 52.dp,
+                modifier = Modifier
+                    .border(2.dp, nx.marca, CircleShape)
+                    .clickable(onClick = onNavigateToProfile)
+            )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = greeting,
-                    fontSize = 14.sp,
-                    color = EduRachaColors.TextSecondary
-                )
+                Text(text = "$greeting,", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = nx.textoSuave)
                 Text(
                     text = fullName,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = nx.texto,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 if (userEmail.isNotEmpty()) {
-                    Text(
-                        text = userEmail,
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (userRole == "docente") EduRachaColors.Primary.copy(alpha = 0.15f)
-                    else EduRachaColors.Success.copy(alpha = 0.15f),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    Text(
-                        text = if (userRole == "docente") " Docente" else " Estudiante",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (userRole == "docente") EduRachaColors.Primary else EduRachaColors.Success,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-            Row {
-                IconButton(onClick = onNavigateToNotifications) {
-                    Icon(
-                        Icons.Outlined.Notifications,
-                        contentDescription = "Notificaciones",
-                        tint = EduRachaColors.TextSecondary
-                    )
-                }
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(
-                        Icons.Outlined.Settings,
-                        contentDescription = "Ajustes",
-                        tint = EduRachaColors.TextSecondary
-                    )
+                    Text(text = userEmail, fontSize = 12.sp, color = nx.textoTenue, maxLines = 1)
                 }
             }
         }
@@ -384,99 +436,125 @@ fun UserHeader(
 }
 
 @Composable
-fun CompactStatCard(
-    label: String,
-    value: String,
+fun AdminSeccionTitulo(texto: String) {
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+        Box(
+            Modifier
+                .size(width = 4.dp, height = 18.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(nx.marca)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = texto,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Black,
+            color = nx.texto
+        )
+    }
+}
+
+@Composable
+fun AdminStatCard(
+    titulo: String,
+    valor: String,
     icon: ImageVector,
-    iconColor: Color,
     modifier: Modifier = Modifier,
+    acento: Color = AdminDS.Brand,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(vertical = 20.dp, horizontal = 12.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(36.dp),
-                tint = iconColor
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = iconColor
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = EduRachaColors.TextSecondary,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
+    com.stiven.sos.ui.theme.StatNexo(
+        icono = icon,
+        valor = valor,
+        etiqueta = titulo,
+        color = acento,
+        onClick = onClick,
+        modifier = modifier
+    )
 }
 
 @Composable
-fun MainToolCard(
+fun AdminToolRow(
     title: String,
     description: String,
     icon: ImageVector,
-    backgroundColor: Color,
+    badge: String? = null,
+    acento: Color = AdminDS.Brand,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                modifier = Modifier.size(40.dp),
-                tint = Color.White
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.9f),
-                    lineHeight = 18.sp
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.FilaNexo(
+        icono = icon,
+        color = acento,
+        titulo = title,
+        subtitulo = description,
+        onClick = onClick,
+        extremo = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (badge != null) {
+                    Text(
+                        text = badge,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(nx.racha)
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
+                        color = nx.sobreAccion,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = "Abrir $title",
+                    tint = acento
                 )
             }
-            Icon(
-                imageVector = Icons.Outlined.ArrowForward,
-                contentDescription = "Ir",
-                tint = Color.White
-            )
         }
+    )
+}
+
+@Composable
+fun AdminErrorBanner(
+    mensaje: String,
+    onRetry: () -> Unit
+) {
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(nx.error.copy(alpha = 0.10f))
+            .border(1.dp, nx.error.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = nx.errorTexto)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = mensaje,
+            modifier = Modifier.weight(1f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = nx.texto,
+            maxLines = 4
+        )
+        Spacer(Modifier.width(8.dp))
+        TextButton(onClick = onRetry) {
+            Text("Reintentar", color = nx.marcaTexto, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+fun AdminEmptyState(mensaje: String) {
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = mensaje, color = nx.textoSuave, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

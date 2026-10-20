@@ -145,7 +145,7 @@ fun PreguntasRevisadasScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary,
+                    containerColor = EduRachaColors.BarraSuperior,
                     titleContentColor = Color.White
                 )
             )
@@ -323,7 +323,7 @@ fun PreguntaCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(cardRadius),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Column(
             modifier = Modifier.padding(cardPadding)

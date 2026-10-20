@@ -26,7 +26,7 @@ class PreguntaRepository {
             if (response.isSuccessful) {
                 ApiResult.Success(response.body() ?: emptyList())
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al obtener preguntas")
@@ -41,7 +41,7 @@ class PreguntaRepository {
                     ApiResult.Success(it)
                 } ?: ApiResult.Error("Pregunta no encontrada")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al obtener la pregunta")
@@ -56,7 +56,7 @@ class PreguntaRepository {
                     ApiResult.Success(it.id ?: "")
                 } ?: ApiResult.Error("No se recibió ID de la pregunta creada")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al crear la pregunta")
@@ -70,7 +70,7 @@ class PreguntaRepository {
                 if (response.isSuccessful) {
                     ApiResult.Success(response.body()?.message ?: "Pregunta actualizada")
                 } else {
-                    ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                    ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
                 }
             } catch (e: Exception) {
                 ApiResult.Error(e.message ?: "Error desconocido al actualizar la pregunta")
@@ -83,7 +83,7 @@ class PreguntaRepository {
             if (response.isSuccessful) {
                 ApiResult.Success(response.body()?.message ?: "Pregunta eliminada")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al eliminar la pregunta")
@@ -103,7 +103,7 @@ class PreguntaRepository {
                     ApiResult.Success(it)
                 } ?: ApiResult.Error("No se recibió respuesta del servidor")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al actualizar el estado")
@@ -124,7 +124,7 @@ class PreguntaRepository {
                     ApiResult.Success(it)
                 } ?: ApiResult.Error("No se recibieron preguntas generadas")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al generar preguntas con IA")
@@ -137,7 +137,7 @@ class PreguntaRepository {
             if (response.isSuccessful) {
                 ApiResult.Success(response.body()?.message ?: "Caché limpiada correctamente")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al limpiar caché")

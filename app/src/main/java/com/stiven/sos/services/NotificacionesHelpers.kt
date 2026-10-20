@@ -60,7 +60,7 @@ object NotificacionesHelper {
         scope.launch {
             try {
                 val mensaje = when {
-                    racha > 1 && aprobado -> "¡Quiz completado! Ganaste $xpGanado XP. 🔥 Racha de $racha días"
+                    racha > 1 && aprobado -> "¡Quiz completado! Ganaste $xpGanado XP. Racha de $racha días"
                     aprobado -> "¡Quiz completado! Ganaste $xpGanado XP. ¡Sigue así!"
                     else -> "Quiz completado. Intenta nuevamente para mejorar tu puntuación."
                 }

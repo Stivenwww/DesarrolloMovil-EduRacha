@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import androidx.compose.ui.draw.clip
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -54,7 +55,7 @@ class ReportesActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (!isGranted) {
-            Toast.makeText(this, " Permiso necesario para guardar reportes", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Permiso necesario para guardar reportes", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -174,7 +175,7 @@ fun ReportesScreenComplete(
         listOf(estadoDiario, estadoTema, estadoGeneral, estadoRango).forEach { estado ->
             when (estado) {
                 is ReporteEstado.Exito -> {
-                    Toast.makeText(context, " Reporte guardado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Reporte guardado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()
@@ -183,7 +184,7 @@ fun ReportesScreenComplete(
                     }
                 }
                 is ReporteEstado.Error -> {
-                    Toast.makeText(context, " Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()
@@ -198,43 +199,13 @@ fun ReportesScreenComplete(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Outlined.Description,
-                            null,
-                            tint = Color.White,
-                            modifier = Modifier.size(if (responsiveConfig.isCompact) 24.dp else 28.dp)
-                        )
-                        Spacer(Modifier.width(if (responsiveConfig.isCompact) 8.dp else 12.dp))
-                        Column {
-                            Text(
-                                "Reportes Excel",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = if (responsiveConfig.isCompact) 16.sp else 20.sp
-                            )
-                            if (!responsiveConfig.isCompact || responsiveConfig.screenWidth > 360) {
-                                Text(
-                                    "Genera y descarga reportes",
-                                    fontSize = if (responsiveConfig.isCompact) 11.sp else 12.sp,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary,
-                    titleContentColor = Color.White
-                )
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Reportes Excel",
+                subtitulo = "Genera y descarga reportes",
+                onVolver = onBackClick
             )
-        }
+        },
+        containerColor = EduRachaColors.Background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -246,6 +217,13 @@ fun ReportesScreenComplete(
                 .padding(vertical = responsiveConfig.verticalSpacing.dp),
             verticalArrangement = Arrangement.spacedBy(responsiveConfig.verticalSpacing.dp)
         ) {
+
+            com.stiven.sos.ui.theme.GloboRobi(
+                titulo = "ASISTENTE",
+                mensaje = "Elige un curso, revisa la vista previa y descarga el reporte en Excel.",
+                expresion = com.stiven.sos.ui.theme.ExpresionRobi.FELIZ,
+                tamanoRobi = 60.dp
+            )
 
             // Stats Cards adaptables
             if (responsiveConfig.isExpanded) {
@@ -297,7 +275,8 @@ fun ReportesScreenComplete(
             }
 
             ReporteCardCompleta(
-                titulo = " Reporte Diario",
+                titulo = "Reporte Diario",
+                icono = Icons.Outlined.Today,
                 descripcion = "Actividad diaria de estudiantes",
                 color = EduRachaColors.Primary,
                 badge = "Popular",
@@ -387,7 +366,8 @@ fun ReportesScreenComplete(
             }
 
             ReporteCardCompleta(
-                titulo = " Reporte por Tema",
+                titulo = "Reporte por Tema",
+                icono = Icons.Outlined.Topic,
                 descripcion = "Desempeño en tema específico",
                 color = EduRachaColors.Secondary,
                 badge = "Detallado",
@@ -496,7 +476,8 @@ fun ReportesScreenComplete(
             }
 
             ReporteCardCompleta(
-                titulo = " Reporte General",
+                titulo = "Reporte General",
+                icono = Icons.Outlined.Assessment,
                 descripcion = "Estadísticas completas del curso",
                 color = EduRachaColors.Accent,
                 badge = "Completo",
@@ -577,7 +558,8 @@ fun ReportesScreenComplete(
             }
 
             ReporteCardCompleta(
-                titulo = " Reporte por Rango",
+                titulo = "Reporte por Rango",
+                icono = Icons.Outlined.DateRange,
                 descripcion = "Actividad entre dos fechas",
                 color = EduRachaColors.Success,
                 badge = "Histórico",
@@ -712,7 +694,7 @@ fun ReportesScreenComplete(
                     Spacer(Modifier.width(if (responsiveConfig.isCompact) 12.dp else 16.dp))
                     Column {
                         Text(
-                            " Información",
+                            "Información",
                             fontSize = if (responsiveConfig.isCompact) 14.sp else 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = EduRachaColors.Info
@@ -740,111 +722,47 @@ fun ReporteCardCompleta(
     color: Color,
     badge: String? = null,
     config: ResponsiveConfig,
+    icono: ImageVector = Icons.Outlined.Description,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(if (config.isCompact) 4.dp else 6.dp, CustomShapes.Card),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.TarjetaNexo(
+        modifier = Modifier.fillMaxWidth(),
+        acento = color,
+        padding = config.horizontalPadding.dp
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(color)
-                    .padding(
-                        horizontal = config.horizontalPadding.dp,
-                        vertical = if (config.isCompact) 16.dp else 20.dp
-                    )
-            ) {
-                if (config.isCompact && config.screenWidth < 360) {
-                    // Pantallas muy pequeñas: layout vertical
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Column {
-                            Text(
-                                text = titulo,
-                                fontSize = config.titleFontSize,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = descripcion,
-                                fontSize = config.fontSize,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
-
-                        if (badge != null) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Text(
-                                    text = badge,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Pantallas normales: layout horizontal
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = titulo,
-                                fontSize = config.titleFontSize,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = descripcion,
-                                fontSize = config.fontSize,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
-
-                        if (badge != null) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Text(
-                                    text = badge,
-                                    fontSize = if (config.isCompact) 11.sp else 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(
-                                        horizontal = if (config.isCompact) 10.dp else 12.dp,
-                                        vertical = if (config.isCompact) 5.dp else 6.dp
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stiven.sos.ui.theme.InsigniaNexo(icono, color, tamano = if (config.isCompact) 44.dp else 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = titulo,
+                    fontSize = config.titleFontSize,
+                    fontWeight = FontWeight.Black,
+                    color = nx.texto
+                )
+                Text(
+                    text = descripcion,
+                    fontSize = config.fontSize,
+                    fontWeight = FontWeight.SemiBold,
+                    color = nx.textoSuave
+                )
             }
-            Column(
-                modifier = Modifier.padding(
-                    horizontal = config.horizontalPadding.dp,
-                    vertical = if (config.isCompact) 16.dp else 20.dp
-                ),
-                content = content
-            )
+            if (badge != null && !(config.isCompact && config.screenWidth < 360)) {
+                Text(
+                    text = badge,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = color,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(color.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
         }
+        Spacer(Modifier.height(if (config.isCompact) 12.dp else 16.dp))
+        content()
     }
 }
 
@@ -857,49 +775,13 @@ fun StatCardMini(
     config: ResponsiveConfig,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.shadow(if (config.isCompact) 3.dp else 4.dp, CustomShapes.Card),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = if (config.isCompact) 12.dp else 16.dp,
-                    vertical = if (config.isCompact) 12.dp else 16.dp
-                ),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(if (config.isCompact) 42.dp else 50.dp)
-                    .background(color.copy(alpha = 0.15f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    null,
-                    tint = color,
-                    modifier = Modifier.size(if (config.isCompact) 24.dp else 28.dp)
-                )
-            }
-            Spacer(Modifier.height(if (config.isCompact) 8.dp else 12.dp))
-            Text(
-                text = value,
-                fontSize = if (config.isCompact) 20.sp else 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = label,
-                fontSize = if (config.isCompact) 12.sp else 13.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+    com.stiven.sos.ui.theme.StatNexo(
+        icono = icon,
+        valor = value,
+        etiqueta = label,
+        color = color,
+        modifier = modifier
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

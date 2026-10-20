@@ -18,7 +18,7 @@ class TemaRepository {
             if (response.isSuccessful) {
                 ApiResult.Success(response.body() ?: emptyList())
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al obtener temas")
@@ -36,7 +36,7 @@ class TemaRepository {
                     ApiResult.Success(it)
                 } ?: ApiResult.Error("Tema no encontrado")
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error desconocido al obtener el tema")
@@ -59,7 +59,7 @@ class TemaRepository {
             if (response.isSuccessful) {
                 ApiResult.Success(Unit)
             } else {
-                ApiResult.Error("Error: ${response.code()} - ${response.message()}")
+                ApiResult.Error(com.stiven.sos.api.mensajeDeError(response))
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error al actualizar estado")

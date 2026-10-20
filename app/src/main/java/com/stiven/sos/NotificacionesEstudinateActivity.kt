@@ -86,24 +86,11 @@ fun NotificacionesEstudianteScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Mis Notificaciones",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Notificaciones",
+                subtitulo = if (notificacionesNoLeidasCount > 0) "$notificacionesNoLeidasCount sin leer" else "Estás al día",
+                onVolver = onNavigateBack,
+                acciones = {
                     if (notificacionesNoLeidasCount > 0) {
                         TextButton(
                             onClick = {
@@ -125,13 +112,10 @@ fun NotificacionesEstudianteScreen(
                                 }
                             }
                         ) {
-                            Text("Leer todo", color = Color.White)
+                            Text("Leer todo", color = EduRachaColors.AccentDark, fontWeight = FontWeight.Black)
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
-                )
+                }
             )
         },
         containerColor = EduRachaColors.Background
@@ -394,37 +378,11 @@ private fun NotificacionEstudianteCard(
 
 @Composable
 private fun EmptyNotificacionesEstudiante(mostrandoFiltro: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            Icons.Default.NotificationsOff,
-            null,
-            modifier = Modifier.size(80.dp),
-            tint = EduRachaColors.TextSecondary.copy(alpha = 0.4f)
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = if (mostrandoFiltro) "No hay notificaciones sin leer" else "No tienes notificaciones",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = if (mostrandoFiltro)
-                "¡Estás al día con todas tus actividades!"
-            else
-                "Aquí aparecerán tus actualizaciones",
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-    }
+    com.stiven.sos.ui.theme.EstadoVacioNexo(
+        titulo = if (mostrandoFiltro) "No hay notificaciones sin leer" else "No tienes notificaciones",
+        mensaje = if (mostrandoFiltro) "Estás al día con todas tus actividades." else "Aquí aparecerán tus avances, rachas y avisos de tus cursos.",
+        expresion = com.stiven.sos.ui.theme.ExpresionRobi.FELIZ
+    )
 }
 
 private fun obtenerIconoYColorEstudiante(tipo: String): Pair<ImageVector, Color> {

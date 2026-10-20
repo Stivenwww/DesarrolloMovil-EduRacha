@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -42,6 +43,14 @@ import androidx.compose.ui.zIndex
 import com.stiven.sos.services.AnimacionEstrellaIncorrecta
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.BotonJugoso
+import com.stiven.sos.ui.theme.PlayColors
+import com.stiven.sos.ui.theme.RachiAnimo
+import com.stiven.sos.ui.theme.RachiMascota
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.border
+import androidx.compose.ui.semantics.Role
 import com.stiven.sos.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.cos
@@ -68,6 +77,8 @@ class QuizActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("EduRachaUserPrefs", MODE_PRIVATE)
         userId = prefs.getString("user_uid", "") ?: ""
+        // Precarga los efectos de sonido para que el primero no llegue tarde
+        com.stiven.sos.services.GestorSonidos.inicializar(this)
 
         if (userId.isNotEmpty() && cursoId.isNotEmpty() && temaId.isNotEmpty()) {
             com.stiven.sos.services.NotificacionesHelper.notificarQuizIniciado(
@@ -182,142 +193,57 @@ fun HeaderQuizFigma(
     totalPreguntas: Int,
     onBackClick: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val progreso by animateFloatAsState(
+        targetValue = if (totalPreguntas > 0) preguntaActual.toFloat() / totalPreguntas else 0f,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "progreso"
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
-            .padding(
-                horizontal = if (isTablet) 32.dp else 20.dp,
-                vertical = if (isTablet) 20.dp else 16.dp
-            ),
-        verticalArrangement = Arrangement.spacedBy(if (isTablet) 18.dp else 14.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Fila superior: Flecha atrás, Vidas, Racha y XP
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Flecha de regreso
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .size(if (isTablet) 44.dp else 40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF7F9FC))
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = Color(0xFF3C79F5),
-                    modifier = Modifier.size(if (isTablet) 26.dp else 24.dp)
+            com.stiven.sos.ui.theme.BotonIconoNexo(
+                icono = Icons.Default.Close,
+                descripcion = "Salir del quiz",
+                onClick = onBackClick
+            )
+            Column(Modifier.weight(1f)) {
+                com.stiven.sos.ui.theme.BarraNexo(progreso = progreso, color = p.accion, alto = 14.dp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Pregunta $preguntaActual de $totalPreguntas",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = p.textoSuave
                 )
             }
-
-            // Vidas (corazones rosas)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 8.dp else 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(vidasMax) { index ->
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = null,
-                        tint = if (index < vidasActuales) Color(0xFFFF7096) else Color(0xFFEFEFEF),
-                        modifier = Modifier.size(if (isTablet) 36.dp else 32.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // Racha (fuego naranja)
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = Color(0xFFFF9800),
-                shadowElevation = 2.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(
-                        horizontal = if (isTablet) 16.dp else 14.dp,
-                        vertical = if (isTablet) 10.dp else 8.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.Whatshot,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
-                    )
-                    Text(
-                        "$rachaActual",
-                        fontSize = if (isTablet) 18.sp else 16.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-            }
-
-            // XP (estrella amarilla)
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = Color(0xFFFFC864),
-                shadowElevation = 2.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(
-                        horizontal = if (isTablet) 16.dp else 14.dp,
-                        vertical = if (isTablet) 10.dp else 8.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
-                    )
-                    Text(
-                        "$xpActual",
-                        fontSize = if (isTablet) 18.sp else 16.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-            }
+            com.stiven.sos.ui.theme.ChipNexo(
+                texto = "$vidasActuales",
+                color = p.error,
+                icono = Icons.Filled.Favorite,
+                descripcion = "$vidasActuales de $vidasMax vidas"
+            )
         }
-
-        // Barra de progreso azul
-        Column(verticalArrangement = Arrangement.spacedBy(if (isTablet) 10.dp else 8.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isTablet) 12.dp else 10.dp)
-                    .clip(RoundedCornerShape(if (isTablet) 6.dp else 5.dp))
-                    .background(Color(0xFFE8F5FE))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth((preguntaActual.toFloat() / totalPreguntas.toFloat()))
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(if (isTablet) 6.dp else 5.dp))
-                        .background(Color(0xFF3C79F5))
-                )
-            }
-
-            Text(
-                "Pregunta $preguntaActual de $totalPreguntas",
-                fontSize = if (isTablet) 16.sp else 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF717182),
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.stiven.sos.ui.theme.ChipNexo(
+                texto = "$rachaActual",
+                color = p.racha,
+                icono = Icons.Filled.LocalFireDepartment,
+                descripcion = "Racha de $rachaActual días"
+            )
+            com.stiven.sos.ui.theme.ChipNexo(
+                texto = "$xpActual XP",
+                color = p.ia,
+                icono = Icons.Filled.Bolt,
+                descripcion = "$xpActual puntos de experiencia"
             )
         }
     }
@@ -332,81 +258,24 @@ fun IdentificadorModoQuiz(
     modo: String,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
-    data class ModoConfig(
-        val colorFondo: Color,
-        val colorTexto: Color,
-        val icono: ImageVector,
-        val titulo: String
-    )
-
-    val config = when (modo) {
-        "practica" -> ModoConfig(
-            colorFondo = Color(0xFF9C27B0),
-            colorTexto = Color.White,
-            icono = Icons.Default.Lightbulb,
-            titulo = "MODO PRÁCTICA"
-        )
-        "final" -> ModoConfig(
-            colorFondo = Color(0xFFFFB300),
-            colorTexto = Color.White,
-            icono = Icons.Default.EmojiEvents,
-            titulo = "QUIZ FINAL"
-        )
-        else -> ModoConfig(
-            colorFondo = Color(0xFF3C79F5),
-            colorTexto = Color.White,
-            icono = Icons.Default.Quiz,
-            titulo = "QUIZ OFICIAL"
-        )
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val (color, icono, titulo) = when (modo) {
+        "practica" -> Triple(p.ia, Icons.Default.Lightbulb, "MODO PRÁCTICA")
+        "final" -> Triple(p.racha, Icons.Default.EmojiEvents, "QUIZ FINAL")
+        else -> Triple(p.marca, Icons.Default.Quiz, "QUIZ OFICIAL")
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "modo_pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Surface(
+    Row(
         modifier = modifier
-            .scale(scale)
-            .padding(horizontal = if (isTablet) 24.dp else 20.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = config.colorFondo,
-        shadowElevation = 6.dp
+            .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = if (isTablet) 20.dp else 16.dp,
-                    vertical = if (isTablet) 14.dp else 12.dp
-                ),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                config.icono,
-                contentDescription = null,
-                tint = config.colorTexto,
-                modifier = Modifier.size(if (isTablet) 26.dp else 22.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                config.titulo,
-                fontSize = if (isTablet) 16.sp else 14.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = config.colorTexto,
-                letterSpacing = 1.sp
-            )
-        }
+        Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        Text(titulo, fontSize = 12.sp, fontWeight = FontWeight.Black, color = color, letterSpacing = 1.sp)
     }
 }
 
@@ -419,173 +288,28 @@ fun BuhoMascotaAnimada(
     estado: EstadoBuho,
     mostrarAnimacion: Boolean
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-    val buhoSize = if (isTablet) 220.dp else 180.dp
-
-    val infiniteTransition = rememberInfiniteTransition(label = "buho")
-
-    // Flotación suave
-    val offsetY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (isTablet) -15f else -12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "float"
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val escala by animateFloatAsState(
+        targetValue = if (mostrarAnimacion) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "escala"
     )
-
-    // Rotación suave
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = -8f,
-        targetValue = 8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "rotate"
-    )
-
-    // Escala animada para respuestas
-    val scale by animateFloatAsState(
-        targetValue = if (mostrarAnimacion) 1.2f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ), label = "scale"
-    )
-
     Box(
-        modifier = Modifier
-            .size(buhoSize)
-            .offset(y = offsetY.dp),
+        modifier = Modifier.size(150.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Confeti animado para respuesta correcta
         if (mostrarAnimacion && estado == EstadoBuho.FELIZ) {
-            ConfetiAnimado(isTablet)
+            ConfetiAnimado(isTablet = false)
         }
-
-        // Signos de interrogación animados para estado pensativo
-        if (estado == EstadoBuho.PENSATIVO) {
-            SignosInterrogacionAnimados(isTablet)
-        }
-
-        // Búho principal
-        when (estado) {
-            EstadoBuho.PENSATIVO -> {
-                // Búho pensativo (amarillo/naranja)
-                Column(
-                    modifier = Modifier
-                        .scale(scale)
-                        .rotate(rotation),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "🦉",
-                        fontSize = if (isTablet) 140.sp else 110.sp
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFFFFB300).copy(alpha = 0.2f)
-                    ) {
-                        Text(
-                            "Pensando...",
-                            fontSize = if (isTablet) 14.sp else 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF9800),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-            EstadoBuho.FELIZ -> {
-                // Búho feliz (verde)
-                Column(
-                    modifier = Modifier
-                        .scale(scale)
-                        .rotate(rotation),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Efectos de brillo
-                    Box(
-                        modifier = Modifier.size(if (isTablet) 150.dp else 120.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Círculo de brillo
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawCircle(
-                                color = Color(0xFF58A700).copy(alpha = 0.2f),
-                                radius = size.minDimension / 2
-                            )
-                        }
-                        Text(
-                            "🦉",
-                            fontSize = if (isTablet) 140.sp else 110.sp
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFF58A700).copy(alpha = 0.2f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "✨",
-                                fontSize = if (isTablet) 14.sp else 12.sp
-                            )
-                            Text(
-                                "Correcto!",
-                                fontSize = if (isTablet) 14.sp else 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF58A700)
-                            )
-                        }
-                    }
-                }
-            }
-            EstadoBuho.TRISTE -> {
-                // Búho triste (rosa/rojo)
-                Column(
-                    modifier = Modifier
-                        .scale(scale)
-                        .rotate(rotation),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "😢",
-                        fontSize = if (isTablet) 140.sp else 110.sp
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFFFF4B4B).copy(alpha = 0.2f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "💪",
-                                fontSize = if (isTablet) 14.sp else 12.sp
-                            )
-                            Text(
-                                "Sigue intentando!",
-                                fontSize = if (isTablet) 14.sp else 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFF4B4B)
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        com.stiven.sos.ui.theme.RobiNeo(
+            tamano = 120.dp,
+            expresion = when (estado) {
+                EstadoBuho.PENSATIVO -> com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                EstadoBuho.FELIZ -> com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA
+                EstadoBuho.TRISTE -> com.stiven.sos.ui.theme.ExpresionRobi.TRISTE
+            },
+            modifier = Modifier.scale(escala)
+        )
     }
 }
 
@@ -595,135 +319,97 @@ enum class EstadoBuho {
 
 @Composable
 fun ConfetiAnimado(isTablet: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "confeti")
-
-    val confetis = listOf(
-        "🎉" to Offset(-40f, -60f),
-        "✨" to Offset(40f, -50f),
-        "🌟" to Offset(-50f, 20f),
-        "💫" to Offset(50f, 30f),
-        "⭐" to Offset(0f, -70f)
-    )
-
-    confetis.forEachIndexed { index, (emoji, offset) ->
-        val rotation by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween((1000 + index * 200), easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "confeti_rotation_$index"
-        )
-
-        val scale by infiniteTransition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = 1.2f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "confeti_scale_$index"
-        )
-
-        Text(
-            emoji,
-            fontSize = if (isTablet) 32.sp else 28.sp,
-            modifier = Modifier
-                .offset(x = offset.x.dp, y = offset.y.dp)
-                .scale(scale)
-                .rotate(rotation)
-        )
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val avance = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        avance.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+    }
+    val colores = listOf(p.racha, p.marca, p.accion, p.ia, p.racha, p.error, p.marca, p.racha)
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val t = avance.value
+        val radioMax = size.minDimension * 0.62f
+        for (i in colores.indices) {
+            val ang = (i * 45.0 - 90.0) * Math.PI / 180.0
+            val r = radioMax * t
+            val centro = Offset(c.x + (cos(ang) * r).toFloat(), c.y + (sin(ang) * r).toFloat())
+            val tam = (if (i % 2 == 0) 9.dp.toPx() else 6.dp.toPx()) * (1f - t * 0.4f)
+            drawPath(estrellaQuiz(centro, tam), colores[i].copy(alpha = 1f - t * 0.7f))
+        }
     }
 }
 
-@Composable
-fun SignosInterrogacionAnimados(isTablet: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "signos")
-
-    val signos = listOf(
-        Offset(-50f, -40f),
-        Offset(50f, -30f),
-        Offset(-40f, 30f),
-        Offset(45f, 35f)
-    )
-
-    signos.forEachIndexed { index, offset ->
-        val offsetY by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = -15f,
-            animationSpec = infiniteRepeatable(
-                animation = tween((1200 + index * 150), easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "signo_offset_$index"
-        )
-
-        val alpha by infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "signo_alpha_$index"
-        )
-
-        Text(
-            "❓",
-            fontSize = if (isTablet) 28.sp else 24.sp,
-            modifier = Modifier
-                .offset(x = offset.x.dp, y = (offset.y + offsetY).dp)
-                .alpha(alpha)
-        )
+private fun estrellaQuiz(c: Offset, r: Float): androidx.compose.ui.graphics.Path {
+    val path = androidx.compose.ui.graphics.Path()
+    for (i in 0 until 10) {
+        val radio = if (i % 2 == 0) r else r * 0.45f
+        val ang = Math.PI / 5 * i - Math.PI / 2
+        val x = c.x + (cos(ang) * radio).toFloat()
+        val y = c.y + (sin(ang) * radio).toFloat()
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
+    path.close()
+    return path
 }
+
+
 
 // ============================================================================
 // FEEDBACK MESSAGE FIGMA
 // ============================================================================
 
 @Composable
-fun MensajeFeedbackFigma(esCorrecta: Boolean?, xpGanado: Int) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
+fun MensajeFeedbackFigma(esCorrecta: Boolean?, xpGanado: Int, combo: Int = 0) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
     AnimatedVisibility(
         visible = esCorrecta != null,
-        enter = fadeIn() + slideInVertically(),
+        enter = fadeIn() + slideInVertically { it / 2 } + scaleIn(initialScale = 0.9f),
         exit = fadeOut() + slideOutVertically()
     ) {
-        Surface(
+        val color = if (esCorrecta == true) p.accion else p.error
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (isTablet) 24.dp else 20.dp),
-            shape = RoundedCornerShape(if (isTablet) 20.dp else 16.dp),
-            color = if (esCorrecta == true) Color(0xFFD7FFD8) else Color(0xFFFFDFE0),
-            shadowElevation = 2.dp
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(color.copy(alpha = 0.16f))
+                .border(2.dp, color, RoundedCornerShape(18.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(
-                    horizontal = if (isTablet) 24.dp else 20.dp,
-                    vertical = if (isTablet) 18.dp else 16.dp
-                ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Icon(
+                if (esCorrecta == true) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(30.dp)
+            )
+            Column(Modifier.weight(1f)) {
                 Text(
-                    if (esCorrecta == true) "¡Excelente! ✨" else "¡Ups! Sigue intentando 💪",
-                    fontSize = if (isTablet) 18.sp else 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (esCorrecta == true) Color(0xFF58A700) else Color(0xFFFF4B4B),
-                    modifier = Modifier.weight(1f)
+                    if (esCorrecta == true) "¡Correcto!" else "Respuesta incorrecta",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (esCorrecta == true) p.accionTexto else p.errorTexto
                 )
-                if (esCorrecta == true && xpGanado > 0) {
-                    Text(
-                        "+$xpGanado XP",
-                        fontSize = if (isTablet) 17.sp else 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF58A700)
-                    )
-                }
+                Text(
+                    if (esCorrecta == true) "Sigue así, vas construyendo tu racha."
+                    else "Pierdes una vida. Revisa la explicación al final.",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = p.textoSuave
+                )
+            }
+            if (esCorrecta == true && combo >= 2) {
+                Text(
+                    "x$combo",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    color = p.sobreAccion,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(p.racha)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                )
             }
         }
     }
@@ -738,50 +424,29 @@ fun PreguntaCardFigma(
     pregunta: com.stiven.sos.models.PreguntaQuizResponse,
     numeroPregunta: Int
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
-    Card(
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.TarjetaNexo(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isTablet) 24.dp else 20.dp),
-        shape = RoundedCornerShape(if (isTablet) 24.dp else 20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .padding(horizontal = 20.dp),
+        acento = p.marca,
+        padding = 18.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(if (isTablet) 24.dp else 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (isTablet) 20.dp else 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Número de pregunta (círculo azul) - exacto como Figma
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFF3C79F5),
-                modifier = Modifier.size(if (isTablet) 60.dp else 52.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "$numeroPregunta",
-                        fontSize = if (isTablet) 26.sp else 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-            }
-
-            // Texto de la pregunta - más grande
-            Text(
-                pregunta.texto,
-                fontSize = if (isTablet) 20.sp else 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1C1C1E),
-                lineHeight = if (isTablet) 28.sp else 25.sp,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        Text(
+            "PREGUNTA $numeroPregunta",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Black,
+            color = p.marcaTexto,
+            letterSpacing = 1.2.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            pregunta.texto,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Black,
+            color = p.texto,
+            lineHeight = 27.sp
+        )
     }
 }
 
@@ -796,78 +461,114 @@ fun OpcionRespuestaFigma(
     esRespuestaCorrecta: Boolean?,
     esRespuestaIncorrecta: Boolean?,
     enabled: Boolean = true,
+    letra: String = "",
     onClick: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
-    val backgroundColor = when {
-        esRespuestaCorrecta == true -> Color(0xFFD7FFD8)
-        esRespuestaIncorrecta == true -> Color(0xFFFFDFE0)
-        else -> Color.White
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val (fondo, borde, sombra, textoColor) = when {
+        esRespuestaCorrecta == true -> listOf(p.accion.copy(alpha = 0.16f), p.accion, p.accionSombra, p.accionTexto)
+        esRespuestaIncorrecta == true -> listOf(p.error.copy(alpha = 0.16f), p.error, p.errorSombra, p.errorTexto)
+        isSelected -> listOf(p.marca.copy(alpha = 0.14f), p.marca, p.marcaSombra, p.marcaTexto)
+        else -> listOf(p.superficie, p.borde, p.borde, p.texto)
     }
 
-    val borderColor = when {
-        esRespuestaCorrecta == true -> Color(0xFF58A700)
-        esRespuestaIncorrecta == true -> Color(0xFFFF4B4B)
-        isSelected -> Color(0xFF3C79F5)
-        else -> Color(0xFFE5E5E5)
+    val interaccion = remember { MutableInteractionSource() }
+    val presionado by interaccion.collectIsPressedAsState()
+    val profundidad = 4.dp
+    val hundido by animateDpAsState(
+        targetValue = if (presionado && enabled) profundidad else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "opcion"
+    )
+    // "Salto" al acertar y "temblor" al fallar
+    val sacudida = remember { Animatable(0f) }
+    LaunchedEffect(esRespuestaIncorrecta) {
+        if (esRespuestaIncorrecta == true) {
+            for (x in listOf(10f, -10f, 6f, -6f, 0f)) sacudida.animateTo(x, tween(60))
+        }
     }
+    val salto by animateFloatAsState(
+        targetValue = if (esRespuestaCorrecta == true) 1.03f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "salto"
+    )
+    val forma = RoundedCornerShape(18.dp)
 
-    val borderWidth = when {
-        esRespuestaCorrecta == true || esRespuestaIncorrecta == true -> 3.dp
-        isSelected -> 3.dp
-        else -> 2.dp
-    }
-
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = if (isTablet) 24.dp else 20.dp,
-                vertical = if (isTablet) 10.dp else 8.dp
-            ),
-        shape = RoundedCornerShape(if (isTablet) 20.dp else 16.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
-        onClick = { if (enabled) onClick() }
+            .padding(horizontal = 20.dp, vertical = 5.dp)
+            .graphicsLayer {
+                translationX = sacudida.value * density
+                scaleX = salto
+                scaleY = salto
+            }
+            .clickable(
+                interactionSource = interaccion,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(top = profundidad)
+                .clip(forma)
+                .background(sombra)
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = if (isTablet) 24.dp else 20.dp,
-                    vertical = if (isTablet) 22.dp else 18.dp
-                ),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(bottom = profundidad)
+                .offset(y = hundido)
+                .clip(forma)
+                .background(p.superficie)
+                .background(fondo)
+                .border(2.dp, borde, forma)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (letra.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSelected || esRespuestaCorrecta == true || esRespuestaIncorrecta == true) borde else p.superficieAlt)
+                        .border(1.dp, borde, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        letra,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (isSelected || esRespuestaCorrecta == true || esRespuestaIncorrecta == true) p.sobreMarca else p.textoSuave
+                    )
+                }
+            }
             Text(
                 opcion.texto,
-                fontSize = if (isTablet) 18.sp else 17.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF3C3C43),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = textoColor,
                 modifier = Modifier.weight(1f),
-                lineHeight = if (isTablet) 26.sp else 24.sp
+                lineHeight = 23.sp
             )
-
             when {
-                esRespuestaCorrecta == true -> {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF58A700),
-                        modifier = Modifier.size(if (isTablet) 32.dp else 28.dp)
-                    )
-                }
-                esRespuestaIncorrecta == true -> {
-                    Icon(
-                        Icons.Filled.Cancel,
-                        contentDescription = null,
-                        tint = Color(0xFFFF4B4B),
-                        modifier = Modifier.size(if (isTablet) 32.dp else 28.dp)
-                    )
-                }
+                esRespuestaCorrecta == true -> Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = "Respuesta correcta",
+                    tint = p.accion,
+                    modifier = Modifier.size(28.dp)
+                )
+                esRespuestaIncorrecta == true -> Icon(
+                    Icons.Filled.Cancel,
+                    contentDescription = "Respuesta incorrecta",
+                    tint = p.error,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
     }
@@ -883,32 +584,13 @@ fun BotonSiguienteFigma(
     esUltimaPregunta: Boolean,
     onClick: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600
-
-    Button(
+    com.stiven.sos.ui.theme.BotonNexo(
+        texto = if (esUltimaPregunta) "Comprobar y finalizar" else "Comprobar",
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (isTablet) 62.dp else 56.dp),
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF3C79F5),
-            disabledContainerColor = Color(0xFFE5E5E5)
-        ),
-        shape = RoundedCornerShape(if (isTablet) 18.dp else 16.dp),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 8.dp
-        )
-    ) {
-        Text(
-            if (esUltimaPregunta) "Finalizar Quiz" else "Siguiente pregunta",
-            fontSize = if (isTablet) 19.sp else 17.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (enabled) Color.White else Color(0xFF9E9E9E)
-        )
-    }
+        habilitado = enabled,
+        tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 // ============================================================================
@@ -956,17 +638,34 @@ fun PreguntaScreenFigma(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars)
-    ) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Sonido al conocer el resultado de la respuesta (respeta la preferencia del usuario)
+    LaunchedEffect(mostrarAnimacionRespuesta, ultimaRespuestaCorrecta) {
+        if (mostrarAnimacionRespuesta && ultimaRespuestaCorrecta != null && !sinVidas) {
+            com.stiven.sos.services.GestorSonidos.reproducir(
+                context,
+                if (ultimaRespuestaCorrecta == true) com.stiven.sos.services.GestorSonidos.Sonido.CORRECTO
+                else com.stiven.sos.services.GestorSonidos.Sonido.ERROR
+            )
+        }
+    }
+
+    // Aciertos seguidos hasta esta pregunta (solo visual, no altera la XP)
+    val combo = remember(respuestasEstado, numeroPregunta) {
+        var n = 0
+        var idx = numeroPregunta - 1
+        while (idx >= 0 && respuestasEstado[idx] == true) { n++; idx-- }
+        n
+    }
+
+    com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF7F9FC))
+                .windowInsetsPadding(WindowInsets.systemBars)
         ) {
-            // Header con vidas, racha, XP, progreso y flecha de regreso
             HeaderQuizFigma(
                 vidasActuales = vidasActuales,
                 vidasMax = vidasMax,
@@ -981,13 +680,17 @@ fun PreguntaScreenFigma(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(scrollState)
-                    .padding(vertical = if (isTablet) 28.dp else 20.dp),
-                verticalArrangement = Arrangement.spacedBy(if (isTablet) 24.dp else 20.dp)
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Identificador del modo de quiz
-                IdentificadorModoQuiz(modo = modo)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IdentificadorModoQuiz(modo = modo)
+                    Spacer(Modifier.weight(1f))
+                }
 
-                // Mascota búho animada
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -998,19 +701,12 @@ fun PreguntaScreenFigma(
                     )
                 }
 
-                // Mensaje de feedback
-                MensajeFeedbackFigma(
-                    esCorrecta = ultimaRespuestaCorrecta,
-                    xpGanado = 50
-                )
-
-                // Card de pregunta
                 PreguntaCardFigma(
                     pregunta = pregunta,
                     numeroPregunta = numeroPregunta
                 )
 
-                // Opciones de respuesta
+                val letras = listOf("A", "B", "C", "D", "E", "F")
                 pregunta.opciones.forEachIndexed { index, opcion ->
                     val esCorrecta = mostrarExplicacion && respuestaSeleccionada != null &&
                             ultimaRespuestaCorrecta == true && respuestaSeleccionada == index
@@ -1023,6 +719,7 @@ fun PreguntaScreenFigma(
                         esRespuestaCorrecta = esCorrecta,
                         esRespuestaIncorrecta = esIncorrecta,
                         enabled = !sinVidas && !mostrarExplicacion,
+                        letra = letras.getOrElse(index) { "${index + 1}" },
                         onClick = {
                             if (!sinVidas && !mostrarExplicacion) {
                                 respuestaSeleccionada = index
@@ -1033,18 +730,25 @@ fun PreguntaScreenFigma(
                     )
                 }
 
-                Spacer(Modifier.height(if (isTablet) 120.dp else 100.dp))
+                Spacer(Modifier.height(16.dp))
             }
 
-            // Botón siguiente en la parte inferior
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
-                shadowElevation = 8.dp
+            // Retroalimentación + botón inferior
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(p.superficie)
+                    .padding(vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.padding(if (isTablet) 24.dp else 20.dp)) {
+                MensajeFeedbackFigma(
+                    esCorrecta = if (mostrarAnimacionRespuesta) ultimaRespuestaCorrecta else null,
+                    xpGanado = 0,
+                    combo = combo
+                )
+                Box(Modifier.padding(horizontal = 20.dp)) {
                     BotonSiguienteFigma(
-                        enabled = respuestaSeleccionada != null && !sinVidas,
+                        enabled = respuestaSeleccionada != null && !sinVidas && !mostrarExplicacion,
                         esUltimaPregunta = numeroPregunta >= totalPreguntas,
                         onClick = {
                             if (!sinVidas && respuestaSeleccionada != null) {
@@ -1060,7 +764,7 @@ fun PreguntaScreenFigma(
             }
         }
 
-        // Overlay de sin vidas
+        // Capa de bloqueo sin vidas
         if (sinVidas) {
             Box(
                 modifier = Modifier
@@ -1069,41 +773,19 @@ fun PreguntaScreenFigma(
                     .clickable(enabled = false) { },
                 contentAlignment = Alignment.Center
             ) {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 16.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = Color(0xFFFF4B4B),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Text(
-                            "Quiz Bloqueado",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFFFF4B4B)
-                        )
-                        Text(
-                            "Te has quedado sin vidas",
-                            fontSize = 16.sp,
-                            color = Color(0xFF717182),
-                            textAlign = TextAlign.Center
-                        )
+                com.stiven.sos.ui.theme.TarjetaNexo(acento = p.error, padding = 28.dp) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        com.stiven.sos.ui.theme.RobiNeo(tamano = 100.dp, expresion = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE)
+                        Spacer(Modifier.height(10.dp))
+                        Text("Quiz bloqueado", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.errorTexto)
+                        Text("Te quedaste sin vidas", fontSize = 15.sp, color = p.textoSuave, textAlign = TextAlign.Center)
                     }
                 }
             }
         }
     }
 
-    // Animaciones de respuesta
+    // Avance automático después de mostrar la retroalimentación
     if (mostrarAnimacionRespuesta && !sinVidas) {
         LaunchedEffect(Unit) {
             delay(2000)
@@ -1271,10 +953,11 @@ fun QuizScreen(
         )
     }
 
+    val nexo = com.stiven.sos.ui.theme.LocalNexo.current
     val colorModo = when (modo) {
-        "practica" -> Color(0xFF9C27B0)
-        "final" -> Color(0xFFFFB300)
-        else -> Color(0xFF3C79F5)
+        "practica" -> nexo.ia
+        "final" -> nexo.racha
+        else -> nexo.marca
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1347,143 +1030,35 @@ fun DialogoSinVidasDuranteQuizFigma(
     onDismiss: () -> Unit,
     onVolverATemas: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = {},
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.HeartBroken,
+        color = p.error,
+        titulo = "Te quedaste sin vidas",
+        mensaje = "El quiz se bloqueó porque no tienes vidas disponibles. Vuelve cuando se recarguen.",
+        expresionRobi = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE,
+        textoPrincipal = "Volver al mapa",
+        iconoPrincipal = Icons.Default.Map,
+        onPrincipal = onVolverATemas,
+        textoSecundario = "Cerrar",
+        onSecundario = onDismiss,
+        onDismiss = {},
+        cerrable = false,
+        contenidoExtra = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(p.marca.copy(alpha = 0.12f))
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFF7096).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.HeartBroken,
-                    contentDescription = null,
-                    tint = Color(0xFFFF7096),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Te quedaste sin vidas",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 24.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFFFF4B4B)
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "El quiz ha sido bloqueado porque te has quedado sin vidas disponibles",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF3C3C43),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 23.sp
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF3C79F5).copy(alpha = 0.1f)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = Color(0xFF3C79F5),
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Próxima vida en:",
-                                fontSize = 13.sp,
-                                color = Color(0xFF3C79F5),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "$minutosParaProxima minutos",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFF3C79F5)
-                            )
-                        }
-                    }
-                }
-
-                Text(
-                    "Vuelve cuando tengas vidas disponibles para continuar aprendiendo",
-                    fontSize = 13.sp,
-                    color = Color(0xFF717182),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 19.sp
-                )
-            }
-        },
-        confirmButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(
-                    onClick = onVolverATemas,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF3C79F5)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            "Volver a Temas del Curso",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFF4B4B)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        "Cerrar",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFF4B4B)
-                    )
+                Icon(Icons.Default.Timer, contentDescription = null, tint = p.marcaTexto, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("Próxima vida en", fontSize = 13.sp, color = p.marcaTexto, fontWeight = FontWeight.Bold)
+                    Text("$minutosParaProxima minutos", fontSize = 20.sp, fontWeight = FontWeight.Black, color = p.texto)
                 }
             }
         }
@@ -1499,162 +1074,19 @@ fun DialogoAbandonarQuizFigma(
     onConfirmar: () -> Unit,
     onCancelar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onCancelar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFF9800).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.ExitToApp,
-                    contentDescription = null,
-                    tint = Color(0xFFFF9800),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "¿Salir del quiz?",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFF1C1C1E),
-                lineHeight = 28.sp
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Si abandonas el quiz ahora, perderás todo tu progreso actual.",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF717182),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFFF9800).copy(alpha = 0.1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFFF9800),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text(
-                                    "Si decides abandonar:",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1C1C1E)
-                                )
-
-                                Text(
-                                    "• Perderás las respuestas correctas\n• No ganarás experiencia\n• Tendrás que empezar de nuevo",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF1C1C1E),
-                                    lineHeight = 19.sp
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Text(
-                    "Te recomendamos continuar y dar lo mejor de ti",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF3C79F5),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
-            }
-        },
-        confirmButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(
-                    onClick = onCancelar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF3C79F5)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            "Continuar quiz",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = onConfirmar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFF4B4B)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.ExitToApp,
-                            contentDescription = null,
-                            tint = Color(0xFFFF4B4B),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            "Abandonar de todas formas",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF4B4B)
-                        )
-                    }
-                }
-            }
-        }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.ExitToApp,
+        color = p.racha,
+        titulo = "¿Salir del quiz?",
+        mensaje = "Si sales ahora perderás el progreso de este intento: no se guardan tus respuestas ni ganarás experiencia.",
+        expresionRobi = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE,
+        textoPrincipal = "Seguir respondiendo",
+        tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+        onPrincipal = onCancelar,
+        textoSecundario = "Salir de todas formas",
+        onSecundario = onConfirmar,
+        onDismiss = onCancelar
     )
 }
 
@@ -1664,77 +1096,20 @@ fun DialogoAbandonarQuizFigma(
 
 @Composable
 fun PantallaCargaQuizFigma(colorModo: Color) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(64.dp),
-                color = colorModo,
-                strokeWidth = 6.dp
-            )
-
-            Text(
-                text = "Preparando tu quiz...",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF1C1C1E),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Cargando las mejores preguntas para ti",
-                fontSize = 15.sp,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+    com.stiven.sos.ui.theme.CargandoNexo(
+        titulo = "Preparando tu quiz",
+        mensaje = "Robi está eligiendo tus preguntas",
+        color = colorModo
+    )
 }
 
 @Composable
 fun PantallaFinalizandoFigma() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(64.dp),
-                color = Color(0xFF58A700),
-                strokeWidth = 6.dp
-            )
-
-            Text(
-                text = "Finalizando quiz...",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF1C1C1E),
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Calculando tu puntuación y recompensas",
-                fontSize = 16.sp,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
+    com.stiven.sos.ui.theme.CargandoNexo(
+        titulo = "Finalizando quiz",
+        mensaje = "Calculando tu puntuación y recompensas",
+        color = com.stiven.sos.ui.theme.LocalNexo.current.accion
+    )
 }
 
 // ============================================================================
@@ -1747,65 +1122,15 @@ fun DialogoPeriodoFinalizadoFigma(
     temaTitulo: String,
     onAceptar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onAceptar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFF9800).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.EventBusy,
-                    contentDescription = null,
-                    tint = Color(0xFFFF9800),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Periodo Finalizado",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFF1C1C1E)
-            )
-        },
-        text = {
-            Text(
-                text = "El periodo de este tema ya finalizó. Ya no puedes realizar quizzes para este tema.",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onAceptar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF9800)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    "Volver a Temas",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-        }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.EventBusy,
+        color = p.racha,
+        titulo = "Periodo finalizado",
+        mensaje = "El periodo de este tema ya terminó. Ya no puedes realizar quizzes para este tema.",
+        textoPrincipal = "Volver al mapa",
+        onPrincipal = onAceptar,
+        onDismiss = onAceptar
     )
 }
 
@@ -1815,65 +1140,16 @@ fun DialogoErrorGeneralFigma(
     mensaje: String,
     onAceptar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onAceptar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFF4B4B).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.Error,
-                    contentDescription = null,
-                    tint = Color(0xFFFF4B4B),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = titulo.ifEmpty { "Error" },
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFF1C1C1E)
-            )
-        },
-        text = {
-            Text(
-                text = mensaje,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onAceptar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF4B4B)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    "Regresar",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-        }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.Error,
+        color = p.error,
+        titulo = titulo.ifEmpty { "Algo salió mal" },
+        mensaje = mensaje,
+        textoPrincipal = "Regresar",
+        tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.PELIGRO,
+        onPrincipal = onAceptar,
+        onDismiss = onAceptar
     )
 }
 
@@ -1882,86 +1158,19 @@ fun DialogoTemaYaAprobadoFigma(
     onContinuar: () -> Unit,
     onCancelar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onCancelar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFF58A700).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = Color(0xFF58A700),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Tema ya aprobado",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFF1C1C1E)
-            )
-        },
-        text = {
-            Text(
-                "Ya has aprobado este tema. Puedes seguir practicando en modo práctica.",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-        },
-        confirmButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(
-                    onClick = onContinuar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF58A700)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        "Seguir practicando",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onCancelar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF58A700)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        "Regresar",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF58A700)
-                    )
-                }
-            }
-        }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.CheckCircle,
+        color = p.accion,
+        titulo = "Isla ya conquistada",
+        mensaje = "Ya aprobaste este tema. Puedes seguir practicando en modo práctica.",
+        expresionRobi = com.stiven.sos.ui.theme.ExpresionRobi.FELIZ,
+        textoPrincipal = "Seguir practicando",
+        tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+        onPrincipal = onContinuar,
+        textoSecundario = "Regresar",
+        onSecundario = onCancelar,
+        onDismiss = onCancelar
     )
 }
 
@@ -1969,65 +1178,15 @@ fun DialogoTemaYaAprobadoFigma(
 fun DialogoQuizFinalCompletadoFigma(
     onAceptar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onAceptar,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        icon = {
-            Box(
-                modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFFC864).copy(alpha = 0.15f),
-                    modifier = Modifier.fillMaxSize()
-                ) {}
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = Color(0xFFFFC864),
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-        },
-        title = {
-            Text(
-                text = "Quiz Final Completado",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-                color = Color(0xFF1C1C1E)
-            )
-        },
-        text = {
-            Text(
-                "Ya has completado exitosamente el Quiz Final de este curso",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF717182),
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onAceptar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFC864)
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    "Entendido",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
-            }
-        }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.EmojiEvents,
+        color = p.racha,
+        titulo = "Quiz final completado",
+        mensaje = "Ya completaste el quiz final de este curso.",
+        expresionRobi = com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA,
+        textoPrincipal = "Entendido",
+        onPrincipal = onAceptar,
+        onDismiss = onAceptar
     )
 }

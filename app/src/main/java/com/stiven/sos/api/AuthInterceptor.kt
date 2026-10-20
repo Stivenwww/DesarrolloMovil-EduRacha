@@ -9,6 +9,8 @@ import okhttp3.Response
 
 class AuthInterceptor : Interceptor {
     private val TAG = "AuthInterceptor"
+    @Volatile private var tokenCache: String? = null
+    @Volatile private var tokenExpiraEn: Long = 0L
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
@@ -20,8 +22,12 @@ class AuthInterceptor : Interceptor {
             return chain.proceed(originalRequest)
         }
 
-        // Obtener token de Firebase SIEMPRE ACTUALIZADO
-        val firebaseToken = try {
+        // Obtener token de Firebase con caché (evita getIdToken(true) en cada request)
+        val ahora = System.currentTimeMillis()
+        val cacheValido = tokenCache != null && ahora < tokenExpiraEn
+        val firebaseToken = if (cacheValido) {
+            tokenCache
+        } else try {
             runBlocking {
                 val currentUser = FirebaseAuth.getInstance().currentUser
                 if (currentUser == null) {
@@ -29,22 +35,24 @@ class AuthInterceptor : Interceptor {
                     return@runBlocking null
                 }
 
-                Log.d(TAG, "Obteniendo token actualizado de Firebase")
-
-                // IMPORTANTE: Siempre forzar actualizacion del token
-                val tokenResult = currentUser.getIdToken(true).await()
+                // Solo forzar refresh si el caché expiró (50 min)
+                val tokenResult = currentUser.getIdToken(false).await()
 
                 if (tokenResult.token.isNullOrEmpty()) {
                     Log.e(TAG, "Token obtenido esta vacio")
                     null
                 } else {
-                    // Verificar que el token contenga los claims necesarios
                     Log.d(TAG, "Token Firebase obtenido correctamente")
+                    tokenCache = tokenResult.token
+                    tokenExpiraEn = System.currentTimeMillis() + 50 * 60 * 1000L
                     tokenResult.token
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error obteniendo token: ${e.message}", e)
+            // Ante fallo, invalida caché para reintentar la próxima vez
+            tokenCache = null
+            tokenExpiraEn = 0L
             null
         }
 

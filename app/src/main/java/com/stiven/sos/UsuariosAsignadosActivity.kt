@@ -158,11 +158,11 @@ fun UsuariosAsignadosScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = EduRachaColors.BarraSuperior
                 )
             )
         },
-        containerColor = Color(0xFFF5F7FA)
+        containerColor = EduRachaColors.Background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -309,7 +309,7 @@ fun AnimatedEstudianteCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color.White
+                containerColor = EduRachaColors.Surface
             ),
             elevation = CardDefaults.cardElevation(
                 defaultElevation = if (usuario.estado.lowercase() == "activo") 3.dp else 1.dp
@@ -387,7 +387,7 @@ fun AnimatedEstudianteCard(
                 // Sección de estado y acciones
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFFF8F9FA),
+                    color = EduRachaColors.Background,
                     shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                 ) {
                     Row(
@@ -489,7 +489,7 @@ fun EstadoBadge(estado: String) {
     val (icon, color) = when (estado.lowercase()) {
         "activo" -> Icons.Default.CheckCircle to EduRachaColors.Success
         "inactivo" -> Icons.Default.PauseCircle to Color(0xFFFF9800)
-        "eliminado" -> Icons.Default.Cancel to Color(0xFF757575)
+        "eliminado" -> Icons.Default.Cancel to EduRachaColors.TextSecondary
         else -> Icons.Default.Help to EduRachaColors.Primary
     }
 
@@ -540,7 +540,7 @@ fun ConfirmacionAccionDialog(
         )
         "eliminado" -> Quadruple(
             "Eliminar Estudiante",
-            "¿Estás seguro de eliminar a ${accion.usuario.nombre} del curso?\n\n⚠️ Esta acción no se puede deshacer.",
+            "¿Estás seguro de eliminar a ${accion.usuario.nombre} del curso?\n\nEsta acción no se puede deshacer.",
             Icons.Default.DeleteForever,
             Color(0xFFE53935)
         )
@@ -633,7 +633,7 @@ fun ConfirmacionAccionDialog(
                 }
             },
             shape = RoundedCornerShape(24.dp),
-            containerColor = Color.White
+            containerColor = EduRachaColors.Surface
         )
     }
 }
@@ -744,7 +744,7 @@ fun SuccessDialog(
                 }
             },
             shape = RoundedCornerShape(24.dp),
-            containerColor = Color.White
+            containerColor = EduRachaColors.Surface
         )
     }
 }
@@ -787,8 +787,8 @@ fun SearchBarEstudiantes(
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+            focusedContainerColor = EduRachaColors.Surface,
+            unfocusedContainerColor = EduRachaColors.Surface,
             disabledContainerColor = Color.White,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent
@@ -934,8 +934,8 @@ private fun obtenerGradienteEstado(estado: String): List<Color> {
             Color(0xFFEF5350)
         )
         "eliminado" -> listOf(
-            Color(0xFF757575),
-            Color(0xFF9E9E9E)
+            EduRachaColors.TextSecondary,
+            EduRachaColors.TextTertiary
         )
         else -> listOf(
             EduRachaColors.Primary,

@@ -102,7 +102,7 @@ fun VentanaRachaDuolingo(
                     .scale(scale),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = EduRachaColors.Surface
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
@@ -112,7 +112,7 @@ fun VentanaRachaDuolingo(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFFFF9600).copy(alpha = 0.05f),
+                                    Color(0xFFFF8A3D).copy(alpha = 0.05f),
                                     Color.White,
                                     Color.White
                                 )
@@ -137,7 +137,7 @@ fun VentanaRachaDuolingo(
                         text = "RACHA SUBIDA",
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFFFF9600),
+                        color = Color(0xFFFF8A3D),
                         letterSpacing = 2.sp,
                         textAlign = TextAlign.Center
                     )
@@ -150,7 +150,7 @@ fun VentanaRachaDuolingo(
                         text = "Continúas aprendiendo cada día",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF4B4B4B),
+                        color = EduRachaColors.TextPrimary,
                         textAlign = TextAlign.Center
                     )
 
@@ -161,7 +161,7 @@ fun VentanaRachaDuolingo(
                      */
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFFFF9600),
+                        color = Color(0xFFFF8A3D),
                         shadowElevation = 8.dp,
                         modifier = Modifier.padding(vertical = 8.dp)
                     ) {
@@ -170,7 +170,7 @@ fun VentanaRachaDuolingo(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color(0xFFFF9600),
+                                            Color(0xFFFF8A3D),
                                             Color(0xFFFFAA00)
                                         )
                                     )
@@ -223,13 +223,13 @@ fun VentanaRachaDuolingo(
                             text = "¡Sigue así!",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3C3C3C)
+                            color = EduRachaColors.TextPrimary
                         )
                         Text(
                             text = "Cada día cuenta para tu progreso",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF777777),
+                            color = EduRachaColors.TextSecondary,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -300,7 +300,7 @@ fun LlamaAnimadaGrande() {
         // Círculo exterior pulsante (naranja muy claro)
         Surface(
             shape = CircleShape,
-            color = Color(0xFFFF9600).copy(alpha = 0.15f),
+            color = Color(0xFFFF8A3D).copy(alpha = 0.15f),
             modifier = Modifier
                 .size(160.dp)
                 .scale(outerScale)
@@ -309,7 +309,7 @@ fun LlamaAnimadaGrande() {
         // Círculo medio (naranja claro)
         Surface(
             shape = CircleShape,
-            color = Color(0xFFFF9600).copy(alpha = 0.3f),
+            color = Color(0xFFFF8A3D).copy(alpha = 0.3f),
             modifier = Modifier
                 .size(120.dp)
                 .scale(scale * 0.8f)
@@ -318,7 +318,7 @@ fun LlamaAnimadaGrande() {
         // Círculo interno (naranja más intenso)
         Surface(
             shape = CircleShape,
-            color = Color(0xFFFF9600).copy(alpha = 0.5f),
+            color = Color(0xFFFF8A3D).copy(alpha = 0.5f),
             modifier = Modifier.size(90.dp)
         ) {}
 
@@ -326,7 +326,7 @@ fun LlamaAnimadaGrande() {
         Icon(
             Icons.Default.Whatshot,
             contentDescription = null,
-            tint = Color(0xFFFF9600),
+            tint = Color(0xFFFF8A3D),
             modifier = Modifier
                 .size(64.dp)
                 .scale(scale)
@@ -376,9 +376,9 @@ fun BarrasProgresoDias(diasRacha: Int) {
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                     .background(
                         if (estaCompleto)
-                            Color(0xFFFF9600)
+                            Color(0xFFFF8A3D)
                         else
-                            Color(0xFFE5E5E5)
+                            EduRachaColors.Border
                     )
             )
         }
@@ -423,7 +423,7 @@ fun EfectoParticulasFuego() {
             val y = size.height * (particle.y - (time * particle.speed) % 1)
 
             drawCircle(
-                color = Color(0xFFFF9600).copy(alpha = particle.alpha),
+                color = Color(0xFFFF8A3D).copy(alpha = particle.alpha),
                 radius = particle.size,
                 center = Offset(x, y)
             )
@@ -501,7 +501,7 @@ fun VentanaRachaPerdida(
                     .scale(scale),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = EduRachaColors.Surface
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
@@ -511,7 +511,7 @@ fun VentanaRachaPerdida(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFF1CB0F6).copy(alpha = 0.05f),
+                                    Color(0xFF14C8D6).copy(alpha = 0.05f),
                                     Color.White
                                 )
                             )
@@ -530,20 +530,20 @@ fun VentanaRachaPerdida(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF1CB0F6).copy(alpha = 0.15f),
+                            color = Color(0xFF14C8D6).copy(alpha = 0.15f),
                             modifier = Modifier.size(120.dp)
                         ) {}
 
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF1CB0F6).copy(alpha = 0.25f),
+                            color = Color(0xFF14C8D6).copy(alpha = 0.25f),
                             modifier = Modifier.size(90.dp)
                         ) {}
 
                         Icon(
                             Icons.Default.TrendingUp,
                             contentDescription = null,
-                            tint = Color(0xFF1CB0F6),
+                            tint = Color(0xFF14C8D6),
                             modifier = Modifier.size(56.dp)
                         )
                     }
@@ -556,7 +556,7 @@ fun VentanaRachaPerdida(
                         text = "SIGUE MEJORANDO",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFF1CB0F6),
+                        color = Color(0xFF14C8D6),
                         letterSpacing = 1.sp,
                         textAlign = TextAlign.Center
                     )
@@ -573,14 +573,14 @@ fun VentanaRachaPerdida(
                             text = "Obtuviste $porcentaje%",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF3C3C3C)
+                            color = EduRachaColors.TextPrimary
                         )
 
                         Text(
                             text = "Necesitas 80% o más para subir tu racha",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF777777),
+                            color = EduRachaColors.TextSecondary,
                             textAlign = TextAlign.Center,
                             lineHeight = 24.sp
                         )
@@ -592,7 +592,7 @@ fun VentanaRachaPerdida(
                      */
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFF58CC02).copy(alpha = 0.1f),
+                        color = Color(0xFF1FC77E).copy(alpha = 0.1f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -606,14 +606,14 @@ fun VentanaRachaPerdida(
                                 Icon(
                                     Icons.Default.EmojiObjects,
                                     contentDescription = null,
-                                    tint = Color(0xFF58CC02),
+                                    tint = Color(0xFF1FC77E),
                                     modifier = Modifier.size(28.dp)
                                 )
                                 Text(
                                     text = "Consejo",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF3C3C3C)
+                                    color = EduRachaColors.TextPrimary
                                 )
                             }
 
@@ -621,7 +621,7 @@ fun VentanaRachaPerdida(
                                 text = "Revisa la retroalimentación para aprender de tus errores y mejorar en tu próximo intento",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF4B4B4B),
+                                color = EduRachaColors.TextPrimary,
                                 lineHeight = 22.sp
                             )
                         }
@@ -634,7 +634,7 @@ fun VentanaRachaPerdida(
                         text = "¡La práctica hace al maestro!",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1CB0F6),
+                        color = Color(0xFF14C8D6),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -654,14 +654,14 @@ fun DialogoSinVidasMejorado(
             // Icono de corazón vacío con círculo de fondo
             Surface(
                 shape = CircleShape,
-                color = Color(0xFFFF4B4B).copy(alpha = 0.15f),
+                color = Color(0xFFFF4D6D).copy(alpha = 0.15f),
                 modifier = Modifier.size(80.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.FavoriteBorder,
                         contentDescription = null,
-                        tint = Color(0xFFFF4B4B),
+                        tint = Color(0xFFFF4D6D),
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -672,7 +672,7 @@ fun DialogoSinVidasMejorado(
                 "Sin vidas",
                 fontWeight = FontWeight.Black,
                 fontSize = 24.sp,
-                color = Color(0xFF3C3C3C),
+                color = EduRachaColors.TextPrimary,
                 textAlign = TextAlign.Center
             )
         },
@@ -685,7 +685,7 @@ fun DialogoSinVidasMejorado(
                 Text(
                     text = "No tienes vidas disponibles para realizar este quiz.",
                     fontSize = 16.sp,
-                    color = Color(0xFF4B4B4B),
+                    color = EduRachaColors.TextPrimary,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center
                 )
@@ -693,7 +693,7 @@ fun DialogoSinVidasMejorado(
                 // Tarjeta informativa sobre el sistema de vidas
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1CB0F6).copy(alpha = 0.1f),
+                    color = Color(0xFF14C8D6).copy(alpha = 0.1f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -707,21 +707,21 @@ fun DialogoSinVidasMejorado(
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                tint = Color(0xFF1CB0F6),
+                                tint = Color(0xFF14C8D6),
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
                                 text = "Cómo funcionan las vidas",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF3C3C3C)
+                                color = EduRachaColors.TextPrimary
                             )
                         }
 
                         Text(
                             text = "• Recuperas 1 vida cada 30 minutos\n• Máximo: 5 vidas\n• Próxima vida en: $minutosParaProxima minutos",
                             fontSize = 15.sp,
-                            color = Color(0xFF4B4B4B),
+                            color = EduRachaColors.TextPrimary,
                             lineHeight = 22.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -731,7 +731,7 @@ fun DialogoSinVidasMejorado(
                 // Tarjeta de tiempo de espera (verde para dar sensación positiva)
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF58CC02).copy(alpha = 0.1f),
+                    color = Color(0xFF1FC77E).copy(alpha = 0.1f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -742,14 +742,14 @@ fun DialogoSinVidasMejorado(
                         Icon(
                             Icons.Default.Timer,
                             contentDescription = null,
-                            tint = Color(0xFF58CC02),
+                            tint = Color(0xFF1FC77E),
                             modifier = Modifier.size(22.dp)
                         )
                         Text(
                             text = "Regresa en $minutosParaProxima minutos",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF58CC02)
+                            color = Color(0xFF1FC77E)
                         )
                     }
                 }
@@ -763,7 +763,7 @@ fun DialogoSinVidasMejorado(
                     .fillMaxWidth()
                     .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1CB0F6)
+                    containerColor = Color(0xFF14C8D6)
                 ),
                 shape = RoundedCornerShape(12.dp),
                 elevation = ButtonDefaults.buttonElevation(
@@ -777,7 +777,7 @@ fun DialogoSinVidasMejorado(
                 )
             }
         },
-        containerColor = Color.White,
+        containerColor = EduRachaColors.Surface,
         shape = RoundedCornerShape(20.dp)
     )
 }
@@ -798,15 +798,15 @@ fun IndicadorVidasMejorado(
 ) {
     // Color adaptativo según número de vidas
     val colorVidas = when {
-        vidasActuales == 0 -> Color(0xFFFF4B4B) // Rojo - sin vidas
+        vidasActuales == 0 -> Color(0xFFFF4D6D) // Rojo - sin vidas
         vidasActuales <= 2 -> Color(0xFFFFC800) // Amarillo - pocas vidas
-        else -> Color(0xFFFF4B4B) // Rojo normal
+        else -> Color(0xFFFF4D6D) // Rojo normal
     }
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
+        color = EduRachaColors.Surface,
         shadowElevation = 2.dp
     ) {
         Row(
@@ -832,7 +832,7 @@ fun IndicadorVidasMejorado(
                     Text(
                         text = "Vidas",
                         fontSize = 14.sp,
-                        color = Color(0xFF777777),
+                        color = EduRachaColors.TextSecondary,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
@@ -848,7 +848,7 @@ fun IndicadorVidasMejorado(
             if (vidasActuales < vidasMax && minutosParaProxima > 0) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF1CB0F6).copy(alpha = 0.15f)
+                    color = Color(0xFF14C8D6).copy(alpha = 0.15f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -858,13 +858,13 @@ fun IndicadorVidasMejorado(
                         Icon(
                             Icons.Default.Timer,
                             contentDescription = null,
-                            tint = Color(0xFF1CB0F6),
+                            tint = Color(0xFF14C8D6),
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
                             text = "+1 en ${minutosParaProxima}m",
                             fontSize = 14.sp,
-                            color = Color(0xFF1CB0F6),
+                            color = Color(0xFF14C8D6),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -1071,7 +1071,7 @@ fun AnimacionEstrellaIncorrecta(
             Icon(
                 Icons.Default.Star,
                 contentDescription = null,
-                tint = Color(0xFFFF4B4B),
+                tint = Color(0xFFFF4D6D),
                 modifier = Modifier
                     .size((200 * sizeScale).dp)
                     .scale(escalaInicial)
@@ -1273,7 +1273,7 @@ fun BarraProgresoQuizMejorada(
                 text = "Pregunta $preguntaActual de $totalPreguntas",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF3C3C3C)
+                color = EduRachaColors.TextPrimary
             )
 
             Text(
@@ -1290,7 +1290,7 @@ fun BarraProgresoQuizMejorada(
                 .fillMaxWidth()
                 .height(10.dp)
                 .background(
-                    color = Color(0xFFE5E5E5),
+                    color = EduRachaColors.Border,
                     shape = RoundedCornerShape(5.dp)
                 )
         ) {

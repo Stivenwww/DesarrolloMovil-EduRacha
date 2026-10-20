@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import com.stiven.sos.ui.theme.EduRachaColors
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -54,27 +56,20 @@ class WelcomeActivity : ComponentActivity() {
 
 // Colores institucionales de UNIAUTÓNOMA
 object AppColors {
-    val PrimaryBlue = Color(0xFF003D82)
-    val DarkBlue = Color(0xFF002A5C)
-    val AccentGold = Color(0xFFFFB300)
-    val LightBlue = Color(0xFF1565C0)
-    val BackgroundGray = Color(0xFFF5F7FA)
-    val TextGray = Color(0xFF666666)
-    val TextLightGray = Color(0xFF999999)
+    val PrimaryBlue: Color get() = EduRachaColors.PrimaryDark
+    val DarkBlue: Color get() = EduRachaColors.PrimaryDark
+    val AccentGold = Color(0xFFFFC531)
+    val LightBlue: Color get() = EduRachaColors.PrimaryDark
+    val BackgroundGray: Color get() = EduRachaColors.Background
+    val TextGray: Color get() = EduRachaColors.TextSecondary
+    val TextLightGray: Color get() = EduRachaColors.TextTertiary
     val White = Color.White
 }
 
+// Delegamos en el tema central (colores, tipografía y formas unificados)
 @Composable
 fun EduRachaTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = AppColors.PrimaryBlue,
-            secondary = AppColors.AccentGold,
-            background = AppColors.White,
-            surface = AppColors.White
-        ),
-        content = content
-    )
+    com.stiven.sos.ui.theme.EduRachaTheme(content = content)
 }
 
 @Composable
@@ -82,235 +77,113 @@ fun WelcomeScreen(
     onStudentClick: () -> Unit,
     onTeacherClick: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val aparicion by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(700, easing = FastOutSlowInEasing),
+        label = "aparicion"
     )
 
-    val glowScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppColors.White)
-    ) {
-        // Header minimalista con barra institucional
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-        ) {
-            // Barra de color institucional sutil en la parte superior
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .background(AppColors.PrimaryBlue)
-            )
-        }
-
-        // Contenedor principal sin elevación excesiva
+    com.stiven.sos.ui.theme.FondoNexo {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(top = 80.dp),
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Logo circular con brillo animado más prominente y visible
-            Box(
-                modifier = Modifier.size(180.dp),
-                contentAlignment = Alignment.Center
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Círculo de brillo externo animado muy grande
-                Box(
-                    modifier = Modifier
-                        .size(200.dp * glowScale)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    AppColors.AccentGold.copy(alpha = glowAlpha),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.7f),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.4f),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.2f),
-                                    Color.Transparent
-                                ),
-                                radius = 300f
-                            ),
-                            shape = CircleShape
-                        )
-                )
-                // Círculo de brillo medio animado
-                Box(
-                    modifier = Modifier
-                        .size(160.dp * glowScale)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.9f),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.6f),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.3f),
-                                    Color.Transparent
-                                ),
-                                radius = 200f
-                            ),
-                            shape = CircleShape
-                        )
-                )
-                // Círculo de brillo interno
-                Box(
-                    modifier = Modifier
-                        .size(130.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.5f),
-                                    AppColors.AccentGold.copy(alpha = glowAlpha * 0.2f),
-                                    Color.Transparent
-                                ),
-                                radius = 150f
-                            ),
-                            shape = CircleShape
-                        )
-                )
-                // Logo circular
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .shadow(12.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(AppColors.White)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img),
-                        contentDescription = "Logo EduRacha",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("edu", fontSize = 26.sp, fontWeight = FontWeight.Black, color = p.texto)
+                    Text("racha", fontSize = 26.sp, fontWeight = FontWeight.Black, color = p.marcaTexto)
                 }
+                Text(
+                    "UNIAUTÓNOMA",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                    color = p.textoSuave,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(p.superficie)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.weight(1f))
 
-            // Título institucional minimalista
-            Text(
-                text = "UNIAUTÓNOMA",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.PrimaryBlue,
-                letterSpacing = 1.sp
-            )
+            Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.height(300.dp).fillMaxWidth()) {
+                com.stiven.sos.ui.theme.IslaFlotante(
+                    modifier = Modifier.width(280.dp).height(120.dp),
+                    tipo = com.stiven.sos.ui.theme.TipoIsla.ACTIVA
+                )
+                com.stiven.sos.ui.theme.RobiNeo(
+                    tamano = 170.dp,
+                    expresion = com.stiven.sos.ui.theme.ExpresionRobi.SALUDA,
+                    modifier = Modifier.padding(bottom = 70.dp)
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.graphicsLayer {
+                    alpha = aparicion
+                    translationY = (1f - aparicion) * 40f
+                }
+            ) {
+                Text(
+                    "Aprende con Robi",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Black,
+                    color = p.texto,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Conquista islas de conocimiento, mantén tu racha y sube en la liga de tu curso.",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = p.textoSuave,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+            }
 
-            // Título principal
-            Text(
-                text = "EduRacha",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = AppColors.DarkBlue
-            )
+            Spacer(Modifier.weight(1f))
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Subtítulo
-            Text(
-                text = "Sistema de Gestión Académica",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Normal,
-                color = AppColors.TextGray
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Descripción simple
-            Text(
-                text = "Desbloquea el conocimiento al convertir el estudio en un juego, elevando tus habilidades.",
-                fontSize = 14.sp,
-                color = AppColors.TextLightGray,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Botón Estudiante
-            InstitutionalButton(
-                text = "Portal Estudiante",
-                icon = Icons.Default.School,
-                backgroundColor = AppColors.PrimaryBlue,
-                accentColor = AppColors.AccentGold,
-                onClick = onStudentClick
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botón Docente
-            InstitutionalButton(
-                text = "Panel Docente",
-                icon = Icons.Default.MenuBook,
-                backgroundColor = AppColors.AccentGold,
-                textColor = AppColors.White,
-                accentColor = AppColors.AccentGold,
-                onClick = onTeacherClick,
-                outlined = false
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Información adicional minimalista
-            Text(
-                text = "Construyamos tu conocimiento, en equipo.",
-                fontSize = 13.sp,
-                color = AppColors.TextLightGray,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        // Footer institucional sutil
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .align(Alignment.BottomCenter)
-        ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .weight(2f)
-                    .fillMaxHeight()
-                    .background(AppColors.PrimaryBlue)
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(AppColors.AccentGold)
-            )
-            Box(
-                modifier = Modifier
-                    .weight(2f)
-                    .fillMaxHeight()
-                    .background(AppColors.PrimaryBlue)
-            )
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = aparicion
+                        translationY = (1f - aparicion) * 80f
+                    },
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Soy estudiante",
+                    onClick = onStudentClick,
+                    icono = Icons.Default.School,
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Soy docente",
+                    onClick = onTeacherClick,
+                    icono = Icons.Default.MenuBook,
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            Spacer(Modifier.height(20.dp))
         }
     }
 }

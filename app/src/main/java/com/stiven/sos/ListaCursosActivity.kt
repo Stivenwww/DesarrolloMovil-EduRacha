@@ -119,7 +119,7 @@ fun ListaCursosScreen(
             cursoViewModel.clearError()
         }
         successMessage?.let {
-            Toast.makeText(context, "✓ $it", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "$it", Toast.LENGTH_SHORT).show()
             cursoViewModel.clearSuccessMessage()
         }
     }
@@ -180,7 +180,7 @@ fun ListaCursosScreen(
                         Spacer(Modifier.width(8.dp))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.Primary)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.BarraSuperior)
             )
         },
         containerColor = EduRachaColors.Background
@@ -362,7 +362,7 @@ fun AnimatedCursoCard(
         Card(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -525,7 +525,7 @@ fun DetallesCursoDialog(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
@@ -750,7 +750,7 @@ fun EditarCursoDialog(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
@@ -835,10 +835,23 @@ fun EditarCursoDialog(
 
                 OutlinedTextField(
                     value = duracionDias,
-                    onValueChange = { duracionDias = it.filter { c -> c.isDigit() } },
-                    label = { Text("Duración (días)") },
+                    onValueChange = { duracionDias = it.filter { c -> c.isDigit() }.take(3) },
+                    label = { Text("Duración (días, 1-365)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
+                    isError = duracionDias.toIntOrNull()?.let { it !in 1..365 } == true,
+                    supportingText = {
+                        val d = duracionDias.toIntOrNull()
+                        if (d != null && d !in 1..365) Text("Debe estar entre 1 y 365 días")
+                        else {
+                            // Vista previa de vigencia recalculada (el backend la confirma)
+                            val base = if (curso.fechaInicio > 0) curso.fechaInicio else System.currentTimeMillis()
+                            if (d != null) Text(
+                                "Vigencia: ${com.stiven.sos.utils.CursoVigencia.formatearFecha(base)} → " +
+                                    com.stiven.sos.utils.CursoVigencia.formatearFecha(base + d * 86_400_000L)
+                            )
+                        }
+                    },
                     leadingIcon = {
                         Icon(Icons.Outlined.CalendarToday, null, tint = EduRachaColors.Primary)
                     },
@@ -879,10 +892,18 @@ fun EditarCursoDialog(
                     }
                     Button(
                         onClick = {
+                            val dias = duracionDias.toIntOrNull() ?: curso.duracionDias
+                            if (dias !in 1..365) return@Button
+                            val inicio = if (curso.fechaInicio > 0) curso.fechaInicio else System.currentTimeMillis()
                             val cursoActualizado = curso.copy(
                                 titulo = titulo,
                                 descripcion = descripcion,
-                                duracionDias = duracionDias.toIntOrNull() ?: curso.duracionDias,
+                                duracionDias = dias,
+                                fechaInicio = inicio,
+                                // Se recalcula en cliente para preview; el backend la recalcula de forma canónica
+                                fechaFin = inicio + dias * 86_400_000L,
+                                // Se limpia para que el backend regenere la distribución sin ventanas residuales
+                                programacion = null,
                                 estado = estado
                             )
                             viewModel.actualizarCurso(cursoActualizado)
@@ -1016,7 +1037,7 @@ fun ConfirmDeleteDialog(
             }
         },
         shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White
+        containerColor = EduRachaColors.Surface
     )
 }
 
@@ -1212,7 +1233,7 @@ fun SeleccionarTemaDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
         },
-        containerColor = Color.White,
+        containerColor = EduRachaColors.Surface,
         shape = RoundedCornerShape(24.dp)
     )
 }
@@ -1234,8 +1255,8 @@ fun SearchBarMejorada(searchQuery: String, onSearchQueryChange: (String) -> Unit
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+            focusedContainerColor = EduRachaColors.Surface,
+            unfocusedContainerColor = EduRachaColors.Surface,
             disabledContainerColor = Color.White,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent

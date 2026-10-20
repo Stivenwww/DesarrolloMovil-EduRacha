@@ -11,10 +11,10 @@ import androidx.compose.ui.unit.dp
 // ============================================
 val EduRachaShapes = Shapes(
     extraSmall = RoundedCornerShape(4.dp),   // Para elementos muy pequeños
-    small = RoundedCornerShape(8.dp),        // Para chips pequeños
-    medium = RoundedCornerShape(12.dp),      // Para textfields
-    large = RoundedCornerShape(16.dp),       // Para cards
-    extraLarge = RoundedCornerShape(24.dp)   // Para dialogs
+    small = RoundedCornerShape(10.dp),        // Para chips pequeños
+    medium = RoundedCornerShape(16.dp),      // Para textfields
+    large = RoundedCornerShape(20.dp),       // Para cards
+    extraLarge = RoundedCornerShape(28.dp)   // Para dialogs
 )
 
 // ============================================
@@ -27,12 +27,12 @@ object CustomShapes {
     val ButtonLarge = RoundedCornerShape(32.dp)
 
     // Cards
-    val Card = RoundedCornerShape(16.dp)
-    val CardLarge = RoundedCornerShape(20.dp)
-    val CardSmall = RoundedCornerShape(12.dp)
+    val Card = RoundedCornerShape(20.dp)
+    val CardLarge = RoundedCornerShape(24.dp)
+    val CardSmall = RoundedCornerShape(16.dp)
 
     // TextFields
-    val TextField = RoundedCornerShape(12.dp)
+    val TextField = RoundedCornerShape(16.dp)
     val TextFieldRounded = RoundedCornerShape(24.dp)
 
     // Diálogos y Modales

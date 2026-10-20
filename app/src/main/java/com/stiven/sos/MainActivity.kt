@@ -9,21 +9,41 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.SolicitudViewModel
 import kotlinx.coroutines.delay
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
 
@@ -31,6 +51,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Trae el tema/sonidos guardados en el perfil (si el usuario cambió de celular)
+        com.stiven.sos.services.SincronizadorPreferencias.descargar(this)
         cargarDatos()
     }
 
@@ -103,7 +125,7 @@ fun MainEstudianteScreen(
 
     val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
-    // ✅ DATOS REALES - No hardcoded
+    // Datos reales (sin valores inventados)
     val solicitudesPendientes = remember(solicitudUiState.solicitudes) {
         solicitudUiState.solicitudes.count {
             it.estado == com.stiven.sos.models.EstadoSolicitud.PENDIENTE
@@ -116,262 +138,420 @@ fun MainEstudianteScreen(
         }
     }
 
-    // Calcular puntos reales basados en cursos
-    val puntosReales = remember(solicitudesAceptadas) {
-        solicitudesAceptadas * 50 // 50 puntos por curso inscrito
-    }
 
     val userInitial = fullName.firstOrNull()?.uppercase() ?: "E"
+    val primerNombre = fullName.trim().split(" ").firstOrNull()?.takeIf { it.isNotBlank() } ?: "Estudiante"
 
-    // Animación de entrada para toda la pantalla
-    var screenVisible by remember { mutableStateOf(false) }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
 
-    LaunchedEffect(Unit) {
-        delay(100)
-        screenVisible = true
-    }
-
-    AnimatedVisibility(
-        visible = screenVisible,
-        enter = fadeIn(animationSpec = tween(600))
-    ) {
-        EduRachaV2Container(
-            modifier = Modifier.verticalScroll(rememberScrollState())
+    com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            // Header con animación
-            EduRachaV2Header(
-                userName = fullName,
+            HeaderInicioEstudiante(
+                primerNombre = primerNombre,
                 userEmail = userEmail,
                 userInitial = userInitial,
+                hasNotificationBadge = solicitudesPendientes > 0,
                 onNotificationClick = onNavigateToNotifications,
                 onSettingsClick = onNavigateToSettings,
-                onInfoClick = onNavigateToProfile,
-                hasNotificationBadge = solicitudesPendientes > 0
+                onInfoClick = onNavigateToProfile
             )
 
-            // Stats Cards con animación escalonada
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                AnimatedStatCard(
-                    icon = Icons.Outlined.School,
-                    value = "$solicitudesAceptadas",
-                    label = "Inscritos",
-                    color = EduRachaV2Colors.Success,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToCursosInscritos,
-                    delay = 150
-                )
-
-                AnimatedStatCard(
-                    icon = Icons.Outlined.HourglassTop,
-                    value = "$solicitudesPendientes",
-                    label = "Pendientes",
-                    color = EduRachaV2Colors.Warning,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToSolicitudes,
-                    delay = 300
-                )
-
-                AnimatedStatCard(
-                    icon = Icons.Outlined.EmojiEvents,
-                    value = "$puntosReales",
-                    label = "Puntos",
-                    color = EduRachaV2Colors.Primary,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToRanking,
-                    delay = 450
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Sección de módulos con animación
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                AnimatedTitle(text = "Explora y aprende ⭐")
+                // Héroe: Robi en su isla + acción principal
+                EntradaAnimada(retraso = 80) {
+                    com.stiven.sos.ui.theme.TarjetaNexo(
+                        modifier = Modifier.fillMaxWidth(),
+                        acento = p.marca,
+                        padding = 18.dp
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "TU RUTA DE HOY",
+                                    color = p.marcaTexto,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.2.sp
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    if (solicitudesAceptadas > 0) "Sigue conquistando islas"
+                                    else "Únete a tu primer curso",
+                                    color = p.texto,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Black,
+                                    lineHeight = 25.sp
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Un poquito cada día mantiene viva tu racha.",
+                                    color = p.textoSuave,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.size(width = 110.dp, height = 120.dp)) {
+                                com.stiven.sos.ui.theme.IslaFlotante(
+                                    modifier = Modifier.size(width = 110.dp, height = 46.dp),
+                                    tipo = com.stiven.sos.ui.theme.TipoIsla.ACTIVA
+                                )
+                                com.stiven.sos.ui.theme.RobiNeo(
+                                    tamano = 84.dp,
+                                    expresion = com.stiven.sos.ui.theme.ExpresionRobi.SALUDA,
+                                    modifier = Modifier.padding(bottom = 22.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        com.stiven.sos.ui.theme.BotonNexo(
+                            texto = if (solicitudesAceptadas > 0) "Continuar aprendiendo" else "Explorar cursos",
+                            onClick = if (solicitudesAceptadas > 0) onNavigateToCursosInscritos else onNavigateToCursos,
+                            icono = Icons.Outlined.PlayArrow,
+                            tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // Estadísticas reales
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TarjetaStatInicio(
+                        icono = Icons.Outlined.MenuBook,
+                        valor = solicitudesAceptadas,
+                        etiqueta = "Cursos inscritos",
+                        color = p.accion,
+                        retraso = 150,
+                        onClick = onNavigateToCursosInscritos,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TarjetaStatInicio(
+                        icono = Icons.Outlined.HourglassTop,
+                        valor = solicitudesPendientes,
+                        etiqueta = "Pendientes",
+                        color = p.racha,
+                        retraso = 250,
+                        onClick = onNavigateToSolicitudes,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-                // Module Cards con animación escalonada
-                AnimatedModuleCard(
-                    title = "Cursos Disponibles",
-                    subtitle = "Explora y únete a nuevos cursos",
-                    icon = Icons.Outlined.Explore,
-                    gradient = EduRachaV2Gradients.Blue,
-                    onClick = onNavigateToCursos,
-                    delay = 100
+                com.stiven.sos.ui.theme.TituloSeccionNexo(
+                    texto = "Explora",
+                    icono = Icons.Outlined.Explore,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
 
-                AnimatedModuleCard(
-                    title = "Mis Cursos",
-                    subtitle = "Continúa tu aprendizaje",
-                    icon = Icons.Outlined.MenuBook,
-                    gradient = EduRachaV2Gradients.Green,
-                    onClick = onNavigateToCursosInscritos,
-                    delay = 200
-                )
+                EntradaAnimada(retraso = 220) {
+                    TarjetaModuloJugosa(
+                        titulo = "Cursos disponibles",
+                        subtitulo = "Explora y únete a nuevos cursos",
+                        icono = Icons.Outlined.Explore,
+                        color = p.marca,
+                        colorSombra = p.marcaSombra,
+                        onClick = onNavigateToCursos
+                    )
+                }
+                EntradaAnimada(retraso = 290) {
+                    TarjetaModuloJugosa(
+                        titulo = "Mis cursos",
+                        subtitulo = "Tu mapa de islas por curso",
+                        icono = Icons.Outlined.Map,
+                        color = p.accion,
+                        colorSombra = p.accionSombra,
+                        onClick = onNavigateToCursosInscritos
+                    )
+                }
+                EntradaAnimada(retraso = 360) {
+                    TarjetaModuloJugosa(
+                        titulo = "Mis solicitudes",
+                        subtitulo = if (solicitudesPendientes > 0)
+                            "Tienes $solicitudesPendientes por revisar"
+                        else "Revisa el estado de tus solicitudes",
+                        icono = Icons.Outlined.Assignment,
+                        color = p.ia,
+                        colorSombra = p.iaSombra,
+                        onClick = onNavigateToSolicitudes
+                    )
+                }
+                EntradaAnimada(retraso = 430) {
+                    TarjetaModuloJugosa(
+                        titulo = "Ligas",
+                        subtitulo = "Compite sanamente con tu grupo",
+                        icono = Icons.Outlined.Leaderboard,
+                        color = p.racha,
+                        colorSombra = p.rachaSombra,
+                        onClick = onNavigateToRanking
+                    )
+                }
 
-                AnimatedModuleCard(
-                    title = "Mis Solicitudes",
-                    subtitle = "Revisa el estado de tus solicitudes",
-                    icon = Icons.Outlined.Assignment,
-                    gradient = EduRachaV2Gradients.Purple,
-                    onClick = onNavigateToSolicitudes,
-                    delay = 300
-                )
-
-                AnimatedModuleCard(
-                    title = "Ranking",
-                    subtitle = "Compite y gana recompensas",
-                    icon = Icons.Outlined.Leaderboard,
-                    gradient = EduRachaV2Gradients.Yellow,
-                    onClick = onNavigateToRanking,
-                    delay = 400
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.navigationBarsPadding().height(24.dp))
             }
         }
     }
 }
 
-@Composable
-private fun AnimatedStatCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    value: String,
-    label: String,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    delay: Int = 0
-) {
-    var visible by remember { mutableStateOf(false) }
+// ============================================================================
+// COMPONENTES PRIVADOS DE LA PANTALLA DE INICIO
+// ============================================================================
 
-    LaunchedEffect(Unit) {
-        delay(delay.toLong())
-        visible = true
-    }
-
-    val offsetY by animateDpAsState(
-        targetValue = if (visible) 0.dp else 50.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        )
-    )
-
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 600)
-    )
-
-    Box(
-        modifier = modifier
-            .graphicsLayer {
-                translationY = offsetY.toPx()
-                this.alpha = alpha
-            }
-    ) {
-        EduRachaV2StatCard(
-            icon = icon,
-            value = value,
-            label = label,
-            color = color,
-            onClick = onClick
-        )
+private fun saludoSegunHora(): String {
+    val hora = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hora) {
+        in 5..11 -> "Buenos días"
+        in 12..18 -> "Buenas tardes"
+        else -> "Buenas noches"
     }
 }
 
 @Composable
-private fun AnimatedModuleCard(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    gradient: androidx.compose.ui.graphics.Brush,
-    onClick: () -> Unit,
-    delay: Int = 0
+private fun HeaderInicioEstudiante(
+    primerNombre: String,
+    userEmail: String,
+    userInitial: String,
+    hasNotificationBadge: Boolean,
+    onNotificationClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onInfoClick: () -> Unit
 ) {
-    var visible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(delay.toLong())
-        visible = true
-    }
-
-    val offsetX by animateDpAsState(
-        targetValue = if (visible) 0.dp else 100.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        )
-    )
-
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 600)
-    )
-
-    Box(
-        modifier = Modifier.graphicsLayer {
-            translationX = offsetX.toPx()
-            this.alpha = alpha
-        }
-    ) {
-        EduRachaV2ModuleCard(
-            title = title,
-            subtitle = subtitle,
-            icon = icon,
-            gradient = gradient,
-            onClick = onClick
-        )
-    }
-}
-
-@Composable
-private fun AnimatedTitle(text: String) {
-    var visible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(50)
-        visible = true
-    }
-
-    val scale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.8f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        )
-    )
-
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 500)
-    )
-
-    Row(
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-            },
-        horizontalArrangement = Arrangement.SpaceBetween
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp)
     ) {
-        androidx.compose.material3.Text(
-            text = text,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = EduRachaV2Colors.TextPrimary
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.weight(1f)) {
+                Text("edu", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.texto)
+                Text("racha", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.marcaTexto)
+            }
+            BotonIconoHeader(Icons.Outlined.Notifications, "Notificaciones", onNotificationClick, hasNotificationBadge)
+            BotonIconoHeader(Icons.Outlined.Settings, "Configuración", onSettingsClick)
+            Box(
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(p.ia)
+                    .border(2.dp, p.marca, CircleShape)
+                    .clickable(role = Role.Button, onClick = onInfoClick)
+                    .semantics { contentDescription = "Perfil" },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(userInitial, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black)
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "${saludoSegunHora()},",
+            color = p.textoSuave,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold
         )
+        Text(
+            primerNombre,
+            color = p.texto,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (userEmail.isNotBlank()) {
+            Text(
+                userEmail,
+                color = p.textoTenue,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun BotonIconoHeader(
+    icono: ImageVector,
+    descripcion: String,
+    onClick: () -> Unit,
+    conBadge: Boolean = false
+) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    Box {
+        IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+            Icon(icono, contentDescription = descripcion, tint = p.texto, modifier = Modifier.size(24.dp))
+        }
+        if (conBadge) {
+            val t = rememberInfiniteTransition(label = "badge")
+            val pulso by t.animateFloat(
+                initialValue = 1f, targetValue = 1.35f,
+                animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                label = "pulso"
+            )
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp)
+                    .size(10.dp)
+                    .graphicsLayer { scaleX = pulso; scaleY = pulso }
+                    .clip(CircleShape)
+                    .background(p.error)
+                    .border(1.5.dp, p.fondo, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EntradaAnimada(retraso: Int, contenido: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(retraso.toLong())
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(350)) + slideInVertically(
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+        ) { it / 3 }
+    ) {
+        contenido()
+    }
+}
+
+@Composable
+private fun TarjetaStatInicio(
+    icono: ImageVector,
+    valor: Int,
+    etiqueta: String,
+    color: Color,
+    retraso: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    // Contador animado desde 0 hasta el valor real
+    val animado = remember { Animatable(0f) }
+    LaunchedEffect(valor) {
+        delay(retraso.toLong())
+        animado.animateTo(valor.toFloat(), tween(900, easing = FastOutSlowInEasing))
+    }
+    val interaccion = remember { MutableInteractionSource() }
+    val presionado by interaccion.collectIsPressedAsState()
+    val escala by animateFloatAsState(if (presionado) 0.94f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "esc")
+
+    Row(
+        modifier = modifier
+            .graphicsLayer { scaleX = escala; scaleY = escala }
+            .clip(RoundedCornerShape(18.dp))
+            .background(p.superficie)
+            .border(1.dp, p.borde, RoundedCornerShape(18.dp))
+            .clickable(interactionSource = interaccion, indication = null, role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "$etiqueta: $valor" }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        com.stiven.sos.ui.theme.InsigniaNexo(icono, color, tamano = 40.dp)
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text("${animado.value.toInt()}", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.texto)
+            Text(etiqueta, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = p.textoSuave, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun TarjetaModuloJugosa(
+    titulo: String,
+    subtitulo: String,
+    icono: ImageVector,
+    color: Color,
+    colorSombra: Color,
+    onClick: () -> Unit
+) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val interaccion = remember { MutableInteractionSource() }
+    val presionado by interaccion.collectIsPressedAsState()
+    val profundidad = 4.dp
+    val hundido by animateDpAsState(
+        targetValue = if (presionado) profundidad else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "hundido"
+    )
+    val t = rememberInfiniteTransition(label = "icono")
+    val balanceo by t.animateFloat(
+        initialValue = -5f, targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "balanceo"
+    )
+    val forma = RoundedCornerShape(20.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = interaccion, indication = null, role = Role.Button, onClick = onClick)
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(top = profundidad)
+                .clip(forma)
+                .background(p.borde)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = profundidad)
+                .offset(y = hundido)
+                .clip(forma)
+                .background(p.superficie)
+                .border(1.dp, p.borde, forma)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .graphicsLayer { rotationZ = balanceo }
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .background(colorSombra)
+                )
+                Icon(icono, contentDescription = null, tint = p.sobreAccion, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(titulo, fontSize = 17.sp, fontWeight = FontWeight.Black, color = p.texto)
+                Spacer(Modifier.height(2.dp))
+                Text(subtitulo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
+            }
+            Icon(
+                Icons.AutoMirrored.Outlined.ArrowForward,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }

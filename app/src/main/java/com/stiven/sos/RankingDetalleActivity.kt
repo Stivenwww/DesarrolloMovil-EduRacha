@@ -260,7 +260,7 @@ fun EncabezadoRankingMejorado(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color.White,
+            color = EduRachaColors.Surface,
             shadowElevation = 4.dp
         ) {
             Row(
@@ -331,9 +331,11 @@ fun IconoTrofeoAnimado() {
             .background(Color.White.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "🏆",
-            fontSize = 32.sp
+        Icon(
+            Icons.Outlined.EmojiEvents,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
         )
     }
 }
@@ -510,7 +512,7 @@ fun EstadisticasAvanzadas(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = Color.White,
+        color = EduRachaColors.Surface,
         shadowElevation = 6.dp
     ) {
         Column(
@@ -674,7 +676,7 @@ fun PodioMejorado(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = Color.White,
+        color = EduRachaColors.Surface,
         shadowElevation = 6.dp
     ) {
         Box(
@@ -698,9 +700,11 @@ fun PodioMejorado(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "🏆",
-                        fontSize = 40.sp
+                    Icon(
+                        Icons.Outlined.EmojiEvents,
+                        contentDescription = null,
+                        tint = com.stiven.sos.ui.theme.LocalNexo.current.racha,
+                        modifier = Modifier.size(40.dp)
                     )
                     Column {
                         Text(
@@ -772,9 +776,9 @@ fun ColumnaPodioClickeable(
     onClick: () -> Unit
 ) {
     val (colorMedalla, emoji) = when (posicion) {
-        1 -> Pair(Color(0xFFFFD700), "🥇")
-        2 -> Pair(Color(0xFFC0C0C0), "🥈")
-        3 -> Pair(Color(0xFFCD7F32), "🥉")
+        1 -> Pair(Color(0xFFFFD700), "1")
+        2 -> Pair(Color(0xFFC0C0C0), "2")
+        3 -> Pair(Color(0xFFCD7F32), "3")
         else -> Pair(EduRachaV2Colors.TextSecondary, "")
     }
 
@@ -824,7 +828,9 @@ fun ColumnaPodioClickeable(
         ) {
             Text(
                 text = emoji,
-                fontSize = if (posicion == 1) 36.sp else 32.sp
+                fontSize = if (posicion == 1) 32.sp else 28.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White
             )
         }
 
@@ -941,7 +947,7 @@ fun GraficasComparativas(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = Color.White,
+        color = EduRachaColors.Surface,
         shadowElevation = 4.dp
     ) {
         Column(
@@ -1206,7 +1212,7 @@ fun TarjetaEstudianteInteractiva(
                 val valor = when (tipoRanking) {
                     TipoRanking.EXPERIENCIA -> "${estudiante.experiencia} XP"
                     TipoRanking.RACHA -> "${estudiante.diasConsecutivos} días"
-                    TipoRanking.VIDAS -> "${estudiante.vidas} ❤️"
+                    TipoRanking.VIDAS -> "${estudiante.vidas} vidas"
                 }
 
                 Text(
@@ -1254,7 +1260,7 @@ fun DialogoPerfilEstudiante(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
-            color = Color.White
+            color = EduRachaColors.Surface
         ) {
             Column(
                 modifier = Modifier
@@ -1346,7 +1352,7 @@ fun DialogoPerfilEstudiante(
                     ItemPerfilEstudiante(
                         icono = Icons.Outlined.Favorite,
                         label = "Vidas",
-                        valor = "${estudiante.vidas} ❤️",
+                        valor = "${estudiante.vidas} vidas",
                         color = EduRachaV2Colors.Pink
                     )
 

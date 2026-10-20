@@ -41,7 +41,7 @@ class UsuarioViewModel : ViewModel() {
                     Log.d("UsuarioViewModel", " Total estudiantes recibidos: ${estudiantes.size}")
                     estudiantes.forEachIndexed { index, estudiante ->
                         Log.d("UsuarioViewModel", """
-                            📋 Estudiante #${index + 1}:
+                            Estudiante #${index + 1}:
                             - UID: ${estudiante.uid}
                             - Nombre: ${estudiante.nombre}
                             - Email: ${estudiante.correo}

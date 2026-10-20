@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import com.stiven.sos.ui.theme.EduRachaColors
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -21,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -123,8 +125,8 @@ fun LoginScreen(
     var errorTitle by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
-    val primaryColor = Color(0xFF0D47A1)
-    val secondaryColor = Color(0xFF0D47A1)
+    val primaryColor = EduRachaColors.PrimaryDark
+    val secondaryColor = EduRachaColors.PrimaryDark
     val backgroundColor = Color(0xFFF5F5F5)
 
     fun showError(title: String, message: String) {
@@ -314,159 +316,12 @@ fun LoginScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(primaryColor, secondaryColor)
-                        )
-                    )
-                    .padding(horizontal = 24.dp, vertical = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(80.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
-                            contentDescription = "Logo institucional",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .size(48.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Sistema Institucional",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        letterSpacing = 0.5.sp
-                    )
-
-                    Text(
-                        text = "Plataforma de Gestión Educativa",
-                        fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .offset(y = (-20).dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Column(
-                    modifier = Modifier.padding(28.dp)
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 36.dp),
-                        letterSpacing = 0.2.sp
-                    )
-
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Correo electrónico") },
-                        placeholder = { Text("ejemplo@correo.com") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Contraseña") },
-                        placeholder = { Text("Mínimo 6 caracteres") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { passwordVisible = !passwordVisible },
-                                enabled = !isLoading
-                            ) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
-                                    tint = primaryColor
-                                )
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Button(
-                        onClick = {
+    // Lógica original del inicio de sesión con correo (sin cambios)
+    fun iniciarSesionConCorreo() {
                             if (validateInputs()) {
                                 isLoading = true
                                 Log.d("LoginActivity", "=== INICIANDO SESIÓN ===")
-                                Log.d("LoginActivity", "Email: $email, Portal: $userType")
+                                Log.d("LoginActivity", "Portal: $userType")
 
                                 auth.signInWithEmailAndPassword(email.trim(), password)
                                     .addOnSuccessListener { authResult ->
@@ -535,122 +390,240 @@ fun LoginScreen(
                                         showError("Error de inicio de sesión", errorMsg)
                                     }
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0D47A1),
-                            disabledContainerColor = Color(0xFF1565C0).copy(alpha = 0.6f)
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = "INICIAR SESIÓN",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = Color.White
+                        }
+
+    val esDocente = userType == "teacher"
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    val campoColores = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = nx.marca,
+        unfocusedBorderColor = nx.borde,
+        focusedLabelColor = nx.marcaTexto,
+        unfocusedLabelColor = nx.textoSuave,
+        focusedLeadingIconColor = nx.marcaTexto,
+        unfocusedLeadingIconColor = nx.textoSuave,
+        focusedTextColor = nx.texto,
+        unfocusedTextColor = nx.texto,
+        disabledTextColor = nx.textoSuave,
+        disabledBorderColor = nx.borde,
+        focusedContainerColor = nx.superficieAlt,
+        unfocusedContainerColor = nx.superficieAlt,
+        disabledContainerColor = nx.superficieAlt,
+        cursorColor = nx.marca,
+        focusedPlaceholderColor = nx.textoTenue,
+        unfocusedPlaceholderColor = nx.textoTenue
+    )
+
+    com.stiven.sos.ui.theme.FondoNexo {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.weight(1f)) {
+                    Text("edu", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.texto)
+                    Text("racha", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.marcaTexto)
+                }
+                com.stiven.sos.ui.theme.ChipNexo(
+                    texto = if (esDocente) "Docente" else "Estudiante",
+                    color = if (esDocente) nx.iaTexto else nx.marcaTexto,
+                    icono = if (esDocente) Icons.Default.MenuBook else Icons.Default.School
+                )
+            }
+
+            // Robi sobre su isla
+            Box(
+                contentAlignment = Alignment.BottomCenter,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(190.dp)
+            ) {
+                com.stiven.sos.ui.theme.IslaFlotante(
+                    modifier = Modifier.size(width = 210.dp, height = 84.dp),
+                    tipo = com.stiven.sos.ui.theme.TipoIsla.ACTIVA
+                )
+                com.stiven.sos.ui.theme.RobiNeo(
+                    tamano = 128.dp,
+                    expresion = if (isLoading) com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                    else com.stiven.sos.ui.theme.ExpresionRobi.SALUDA,
+                    modifier = Modifier.padding(bottom = 46.dp)
+                )
+            }
+
+            Text(
+                text = "¡Hola de nuevo!",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = nx.texto
+            )
+            Text(
+                text = if (esDocente) "Entra para gestionar tus cursos" else "Entra para seguir tu racha",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = nx.textoSuave,
+                modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
+            )
+
+            // Tarjeta del formulario
+            com.stiven.sos.ui.theme.TarjetaNexo(
+                modifier = Modifier.fillMaxWidth(),
+                padding = 20.dp
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black,
+                    color = nx.texto
+                )
+                Text(
+                    text = "Ingresa con tu cuenta institucional",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = nx.textoSuave,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
+                )
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Correo electrónico") },
+                    placeholder = { Text("ejemplo@correo.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    placeholder = { Text("Mínimo 6 caracteres") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { if (!isLoading) iniciarSesionConCorreo() }
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { passwordVisible = !passwordVisible },
+                            enabled = !isLoading
+                        ) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
+                                tint = nx.textoSuave
                             )
                         }
                     }
+                )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                    OutlinedButton(
-                        onClick = {
-                            val signInIntent = googleClient.signInIntent
-                            googleLauncher.launch(signInIntent)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = !isLoading,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFF424242)
-                        ),
-                        shape = RoundedCornerShape(28.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.img_2),
-                            contentDescription = "Google",
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Iniciar sesión con Google",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF424242)
-                        )
-                    }
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = if (isLoading) "Ingresando..." else "Iniciar sesión",
+                    onClick = { iniciarSesionConCorreo() },
+                    habilitado = !isLoading,
+                    cargando = isLoading,
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = nx.borde)
+                    Text(
+                        "o",
+                        color = nx.textoTenue,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = nx.borde)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val signInIntent = googleClient.signInIntent
+                        googleLauncher.launch(signInIntent)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = nx.superficie,
+                        contentColor = nx.texto
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, nx.borde)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_2),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Continuar con Google",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .width(80.dp)
-                    .height(2.dp)
-                    .background(Color(0xFFE0E0E0))
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(vertical = 18.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "¿No tienes cuenta?",
                     fontSize = 15.sp,
-                    color = Color(0xFF757575),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    fontWeight = FontWeight.SemiBold,
+                    color = nx.textoSuave
                 )
-
-                Button(
-                    onClick = onNavigateToRegister,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, primaryColor)
-                ) {
+                TextButton(onClick = onNavigateToRegister) {
                     Text(
-                        text = "REGISTRARSE AHORA",
+                        text = "Regístrate",
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = primaryColor
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier.size(20.dp)
+                        fontWeight = FontWeight.Black,
+                        color = nx.marcaTexto
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
@@ -669,69 +642,15 @@ fun ErrorDialog(
     message: String,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFFFEBEE),
-                    modifier = Modifier.size(64.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = null,
-                        tint = Color(0xFFD32F2F),
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = title,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF212121),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = message,
-                    fontSize = 14.sp,
-                    color = Color(0xFF757575),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0D47A1)
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Text(
-                        text = "Entendido",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.DialogoAccionNexo(
+        icono = Icons.Default.Error,
+        color = p.error,
+        titulo = title,
+        mensaje = message,
+        textoPrincipal = "Entendido",
+        onPrincipal = onDismiss,
+        onDismiss = onDismiss,
+        expresionRobi = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE
+    )
 }
