@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
@@ -65,7 +66,7 @@ class CrearPreguntaActivity : ComponentActivity() {
                     preguntaViewModel = preguntaViewModel,
                     onBack = { finish() },
                     onSuccess = {
-                        Toast.makeText(this, "✅ Pregunta creada exitosamente", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Pregunta creada exitosamente", Toast.LENGTH_LONG).show()
                         finish()
                     }
                 )
@@ -461,11 +462,11 @@ fun CrearPreguntaScreen(
                                             )
                                         } else {
                                             val mensaje = when {
-                                                preguntaError -> "⚠️ El texto de la pregunta es obligatorio"
-                                                !opciones.any { it.esCorrecta } -> "⚠️ Debes marcar una respuesta correcta"
-                                                !opciones.all { it.texto.isNotEmpty() } -> "⚠️ Todas las opciones deben tener texto"
-                                                explicacionCorrecta.isBlank() -> "⚠️ La explicación de la respuesta es obligatoria"
-                                                else -> "⚠️ Completa todos los campos obligatorios"
+                                                preguntaError -> "El texto de la pregunta es obligatorio"
+                                                !opciones.any { it.esCorrecta } -> "Debes marcar una respuesta correcta"
+                                                !opciones.all { it.texto.isNotEmpty() } -> "Todas las opciones deben tener texto"
+                                                explicacionCorrecta.isBlank() -> "La explicación de la respuesta es obligatoria"
+                                                else -> "Completa todos los campos obligatorios"
                                             }
                                             Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
                                         }
@@ -497,6 +498,12 @@ fun CrearPreguntaScreen(
                     // Mensaje de error
                     preguntaUiState.error?.let { error ->
                         ErrorMessage(dims, error)
+                        val cursoActual = cursoSeleccionado
+                        val temaActual = temaSeleccionado
+                        if (error.contains("explicación aprobada", ignoreCase = true) && cursoActual != null && temaActual != null) {
+                            Spacer(Modifier.height(12.dp))
+                            GenerarExplicacionTemaCard(curso = cursoActual, tema = temaActual)
+                        }
                     }
                 }
 
@@ -515,6 +522,9 @@ fun CrearPreguntaScreen(
         SelectorCursoDialogSimple(
             dims,
             cursos = cursoUiState.cursos,
+            isLoading = cursoUiState.isLoading,
+            error = cursoUiState.error,
+            onRetry = { cursoViewModel.obtenerCursos() },
             onCursoSelected = {
                 cursoSeleccionado = it
                 temaSeleccionado = null
@@ -579,7 +589,7 @@ fun ModoCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(dims.borderRadius),
         elevation = CardDefaults.cardElevation(dims.cardElevation),
-        colors = CardDefaults.cardColors(Color.White)
+        colors = CardDefaults.cardColors(EduRachaColors.Surface)
     ) {
         Row(
             modifier = Modifier.padding(dims.cardPadding),
@@ -786,7 +796,7 @@ fun FormularioManualSection(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(Color.White),
+            colors = CardDefaults.cardColors(EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(dims.cardElevation)
         ) {
             Column(
@@ -821,7 +831,7 @@ fun FormularioManualSection(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(Color.White),
+            colors = CardDefaults.cardColors(EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(dims.cardElevation)
         ) {
             Column(
@@ -1143,7 +1153,7 @@ fun FormularioIASection(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(Color.White),
+            colors = CardDefaults.cardColors(EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(dims.cardElevation)
         ) {
             Column(
@@ -1367,7 +1377,7 @@ fun LoadingOverlay(dims: ResponsiveDimensions, modo: ModoCreacion?) {
     ) {
         Card(
             shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
             modifier = Modifier.padding(dims.horizontalPadding)
         ) {
             Column(
@@ -1398,6 +1408,9 @@ fun LoadingOverlay(dims: ResponsiveDimensions, modo: ModoCreacion?) {
 fun SelectorCursoDialogSimple(
     dims: ResponsiveDimensions,
     cursos: List<Curso>,
+    isLoading: Boolean = false,
+    error: String? = null,
+    onRetry: (() -> Unit)? = null,
     onCursoSelected: (Curso) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1411,13 +1424,35 @@ fun SelectorCursoDialogSimple(
             )
         },
         text = {
-            if (cursos.isEmpty()) {
-                Text(
-                    "No hay cursos disponibles",
-                    fontSize = dims.bodyFontSize.sp
-                )
-            } else {
-                Column(
+            when {
+                isLoading && cursos.isEmpty() -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cargando cursos...", fontSize = dims.bodyFontSize.sp)
+                    }
+                }
+                error != null && cursos.isEmpty() -> {
+                    Column {
+                        Text(
+                            "Sin conexión con el servidor: $error",
+                            fontSize = dims.bodyFontSize.sp,
+                            color = EduRachaColors.Error
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (onRetry != null) {
+                            TextButton(onClick = onRetry) { Text("Reintentar") }
+                        }
+                    }
+                }
+                cursos.isEmpty() -> {
+                    Text(
+                        "No hay cursos disponibles",
+                        fontSize = dims.bodyFontSize.sp
+                    )
+                }
+                else -> {
+                    Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = min(dims.screenHeight * 0.6f, 400.dp))
@@ -1450,6 +1485,7 @@ fun SelectorCursoDialogSimple(
                     }
                 }
             }
+        }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
@@ -1601,9 +1637,79 @@ private fun generarPreguntasIA(
         onSuccess = { response ->
             Toast.makeText(
                 context,
-                "✅ ${response.total} preguntas generadas correctamente",
+                "${response.total} preguntas generadas correctamente",
                 Toast.LENGTH_LONG
             ).show()
         }
     )
+}
+
+/**
+ * Atajo cuando el tema no tiene explicación aprobada: genera la explicación con IA
+ * (queda "pendiente") para que el docente la apruebe en Explicaciones y luego genere preguntas.
+ */
+@Composable
+private fun GenerarExplicacionTemaCard(curso: Curso, tema: Tema) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val scope = rememberCoroutineScope()
+    // 0 = sin iniciar, 1 = generando, 2 = lista, 3 = error
+    var estado by remember(tema.id) { mutableStateOf(0) }
+    var mensaje by remember(tema.id) { mutableStateOf("") }
+
+    com.stiven.sos.ui.theme.TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.ia) {
+        com.stiven.sos.ui.theme.GloboRobi(
+            titulo = "ASISTENTE IA",
+            mensaje = when (estado) {
+                1 -> "Estoy escribiendo la explicación de \"${tema.titulo}\"... puede tardar hasta un minuto."
+                2 -> "Listo. Ve a Panel docente > Explicaciones, apruébala y vuelve aquí para generar las preguntas."
+                3 -> mensaje
+                else -> "Las preguntas se basan en la explicación aprobada del tema. ¿Genero la explicación de \"${tema.titulo}\" ahora?"
+            },
+            expresion = when (estado) {
+                1 -> com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                2 -> com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA
+                3 -> com.stiven.sos.ui.theme.ExpresionRobi.TRISTE
+                else -> com.stiven.sos.ui.theme.ExpresionRobi.FELIZ
+            },
+            tamanoRobi = 60.dp
+        )
+        if (estado != 2) {
+            Spacer(Modifier.height(12.dp))
+            com.stiven.sos.ui.theme.BotonNexo(
+                texto = if (estado == 3) "Reintentar" else "Generar explicación con IA",
+                onClick = {
+                    val cursoId = curso.id ?: return@BotonNexo
+                    estado = 1
+                    scope.launch {
+                        try {
+                            val respuesta = com.stiven.sos.api.ApiClient.apiService.generarExplicacionIA(
+                                cursoId = cursoId,
+                                temaId = tema.id,
+                                request = GenerarExplicacionRequest(
+                                    cursoId = cursoId,
+                                    temaId = tema.id,
+                                    tituloTema = tema.titulo,
+                                    contenidoTema = tema.contenido.ifBlank { null }
+                                )
+                            )
+                            if (respuesta.isSuccessful) {
+                                estado = 2
+                            } else {
+                                mensaje = com.stiven.sos.api.mensajeDeError(respuesta)
+                                estado = 3
+                            }
+                        } catch (e: Exception) {
+                            mensaje = "No pude conectar con el servidor: ${e.message ?: "error desconocido"}"
+                            estado = 3
+                        }
+                    }
+                },
+                habilitado = estado != 1,
+                cargando = estado == 1,
+                tipo = com.stiven.sos.ui.theme.TipoBoton.IA,
+                icono = Icons.Filled.AutoAwesome,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }

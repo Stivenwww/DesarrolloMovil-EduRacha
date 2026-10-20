@@ -1,0 +1,42 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "usuarios": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "notificaciones": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$notifId": {
+          ".write": "auth != null && (auth.uid === $uid || !data.exists())"
+        }
+      }
+    },
+
+    "quizzes": {
+      ".indexOn": ["estudianteId", "cursoId"],
+      "$quizId": {
+        ".read": "auth != null && data.child('estudianteId').val() === auth.uid"
+      }
+    },
+
+    "explicaciones": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "explicaciones_por_tema": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "explicaciones_por_curso": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

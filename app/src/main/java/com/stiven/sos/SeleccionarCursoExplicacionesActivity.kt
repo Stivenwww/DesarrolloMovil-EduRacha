@@ -71,7 +71,7 @@ fun SeleccionarCursoExplicacionesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary,
+                    containerColor = EduRachaColors.BarraSuperior,
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White
                 )
@@ -169,7 +169,7 @@ fun CursoCardExplicaciones(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Row(
             modifier = Modifier

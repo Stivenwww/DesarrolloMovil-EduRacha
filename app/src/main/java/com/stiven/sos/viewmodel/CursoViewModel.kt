@@ -51,24 +51,32 @@ class CursoViewModel(application: Application) : AndroidViewModel(application) {
             isLoadingCursos = true
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            repository.obtenerCursos()
-                .onSuccess { listaCursos ->
-                    Log.d("CursoViewModel", " Cursos obtenidos: ${listaCursos.size}")
-                    _uiState.update { it.copy(isLoading = false, cursos = listaCursos) }
-                    cargarSolicitudesPendientes()
-                }
-                .onFailure { exception ->
-                    Log.e("CursoViewModel", " Error obteniendo cursos", exception)
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = exception.message ?: "Error desconocido al cargar"
-                        )
+            try {
+                repository.obtenerCursos()
+                    .onSuccess { listaCursos ->
+                        Log.d("CursoViewModel", " Cursos obtenidos: ${listaCursos.size}")
+                        _uiState.update { it.copy(isLoading = false, cursos = listaCursos) }
+                        cargarSolicitudesPendientes()
                     }
-                }
-                .also {
-                    isLoadingCursos = false
-                }
+                    .onFailure { exception ->
+                        // La cancelación al navegar es normal: no es error ni borra la lista
+                        if (exception is kotlinx.coroutines.CancellationException) throw exception
+                        Log.e("CursoViewModel", " Error obteniendo cursos", exception)
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                // Se conserva la lista anterior en caché para no dejar la pantalla vacía
+                                error = exception.message ?: "Error desconocido al cargar"
+                            )
+                        }
+                    }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } finally {
+                isLoadingCursos = false
+                // Si la carga se cancela (p. ej. al salir y volver), no dejar el spinner pegado
+                _uiState.update { if (it.isLoading) it.copy(isLoading = false) else it }
+            }
         }
     }
 

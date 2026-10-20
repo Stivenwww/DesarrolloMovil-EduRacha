@@ -21,10 +21,9 @@ class UsuarioRepository {
                 Log.d("UsuarioRepository", " Estudiantes obtenidos exitosamente")
                 Log.d("UsuarioRepository", " Total: ${estudiantes.size}")
 
-                // Verificar que los UIDs no estén vacíos
-                estudiantes.forEach { estudiante ->
-                    Log.d("UsuarioRepository", "👤 ${estudiante.nombre} - UID: ${estudiante.uid} - Correo: ${estudiante.correo}")
-                }
+                // Verificar que los UIDs no estén vacíos (sin exponer PII en logs)
+                val sinUid = estudiantes.count { it.uid.isBlank() }
+                if (sinUid > 0) Log.w("UsuarioRepository", " Estudiantes sin UID: $sinUid")
 
                 Result.success(estudiantes)
             } else {

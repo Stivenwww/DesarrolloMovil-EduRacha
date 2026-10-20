@@ -1,5 +1,7 @@
 package com.stiven.sos
 
+import androidx.compose.ui.draw.clip
+import com.stiven.sos.ui.theme.EduRachaColors
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -112,9 +114,9 @@ fun RegisterScreen(
     var errorTitle by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
-    val primaryColor = Color(0xFF0D47A1)
-    val secondaryColor = Color(0xFF0D47A1)
-    val backgroundColor = Color(0xFFF5F5F5)
+    val primaryColor = EduRachaColors.PrimaryDark
+    val secondaryColor = EduRachaColors.PrimaryDark
+    val backgroundColor = EduRachaColors.Background
 
     fun showError(title: String, message: String) {
         errorTitle = title
@@ -223,509 +225,460 @@ fun RegisterScreen(
     val title = if (userType == "teacher") "Crear Cuenta de Docente" else "Crear Cuenta de Estudiante"
     val buttonText = if (userType == "teacher") "CREAR CUENTA DOCENTE" else "CREAR CUENTA ESTUDIANTIL"
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-    ) {
+    // Lógica original del registro (sin cambios), extraída para reutilizarla desde el botón y el teclado
+    fun registrar() {
+        if (validateInputs()) {
+            isLoading = true
+
+            val rol = if (userType == "teacher") "docente" else "estudiante"
+
+            Log.d("RegisterActivity", "=== INICIANDO REGISTRO ===")
+                    Log.d("RegisterActivity", "Rol esperado: $rol")
+
+            //  PASO 1: Registrar en tu backend
+            val registroRequest = RegistroRequest(
+                nombreCompleto = fullName.trim(),
+                apodo = username.trim(),
+                correo = email.trim(),
+                contrasena = password,
+                rol = rol
+            )
+
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    // Llamada al backend
+                    val response = withContext(Dispatchers.IO) {
+                        ApiClient.apiService.registrarUsuario(registroRequest)
+                    }
+
+                    if (response.isSuccessful && response.body() != null) {
+                        Log.d("RegisterActivity", "✓ Backend: Registro exitoso")
+
+                        val responseBody = response.body()!!
+                        val uid = responseBody["uid"] as? String ?: ""
+
+                        //  PASO 2: Iniciar sesión en Firebase Auth para obtener el token con customClaims
+                        Log.d("RegisterActivity", " Autenticando en Firebase...")
+
+                        auth.signInWithEmailAndPassword(email.trim(), password)
+                            .addOnSuccessListener { authResult ->
+                                val user = authResult.user
+                                if (user != null) {
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        try {
+                                            // Esperar un poco para que Firebase actualice los claims
+                                            kotlinx.coroutines.delay(1000)
+
+                                            // Obtener el rol desde Firebase Auth
+                                            val rolReal = obtenerRolDeFirebaseAuth(user.uid) ?: rol
+
+                                            Log.d("RegisterActivity", "✓ Rol obtenido: $rolReal")
+
+                                            // Guardar en todas las ubicaciones
+                                            guardarDatosEnPreferences(
+                                                user.uid,
+                                                rolReal,
+                                                fullName.trim(),
+                                                email.trim(),
+                                                username.trim()
+                                            )
+
+                                            sessionManager.saveUserSession(
+                                                userId = user.uid,
+                                                userName = fullName.trim(),
+                                                userEmail = email.trim(),
+                                                userRol = rolReal
+                                            )
+
+                                            UserPreferences.saveUserData(
+                                                context = context,
+                                                uid = user.uid,
+                                                nombreCompleto = fullName.trim(),
+                                                apodo = username.trim(),
+                                                correo = email.trim(),
+                                                rol = rolReal
+                                            )
+
+                                            Toast.makeText(
+                                                context,
+                                                "¡Registro exitoso! Bienvenido ${fullName.trim()}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            isLoading = false
+                                            onNavigateToMain()
+
+                                        } catch (e: Exception) {
+                                            Log.e("RegisterActivity", " Error al obtener rol: ${e.message}")
+                                            isLoading = false
+                                            auth.signOut()
+                                            showError("Error", "No se pudo completar el registro: ${e.message}")
+                                        }
+                                    }
+                                }
+                            }
+                            .addOnFailureListener { exception ->
+                                isLoading = false
+                                Log.e("RegisterActivity", " Error en Firebase Auth: ${exception.message}")
+                                showError(
+                                    "Error de autenticación",
+                                    "No se pudo iniciar sesión después del registro. Por favor intenta iniciar sesión manualmente."
+                                )
+                            }
+
+                    } else {
+                        // Manejo de errores del backend
+                        isLoading = false
+                        Log.e("RegisterActivity", " Error del backend: ${response.code()}")
+
+                        val errorTitle: String
+                        val errorMsg: String
+
+                        when (response.code()) {
+                            400 -> {
+                                val errorBody = response.errorBody()?.string()
+                                when {
+                                    errorBody?.contains("EMAIL_EXISTS", ignoreCase = true) == true -> {
+                                        errorTitle = "Correo ya registrado"
+                                        errorMsg = "Este correo electrónico ya está en uso.\n\nPor favor usa otro correo o inicia sesión si ya tienes una cuenta."
+                                    }
+                                    errorBody?.contains("INVALID_EMAIL", ignoreCase = true) == true -> {
+                                        errorTitle = "Correo inválido"
+                                        errorMsg = "El formato del correo electrónico no es válido."
+                                    }
+                                    errorBody?.contains("WEAK_PASSWORD", ignoreCase = true) == true -> {
+                                        errorTitle = "Contraseña débil"
+                                        errorMsg = "La contraseña debe tener al menos 6 caracteres."
+                                    }
+                                    else -> {
+                                        errorTitle = "Datos inválidos"
+                                        errorMsg = "Por favor verifica que todos los campos estén correctos."
+                                    }
+                                }
+                            }
+                            409 -> {
+                                errorTitle = "Usuario existente"
+                                errorMsg = "Ya existe una cuenta con este correo o nombre de usuario.\n\nIntenta con datos diferentes o inicia sesión."
+                            }
+                            500 -> {
+                                errorTitle = "Error del servidor"
+                                errorMsg = "Ocurrió un error en el servidor.\n\nPor favor intenta nuevamente más tarde."
+                            }
+                            503 -> {
+                                errorTitle = "Servicio no disponible"
+                                errorMsg = "El servidor no está disponible en este momento.\n\nIntenta más tarde."
+                            }
+                            else -> {
+                                errorTitle = "Error de registro"
+                                errorMsg = "Error ${response.code()}: ${response.message()}"
+                            }
+                        }
+
+                        showError(errorTitle, errorMsg)
+                    }
+
+                } catch (e: Exception) {
+                    Log.e("RegisterActivity", " Excepción: ${e.message}", e)
+                    isLoading = false
+
+                    val errorMsg = when {
+                        e.message?.contains("timeout", ignoreCase = true) == true ->
+                            "Tiempo de espera agotado.\n\nVerifica tu conexión a internet e intenta nuevamente."
+                        e.message?.contains("unable to resolve host", ignoreCase = true) == true ->
+                            "No se pudo conectar al servidor.\n\nVerifica tu conexión a internet."
+                        else ->
+                            "No se pudo conectar con el servidor.\n\nVerifica tu conexión a internet e intenta más tarde."
+                    }
+                    showError("Error de conexión", errorMsg)
+                }
+            }
+        }
+    }
+
+    val esDocente = userType == "teacher"
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    val campoColores = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = nx.marca,
+        unfocusedBorderColor = nx.borde,
+        focusedLabelColor = nx.marcaTexto,
+        unfocusedLabelColor = nx.textoSuave,
+        focusedLeadingIconColor = nx.marcaTexto,
+        unfocusedLeadingIconColor = nx.textoSuave,
+        focusedTextColor = nx.texto,
+        unfocusedTextColor = nx.texto,
+        disabledTextColor = nx.textoSuave,
+        disabledBorderColor = nx.borde,
+        focusedContainerColor = nx.superficieAlt,
+        unfocusedContainerColor = nx.superficieAlt,
+        disabledContainerColor = nx.superficieAlt,
+        cursorColor = nx.marca,
+        focusedPlaceholderColor = nx.textoTenue,
+        unfocusedPlaceholderColor = nx.textoTenue
+    )
+    val siguiente = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Next)
+
+    // Indicador de fuerza de la contraseña (solo visual)
+    val fuerza = remember(password) {
+        var f = 0
+        if (password.length >= 6) f++
+        if (password.length >= 10) f++
+        if (password.any { it.isDigit() } && password.any { it.isLetter() }) f++
+        if (password.any { !it.isLetterOrDigit() } || (password.any { it.isUpperCase() } && password.any { it.isLowerCase() })) f++
+        f
+    }
+
+    com.stiven.sos.ui.theme.FondoNexo {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                com.stiven.sos.ui.theme.BotonIconoNexo(
+                    icono = Icons.Default.ArrowBack,
+                    descripcion = "Volver al inicio de sesión",
+                    onClick = onNavigateToLogin
+                )
+                Spacer(Modifier.weight(1f))
+                com.stiven.sos.ui.theme.ChipNexo(
+                    texto = if (esDocente) "Docente" else "Estudiante",
+                    color = if (esDocente) nx.iaTexto else nx.marcaTexto,
+                    icono = if (esDocente) Icons.Default.MenuBook else Icons.Default.School
+                )
+            }
+
             Box(
+                contentAlignment = Alignment.BottomCenter,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(primaryColor, secondaryColor)
-                        )
-                    )
-                    .padding(horizontal = 24.dp, vertical = 48.dp),
-                contentAlignment = Alignment.Center
+                    .height(160.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(80.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
-                            contentDescription = "Logo institucional",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .size(48.dp)
-                        )
+                com.stiven.sos.ui.theme.IslaFlotante(
+                    modifier = Modifier.size(width = 190.dp, height = 76.dp),
+                    tipo = com.stiven.sos.ui.theme.TipoIsla.ACTIVA
+                )
+                com.stiven.sos.ui.theme.RobiNeo(
+                    tamano = 110.dp,
+                    expresion = if (isLoading) com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                    else com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA,
+                    modifier = Modifier.padding(bottom = 40.dp)
+                )
+            }
+
+            Text(
+                text = "Crea tu cuenta",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = nx.texto
+            )
+            Text(
+                text = if (esDocente) "Gestiona cursos y genera preguntas con IA" else "Tu primera isla te está esperando",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = nx.textoSuave,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
+            )
+
+            com.stiven.sos.ui.theme.TarjetaNexo(
+                modifier = Modifier.fillMaxWidth(),
+                padding = 20.dp
+            ) {
+                Text(text = title, fontSize = 17.sp, fontWeight = FontWeight.Black, color = nx.texto)
+                Text(
+                    text = "Completa todos los campos para acceder a la plataforma",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = nx.textoSuave,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
+                )
+
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Nombre completo") },
+                    placeholder = { Text("Ingresa tu nombre y apellidos") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = siguiente,
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Nombre de usuario") },
+                    placeholder = { Text("usuario123") },
+                    supportingText = { Text("Letras, números y guion bajo", color = nx.textoTenue) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = siguiente,
+                    leadingIcon = { Icon(Icons.Default.AccountCircle, contentDescription = null) }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Correo electrónico") },
+                    placeholder = { Text("ejemplo@correo.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    placeholder = { Text("Mínimo 6 caracteres") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { passwordVisible = !passwordVisible },
+                            enabled = !isLoading
+                        ) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
+                                tint = nx.textoSuave
+                            )
+                        }
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                )
+                if (password.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                        repeat(4) { i ->
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            i >= fuerza -> nx.borde
+                                            fuerza <= 1 -> nx.error
+                                            fuerza == 2 -> nx.racha
+                                            else -> nx.accion
+                                        }
+                                    )
+                            )
+                        }
+                    }
                     Text(
-                        text = "Sistema Institucional",
-                        fontSize = 22.sp,
+                        when (fuerza) {
+                            0, 1 -> "Contraseña débil"
+                            2 -> "Contraseña aceptable"
+                            3 -> "Contraseña buena"
+                            else -> "Contraseña muy segura"
+                        },
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        letterSpacing = 0.5.sp
-                    )
-
-                    Text(
-                        text = "Plataforma de Gestión Educativa",
-                        fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = nx.textoSuave,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .offset(y = (-20).dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Column(
-                    modifier = Modifier.padding(28.dp)
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        letterSpacing = 0.2.sp
-                    )
-
-                    Text(
-                        text = "Completa todos los campos para acceder a la plataforma",
-                        fontSize = 14.sp,
-                        color = Color(0xFF757575),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 32.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = fullName,
-                        onValueChange = { fullName = it },
-                        label = { Text("Nombre completo") },
-                        placeholder = { Text("Ingresa tu nombre y apellidos") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirmar contraseña") },
+                    placeholder = { Text("Repite tu contraseña") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    isError = confirmPassword.isNotEmpty() && confirmPassword != password,
+                    visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = campoColores,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { if (!isLoading) registrar() }
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { confirmPasswordVisible = !confirmPasswordVisible },
+                            enabled = !isLoading
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Nombre de usuario") },
-                        placeholder = { Text("usuario123") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Correo electrónico") },
-                        placeholder = { Text("ejemplo@correo.com") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Contraseña") },
-                        placeholder = { Text("Mínimo 6 caracteres") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { passwordVisible = !passwordVisible },
-                                enabled = !isLoading
-                            ) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
-                                    tint = primaryColor
-                                )
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
-                        label = { Text("Confirmar contraseña") },
-                        placeholder = { Text("Repite tu contraseña") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color(0xFFBDBDBD),
-                            focusedLabelColor = primaryColor,
-                            disabledBorderColor = Color(0xFFE0E0E0)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = primaryColor
-                            )
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { confirmPasswordVisible = !confirmPasswordVisible },
-                                enabled = !isLoading
-                            ) {
-                                Icon(
-                                    imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (confirmPasswordVisible) "Ocultar contraseña" else "Mostrar contraseña",
-                                    tint = primaryColor
-                                )
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Button(
-                        onClick = {
-                            if (validateInputs()) {
-                                isLoading = true
-
-                                val rol = if (userType == "teacher") "docente" else "estudiante"
-
-                                Log.d("RegisterActivity", "=== INICIANDO REGISTRO ===")
-                                Log.d("RegisterActivity", "Nombre: ${fullName.trim()}")
-                                Log.d("RegisterActivity", "Correo: ${email.trim()}")
-                                Log.d("RegisterActivity", "Rol esperado: $rol")
-
-                                //  PASO 1: Registrar en tu backend
-                                val registroRequest = RegistroRequest(
-                                    nombreCompleto = fullName.trim(),
-                                    apodo = username.trim(),
-                                    correo = email.trim(),
-                                    contrasena = password,
-                                    rol = rol
-                                )
-
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    try {
-                                        // Llamada al backend
-                                        val response = withContext(Dispatchers.IO) {
-                                            ApiClient.apiService.registrarUsuario(registroRequest)
-                                        }
-
-                                        if (response.isSuccessful && response.body() != null) {
-                                            Log.d("RegisterActivity", "✓ Backend: Registro exitoso")
-
-                                            val responseBody = response.body()!!
-                                            val uid = responseBody["uid"] as? String ?: ""
-
-                                            //  PASO 2: Iniciar sesión en Firebase Auth para obtener el token con customClaims
-                                            Log.d("RegisterActivity", " Autenticando en Firebase...")
-
-                                            auth.signInWithEmailAndPassword(email.trim(), password)
-                                                .addOnSuccessListener { authResult ->
-                                                    val user = authResult.user
-                                                    if (user != null) {
-                                                        CoroutineScope(Dispatchers.Main).launch {
-                                                            try {
-                                                                // Esperar un poco para que Firebase actualice los claims
-                                                                kotlinx.coroutines.delay(1000)
-
-                                                                // Obtener el rol desde Firebase Auth
-                                                                val rolReal = obtenerRolDeFirebaseAuth(user.uid) ?: rol
-
-                                                                Log.d("RegisterActivity", "✓ Rol obtenido: $rolReal")
-
-                                                                // Guardar en todas las ubicaciones
-                                                                guardarDatosEnPreferences(
-                                                                    user.uid,
-                                                                    rolReal,
-                                                                    fullName.trim(),
-                                                                    email.trim(),
-                                                                    username.trim()
-                                                                )
-
-                                                                sessionManager.saveUserSession(
-                                                                    userId = user.uid,
-                                                                    userName = fullName.trim(),
-                                                                    userEmail = email.trim(),
-                                                                    userRol = rolReal
-                                                                )
-
-                                                                UserPreferences.saveUserData(
-                                                                    context = context,
-                                                                    uid = user.uid,
-                                                                    nombreCompleto = fullName.trim(),
-                                                                    apodo = username.trim(),
-                                                                    correo = email.trim(),
-                                                                    rol = rolReal
-                                                                )
-
-                                                                Toast.makeText(
-                                                                    context,
-                                                                    "¡Registro exitoso! Bienvenido ${fullName.trim()}",
-                                                                    Toast.LENGTH_SHORT
-                                                                ).show()
-
-                                                                isLoading = false
-                                                                onNavigateToMain()
-
-                                                            } catch (e: Exception) {
-                                                                Log.e("RegisterActivity", " Error al obtener rol: ${e.message}")
-                                                                isLoading = false
-                                                                auth.signOut()
-                                                                showError("Error", "No se pudo completar el registro: ${e.message}")
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                .addOnFailureListener { exception ->
-                                                    isLoading = false
-                                                    Log.e("RegisterActivity", " Error en Firebase Auth: ${exception.message}")
-                                                    showError(
-                                                        "Error de autenticación",
-                                                        "No se pudo iniciar sesión después del registro. Por favor intenta iniciar sesión manualmente."
-                                                    )
-                                                }
-
-                                        } else {
-                                            // Manejo de errores del backend
-                                            isLoading = false
-                                            Log.e("RegisterActivity", " Error del backend: ${response.code()}")
-
-                                            val errorTitle: String
-                                            val errorMsg: String
-
-                                            when (response.code()) {
-                                                400 -> {
-                                                    val errorBody = response.errorBody()?.string()
-                                                    when {
-                                                        errorBody?.contains("EMAIL_EXISTS", ignoreCase = true) == true -> {
-                                                            errorTitle = "Correo ya registrado"
-                                                            errorMsg = "Este correo electrónico ya está en uso.\n\nPor favor usa otro correo o inicia sesión si ya tienes una cuenta."
-                                                        }
-                                                        errorBody?.contains("INVALID_EMAIL", ignoreCase = true) == true -> {
-                                                            errorTitle = "Correo inválido"
-                                                            errorMsg = "El formato del correo electrónico no es válido."
-                                                        }
-                                                        errorBody?.contains("WEAK_PASSWORD", ignoreCase = true) == true -> {
-                                                            errorTitle = "Contraseña débil"
-                                                            errorMsg = "La contraseña debe tener al menos 6 caracteres."
-                                                        }
-                                                        else -> {
-                                                            errorTitle = "Datos inválidos"
-                                                            errorMsg = "Por favor verifica que todos los campos estén correctos."
-                                                        }
-                                                    }
-                                                }
-                                                409 -> {
-                                                    errorTitle = "Usuario existente"
-                                                    errorMsg = "Ya existe una cuenta con este correo o nombre de usuario.\n\nIntenta con datos diferentes o inicia sesión."
-                                                }
-                                                500 -> {
-                                                    errorTitle = "Error del servidor"
-                                                    errorMsg = "Ocurrió un error en el servidor.\n\nPor favor intenta nuevamente más tarde."
-                                                }
-                                                503 -> {
-                                                    errorTitle = "Servicio no disponible"
-                                                    errorMsg = "El servidor no está disponible en este momento.\n\nIntenta más tarde."
-                                                }
-                                                else -> {
-                                                    errorTitle = "Error de registro"
-                                                    errorMsg = "Error ${response.code()}: ${response.message()}"
-                                                }
-                                            }
-
-                                            showError(errorTitle, errorMsg)
-                                        }
-
-                                    } catch (e: Exception) {
-                                        Log.e("RegisterActivity", " Excepción: ${e.message}", e)
-                                        isLoading = false
-
-                                        val errorMsg = when {
-                                            e.message?.contains("timeout", ignoreCase = true) == true ->
-                                                "Tiempo de espera agotado.\n\nVerifica tu conexión a internet e intenta nuevamente."
-                                            e.message?.contains("unable to resolve host", ignoreCase = true) == true ->
-                                                "No se pudo conectar al servidor.\n\nVerifica tu conexión a internet."
-                                            else ->
-                                                "No se pudo conectar con el servidor.\n\nVerifica tu conexión a internet e intenta más tarde."
-                                        }
-                                        showError("Error de conexión", errorMsg)
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0D47A1),
-                            disabledContainerColor = Color(0xFF1565C0).copy(alpha = 0.6f)
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = buttonText,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                color = Color.White
+                                imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (confirmPasswordVisible) "Ocultar contraseña" else "Mostrar contraseña",
+                                tint = nx.textoSuave
                             )
                         }
                     }
-                }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = if (isLoading) "Creando cuenta..." else if (esDocente) "Crear cuenta docente" else "Crear mi cuenta",
+                    onClick = { registrar() },
+                    habilitado = !isLoading,
+                    cargando = isLoading,
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .width(80.dp)
-                    .height(2.dp)
-                    .background(Color(0xFFE0E0E0))
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(vertical = 18.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "¿Ya tienes una cuenta?",
                     fontSize = 15.sp,
-                    color = Color(0xFF757575),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    fontWeight = FontWeight.SemiBold,
+                    color = nx.textoSuave
                 )
-
-                Button(
-                    onClick = onNavigateToLogin,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF0D47A1))
-                ) {
+                TextButton(onClick = onNavigateToLogin) {
                     Text(
-                        text = "INICIAR SESIÓN",
+                        text = "Inicia sesión",
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = Color(0xFF0D47A1)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = Color(0xFF0D47A1),
-                        modifier = Modifier.size(20.dp)
+                        fontWeight = FontWeight.Black,
+                        color = nx.marcaTexto
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 

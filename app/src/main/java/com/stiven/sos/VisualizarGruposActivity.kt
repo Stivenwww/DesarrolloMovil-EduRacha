@@ -196,7 +196,7 @@ fun VisualizarGruposHeader(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 20.dp),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
         ) {
             Row(
@@ -230,7 +230,7 @@ fun GrupoExpandibleCard(
             .clickable(onClick = onCardClick),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(

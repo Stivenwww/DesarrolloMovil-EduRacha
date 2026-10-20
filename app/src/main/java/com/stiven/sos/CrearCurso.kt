@@ -253,141 +253,56 @@ fun CrearCursoConTemasScreen(
                 .padding(paddingValues)
         ) {
 
-            // Header con gradiente
-            Box(
+            // Encabezado Nexo + vista previa del curso
+            val nx = com.stiven.sos.ui.theme.LocalNexo.current
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Crear curso",
+                subtitulo = "Configura el curso y sus temas",
+                onVolver = onNavigateBack,
+                acciones = {
+                    if (temas.isNotEmpty()) {
+                        com.stiven.sos.ui.theme.ChipNexo(
+                            texto = "${temas.size} ${if (temas.size == 1) "tema" else "temas"}",
+                            color = nx.iaTexto,
+                            icono = Icons.Default.BookmarkAdded
+                        )
+                    }
+                }
+            )
+            com.stiven.sos.ui.theme.TarjetaNexo(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                EduRachaColors.Primary,
-                                EduRachaColors.Primary.copy(alpha = 0.85f)
-                            )
-                        )
-                    )
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                acento = nx.ia
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp, bottom = 24.dp, start = 20.dp, end = 20.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onNavigateBack,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                        }
-
-                        if (temas.isNotEmpty()) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = EduRachaColors.Secondary
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.BookmarkAdded,
-                                        null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        "${temas.size} ${if (temas.size == 1) "tema" else "temas"}",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.rotate(bookRotation)) {
+                        com.stiven.sos.ui.theme.InsigniaNexo(Icons.Default.MenuBook, nx.ia, tamano = 52.dp)
                     }
-
-                    Spacer(Modifier.height(20.dp))
-
-                    AnimatedVisibility(
-                        visible = titulo.isNotEmpty(),
-                        enter = fadeIn() + slideInVertically(),
-                        exit = fadeOut() + slideOutVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = null,
-                                tint = EduRachaColors.Secondary,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .rotate(bookRotation)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Vista Previa",
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    titulo,
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (codigo.isNotEmpty()) {
-                                    Text(
-                                        "Código: $codigo",
-                                        color = EduRachaColors.Secondary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (titulo.isEmpty()) {
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Crear Curso Completo",
-                            color = Color.White,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold
+                            "VISTA PREVIA · ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())}",
+                            color = nx.iaTexto,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        Text(
+                            titulo.ifEmpty { "Tu nuevo curso" },
+                            color = if (titulo.isEmpty()) nx.textoTenue else nx.texto,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (codigo.isNotEmpty()) {
                             Text(
-                                "Configura el curso y agrega temas",
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 15.sp
+                                "Código: $codigo",
+                                color = nx.marcaTexto,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Text(
-                                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
                         }
                     }
                 }
@@ -407,7 +322,7 @@ fun CrearCursoConTemasScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     elevation = CardDefaults.cardElevation(3.dp),
-                    colors = CardDefaults.cardColors(Color.White)
+                    colors = CardDefaults.cardColors(EduRachaColors.Surface)
                 ) {
                     Column(
                         modifier = Modifier
@@ -681,7 +596,7 @@ fun CrearCursoConTemasScreen(
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
-                                color = Color.White
+                                color = EduRachaColors.Surface
                             ) {
                                 Column(
                                     modifier = Modifier.padding(16.dp),
@@ -920,7 +835,7 @@ fun AdvertenciaIADialog(
                 .fillMaxWidth(0.9f)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
         ) {
             Column(
                 modifier = Modifier
@@ -1070,7 +985,7 @@ fun ProgresoGeneracionDialog(
                 .fillMaxWidth(0.85f)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
         ) {
             Column(
                 modifier = Modifier
@@ -1658,7 +1573,7 @@ fun AgregarTemaDialog(
                 Text("Cancelar")
             }
         },
-        containerColor = Color.White,
+        containerColor = EduRachaColors.Surface,
         shape = RoundedCornerShape(24.dp),
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier
@@ -1684,7 +1599,7 @@ fun TemaItemCardMejorado(
             .fillMaxWidth()
             .heightIn(min = 180.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(
@@ -1946,8 +1861,8 @@ fun SectionHeader(title: String, icon: ImageVector, color: Color) {
         Text(
             title,
             fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
+            fontWeight = FontWeight.Black,
+            color = EduRachaColors.TextPrimary,
             letterSpacing = 0.5.sp
         )
     }

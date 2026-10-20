@@ -98,7 +98,7 @@ fun GestionExplicacionesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary,
+                    containerColor = EduRachaColors.BarraSuperior,
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White
                 )
@@ -201,7 +201,7 @@ fun TemaExplicacionCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Column(
             modifier = Modifier
@@ -298,7 +298,7 @@ fun TemaExplicacionCard(
 fun FuenteChip(fuente: String) {
     val (color, icon, texto) = when (fuente.lowercase()) {
         "ia" -> Triple(
-            Color(0xFFE3F2FD),
+            EduRachaColors.SurfaceVariant,
             Icons.Default.AutoAwesome,
             "Generada por IA"
         )

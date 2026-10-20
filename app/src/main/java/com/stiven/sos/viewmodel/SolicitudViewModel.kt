@@ -98,6 +98,9 @@ class SolicitudViewModel : ViewModel() {
                             isLoading = false
                         )
                     }
+                } else if (response.code() == 404) {
+                    // El backend responde 404 cuando aún no hay solicitudes: no es un error
+                    _uiState.update { it.copy(solicitudes = emptyList(), isLoading = false) }
                 } else {
                     _uiState.update {
                         it.copy(
@@ -135,6 +138,9 @@ class SolicitudViewModel : ViewModel() {
                             isLoading = false
                         )
                     }
+                } else if (response.code() == 404) {
+                    // El backend responde 404 cuando aún no hay solicitudes: no es un error
+                    _uiState.update { it.copy(solicitudes = emptyList(), isLoading = false) }
                 } else {
                     _uiState.update {
                         it.copy(

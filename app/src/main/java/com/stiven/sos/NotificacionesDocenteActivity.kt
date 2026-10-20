@@ -168,7 +168,7 @@ fun NotificacionesDocenteScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = EduRachaColors.BarraSuperior
                 )
             )
         },

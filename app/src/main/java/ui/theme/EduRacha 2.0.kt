@@ -43,24 +43,25 @@ import kotlin.math.sin
 // ============================================================================
 
 object EduRachaV2Colors {
-  val Primary = Color(0xFF3C79F5)
-  val PrimaryDark = Color(0xFF5B8FF9)
-  val Success = Color(0xFF41C77C)
-  val SuccessDark = Color(0xFF34A866)
-  val Accent = Color(0xFFFFC864)
-  val AccentDark = Color(0xFFFFB330)
-  val Secondary = Color(0xFF9C6BFF)
-  val SecondaryDark = Color(0xFF7E4FD9)
-  val Pink = Color(0xFFFF7096)
-  val PinkDark = Color(0xFFFF5277)
-  val Warning = Color(0xFFFF8A3C)
-  val WarningDark = Color(0xFFFF6B1C)
-  val Background = Color(0xFFF7F9FC)
-  val SoftGray = Color(0xFFD7DDE4)
-  val White = Color(0xFFFFFFFF)
-  val TextPrimary = Color(0xFF1C1C1E)
-  val TextSecondary = Color(0xFF717182)
-  val TextMuted = Color(0xFFA0A0AB)
+  private val p: NexoPaleta get() = TemaApp.paleta
+  val Primary: Color get() = p.marca
+  val PrimaryDark: Color get() = p.marcaSombra
+  val Success: Color get() = p.accion
+  val SuccessDark: Color get() = p.accionSombra
+  val Accent: Color get() = p.racha
+  val AccentDark: Color get() = p.rachaSombra
+  val Secondary: Color get() = p.ia
+  val SecondaryDark: Color get() = p.iaSombra
+  val Pink: Color get() = p.error
+  val PinkDark: Color get() = p.errorSombra
+  val Warning: Color get() = p.racha
+  val WarningDark: Color get() = p.rachaSombra
+  val Background: Color get() = p.fondo
+  val SoftGray: Color get() = p.borde
+  val White: Color get() = p.superficie
+  val TextPrimary: Color get() = p.texto
+  val TextSecondary: Color get() = p.textoSuave
+  val TextMuted: Color get() = p.textoTenue
 }
 
 // ============================================================================
@@ -68,22 +69,22 @@ object EduRachaV2Colors {
 // ============================================================================
 
 object EduRachaV2Gradients {
-  val Blue = Brush.linearGradient(
+  val Blue: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Primary, EduRachaV2Colors.PrimaryDark)
   )
-  val Green = Brush.linearGradient(
+  val Green: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Success, EduRachaV2Colors.SuccessDark)
   )
-  val Yellow = Brush.linearGradient(
+  val Yellow: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Accent, EduRachaV2Colors.AccentDark)
   )
-  val Purple = Brush.linearGradient(
+  val Purple: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Secondary, EduRachaV2Colors.SecondaryDark)
   )
-  val Pink = Brush.linearGradient(
+  val Pink: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Pink, EduRachaV2Colors.PinkDark)
   )
-  val Orange = Brush.linearGradient(
+  val Orange: Brush get() = Brush.linearGradient(
     colors = listOf(EduRachaV2Colors.Warning, EduRachaV2Colors.WarningDark)
   )
 }
@@ -1262,9 +1263,9 @@ enum class TipoMedalla(
   val colorMedalla: Color,
   val colorCinta: Color
 ) {
-  ORO("🏆", Color(0xFFFFD700), Color(0xFFFFA500)),
-  PLATA("⭐", Color(0xFFC0C0C0), Color(0xFF9370DB)),
-  BRONCE("🎖️", Color(0xFFCD7F32), Color(0xFFFF6347))
+  ORO("oro", Color(0xFFFFD700), Color(0xFFFFA500)),
+  PLATA("plata", Color(0xFFC0C0C0), Color(0xFF9370DB)),
+  BRONCE("bronce", Color(0xFFCD7F32), Color(0xFFFF6347))
 }
 
 @Composable
@@ -1337,9 +1338,15 @@ fun MedallaAnimada(
         .border(4.dp, Color.White.copy(alpha = 0.3f), CircleShape),
       contentAlignment = Alignment.Center
     ) {
-      Text(
-        text = tipo.emoji,
-        fontSize = 36.sp
+      Icon(
+        imageVector = when (tipo) {
+          TipoMedalla.ORO -> Icons.Outlined.EmojiEvents
+          TipoMedalla.PLATA -> Icons.Outlined.StarOutline
+          TipoMedalla.BRONCE -> Icons.Outlined.MilitaryTech
+        },
+        contentDescription = "Medalla de ${tipo.emoji}",
+        tint = Color.White,
+        modifier = Modifier.size(36.dp)
       )
     }
   }

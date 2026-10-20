@@ -151,7 +151,7 @@ fun SeleccionarCursoValidacionScreen(
                     Spacer(Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = EduRachaColors.BarraSuperior
                 )
             )
         },
@@ -308,7 +308,7 @@ fun CursoValidacionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         onClick = onClick
     ) {

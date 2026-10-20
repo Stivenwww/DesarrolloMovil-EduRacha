@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,20 @@ plugins {
     id("kotlin-parcelize")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// NOTA: la URL que usa la app se elige en app/src/main/java/com/stiven/sos/api/ApiClient.kt
+// (comentando/descomentando la línea LOCAL o DESPLEGADO). Este valor de BuildConfig ya no se usa.
+// URL del backend (anterior): se podía cambiar agregando en local.properties
+//   eduracha.apiUrl=http://10.0.2.2:8080/      (backend local + emulador)
+//   eduracha.apiUrl=http://192.168.X.X:8080/   (backend local + celular en la misma red)
+// Si no se define, se usa el backend desplegado.
+val propiedadesLocales = Properties().apply {
+    val archivo = rootProject.file("local.properties")
+    if (archivo.exists()) archivo.inputStream().use { load(it) }
+}
+val apiBaseUrl: String = (propiedadesLocales.getProperty("eduracha.apiUrl")
+    ?: "https://backend-eduracha-kotlin-35lqe.sevalla.app/").let { if (it.endsWith("/")) it else "$it/" }
+
 
 android {
     namespace = "com.stiven.sos"
@@ -18,6 +34,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -33,6 +50,7 @@ android {
     buildFeatures {
         viewBinding = false
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

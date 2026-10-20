@@ -90,7 +90,7 @@ fun RetroalimentacionScreenV2(
         }
     }
 
-    EduRachaV2Container {
+    FondoNexo(conCuadricula = false) {
         when {
             isLoading -> {
                 RetroalimentacionLoadingState()
@@ -122,63 +122,10 @@ fun RetroalimentacionScreenV2(
  */
 @Composable
 fun RetroalimentacionLoadingState() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        // Animación de búsqueda circular
-        val infiniteTransition = rememberInfiniteTransition(label = "search")
-        val rotation by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "rotation"
-        )
-
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .graphicsLayer { rotationZ = rotation }
-        ) {
-            Icon(
-                Icons.Outlined.Search,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = EduRachaV2Colors.Primary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "Analizando tus respuestas",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaV2Colors.TextPrimary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Preparando tu retroalimentación...",
-            fontSize = 14.sp,
-            color = EduRachaV2Colors.TextSecondary
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        EduRachaV2ProgressBar(
-            progress = 0.7f,
-            modifier = Modifier
-                .fillMaxWidth(0.6f)
-                .padding(horizontal = 24.dp),
-            color = EduRachaV2Colors.Success
-        )
-    }
+    CargandoNexo(
+        titulo = "Analizando tus respuestas",
+        mensaje = "Robi está preparando tu retroalimentación"
+    )
 }
 
 /**
@@ -189,56 +136,17 @@ fun RetroalimentacionErrorState(
     error: String,
     onCerrar: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(EduRachaV2Colors.Warning.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.ErrorOutline,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = EduRachaV2Colors.Warning
+    Column(Modifier.fillMaxSize()) {
+        EncabezadoNexo(titulo = "Retroalimentación", onVolver = onCerrar)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EstadoVacioNexo(
+                titulo = "No pudimos cargar la retroalimentación",
+                mensaje = error,
+                expresion = ExpresionRobi.TRISTE,
+                textoAccion = "Volver",
+                onAccion = onCerrar
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "¡Ups! Algo salió mal",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaV2Colors.TextPrimary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "No pudimos cargar tu retroalimentación",
-            fontSize = 15.sp,
-            color = EduRachaV2Colors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(40.dp))
-
-        EduRachaV2Button(
-            text = "Cerrar",
-            onClick = onCerrar,
-            icon = Icons.Outlined.Close,
-            gradient = EduRachaV2Gradients.Orange,
-            modifier = Modifier.fillMaxWidth(0.7f)
-        )
     }
 }
 
@@ -247,83 +155,46 @@ fun RetroalimentacionErrorState(
  */
 @Composable
 fun PerfectScoreScreenV2(onCerrar: () -> Unit) {
-    var showContent by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(200)
-        showContent = true
-    }
-
-    AnimatedVisibility(
-        visible = showContent,
-        enter = fadeIn(tween(600)) + scaleIn(tween(600))
+    val p = LocalNexo.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Medalla animada
-            MedallaAnimada(
-                tipo = TipoMedalla.ORO,
-                modifier = Modifier.size(140.dp)
+        Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.height(200.dp).fillMaxWidth()) {
+            IslaFlotante(
+                modifier = Modifier.size(width = 220.dp, height = 90.dp),
+                tipo = TipoIsla.CONQUISTADA
             )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "¡PERFECTO!",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = EduRachaV2Colors.Primary,
-                letterSpacing = 2.sp
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Sin errores en este quiz",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                color = EduRachaV2Colors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Badges de logros
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                LogroBadge(
-                    icon = Icons.Outlined.EmojiEvents,
-                    label = "Experto",
-                    color = EduRachaV2Colors.Success
-                )
-                LogroBadge(
-                    icon = Icons.Outlined.Star,
-                    label = "100%",
-                    color = EduRachaV2Colors.Accent
-                )
-                LogroBadge(
-                    icon = Icons.Outlined.Whatshot,
-                    label = "Racha",
-                    color = EduRachaV2Colors.Warning
-                )
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            EduRachaV2Button(
-                text = "Continuar",
-                onClick = onCerrar,
-                icon = Icons.Outlined.ArrowForward,
-                gradient = EduRachaV2Gradients.Green,
-                modifier = Modifier.fillMaxWidth()
+            RobiNeo(
+                tamano = 140.dp,
+                expresion = ExpresionRobi.CELEBRA,
+                modifier = Modifier.padding(bottom = 50.dp)
             )
         }
+        EstrellasNexo(ganadas = 3, tamano = 48.dp)
+        Spacer(Modifier.height(12.dp))
+        Text("¡Puntuación perfecta!", fontSize = 28.sp, fontWeight = FontWeight.Black, color = p.texto, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "No tuviste errores en este quiz. No hay nada que repasar.",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = p.textoSuave,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(24.dp))
+        BotonNexo(
+            texto = "Continuar",
+            onClick = onCerrar,
+            tipo = TipoBoton.ACCION,
+            icono = Icons.Outlined.ArrowForward,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -386,95 +257,37 @@ fun RetroalimentacionContent(
     onCerrar: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Header con gradiente
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    EduRachaV2Gradients.Blue,
-                    shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-                )
-        ) {
-            // Burbujas decorativas
-            AnimatedBubblesDecoration(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                color = Color.White
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 32.dp)
-            ) {
-                // Botón de cerrar
-                IconButton(
-                    onClick = onCerrar,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f))
-                ) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "Cerrar",
-                        tint = Color.White
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Título principal
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Lightbulb,
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = Color.White
-                    )
-
-                    Column {
-                        Text(
-                            text = "Retroalimentación",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Aprende de tus errores",
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
-                }
-            }
-        }
+        EncabezadoNexo(
+            titulo = "Retroalimentación",
+            subtitulo = "Aprende de tus errores",
+            onVolver = onCerrar
+        )
 
         // Lista de contenido
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Estadísticas de errores
             item {
-                EstadisticasErroresCard(totalFallos = retroalimentacion.totalFallos)
+                GloboRobi(
+                    titulo = "ROBI",
+                    mensaje = if (retroalimentacion.totalFallos == 1)
+                        "Fallaste 1 pregunta. Toca la tarjeta para ver la respuesta correcta y por qué."
+                    else
+                        "Fallaste ${retroalimentacion.totalFallos} preguntas. Toca cada tarjeta para ver la respuesta correcta y por qué.",
+                    expresion = ExpresionRobi.PIENSA,
+                    tamanoRobi = 68.dp
+                )
             }
 
             // Título de sección
             item {
-                Text(
-                    text = "Preguntas a revisar",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                Row(Modifier.fillMaxWidth()) {
+                    TituloSeccionNexo(texto = "Preguntas a revisar", icono = Icons.Outlined.FactCheck)
+                }
             }
 
             // Preguntas falladas
@@ -522,7 +335,7 @@ fun EstadisticasErroresCard(totalFallos: Int) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = Color.White,
+            color = EduRachaColors.Surface,
             shadowElevation = 4.dp
         ) {
             Row(
@@ -616,7 +429,7 @@ fun PreguntaFalladaCardV2(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = Color.White,
+            color = EduRachaColors.Surface,
             shadowElevation = if (expandido) 8.dp else 4.dp,
             onClick = { expandido = !expandido }
         ) {
@@ -636,7 +449,7 @@ fun PreguntaFalladaCardV2(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(EduRachaV2Gradients.Pink),
+                            .background(EduRachaV2Colors.Pink),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -863,80 +676,13 @@ fun ExplicacionCardV2(explicacion: String) {
  */
 @Composable
 fun MensajeMotivacionalCard() {
-    var visible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(1000)
-        visible = true
-    }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(600)) + scaleIn(tween(600))
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White,
-            shadowElevation = 4.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                EduRachaV2Colors.Success.copy(alpha = 0.1f),
-                                EduRachaV2Colors.Primary.copy(alpha = 0.05f)
-                            )
-                        )
-                    )
-                    .padding(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val infiniteTransition = rememberInfiniteTransition(label = "motivacion")
-                val rotation by infiniteTransition.animateFloat(
-                    initialValue = -10f,
-                    targetValue = 10f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(2000),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "rotation"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .graphicsLayer { rotationZ = rotation }
-                        .clip(CircleShape)
-                        .background(EduRachaV2Colors.Success.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "💪",
-                        fontSize = 28.sp
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "¡Sigue mejorando!",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaV2Colors.TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Cada error es una oportunidad de aprendizaje",
-                        fontSize = 13.sp,
-                        color = EduRachaV2Colors.TextSecondary,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-        }
+    TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = LocalNexo.current.accion) {
+        GloboRobi(
+            titulo = "CONSEJO",
+            mensaje = "Equivocarse es parte de aprender. Repasa la explicación del tema y vuelve a intentarlo: tu racha te espera.",
+            expresion = ExpresionRobi.FELIZ,
+            tamanoRobi = 60.dp
+        )
     }
 }
 
@@ -945,93 +691,11 @@ fun MensajeMotivacionalCard() {
  */
 @Composable
 fun BotonHeAprendido(onClick: () -> Unit) {
-    var pressed by remember { mutableStateOf(false) }
-
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "button_scale"
+    BotonNexo(
+        texto = "¡Lo entendí!",
+        onClick = onClick,
+        tipo = TipoBoton.ACCION,
+        icono = Icons.Outlined.CheckCircle,
+        modifier = Modifier.fillMaxWidth()
     )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "shine")
-    val shimmer by infiniteTransition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer"
-    )
-
-    Button(
-        onClick = {
-            pressed = true
-            onClick()
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .scale(scale),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent
-        ),
-        contentPadding = PaddingValues(0.dp),
-        shape = RoundedCornerShape(20.dp),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 8.dp,
-            pressedElevation = 12.dp
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            EduRachaV2Colors.Success,
-                            EduRachaV2Colors.SuccessDark,
-                            EduRachaV2Colors.Success
-                        )
-                    ),
-                    shape = RoundedCornerShape(20.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.CheckCircle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Text(
-                    text = "He Aprendido",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    letterSpacing = 0.5.sp
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Icon(
-                    Icons.Outlined.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-    }
 }

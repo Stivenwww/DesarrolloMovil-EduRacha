@@ -1,4 +1,7 @@
 package com.stiven.sos
+import androidx.compose.foundation.border
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.drop
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -127,6 +130,34 @@ fun SettingsScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(28.dp)
             ) {
+                // Sincroniza tema/sonidos con el perfil en el servidor cuando el usuario los cambia
+                LaunchedEffect(Unit) {
+                    snapshotFlow { com.stiven.sos.ui.theme.TemaApp.preferencia to com.stiven.sos.ui.theme.TemaApp.sonidosActivos }
+                        .drop(1)
+                        .collect { com.stiven.sos.services.SincronizadorPreferencias.subir() }
+                }
+                SettingsSection(title = "APARIENCIA", iconColor = EduRachaColors.Primary) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Tema de la app",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EduRachaColors.TextPrimary
+                        )
+                        Text(
+                            "Claro, oscuro o igual que tu celular",
+                            fontSize = 13.sp,
+                            color = EduRachaColors.TextSecondary
+                        )
+                        com.stiven.sos.ui.theme.SelectorTemaNexo()
+                    }
+                    SettingsDivider()
+                    SettingsSwitchItem(
+                        "Efectos de sonido", "Sonidos al acertar, fallar y terminar un quiz",
+                        com.stiven.sos.ui.theme.TemaApp.sonidosActivos
+                    ) { com.stiven.sos.ui.theme.TemaApp.cambiarSonidos(context, it) }
+                }
+
                 SettingsSection(title = "CUENTA", iconColor = EduRachaColors.Primary) {
                     SettingsItem(
                         Icons.Outlined.Edit, "Editar perfil", "Actualiza tu información",
@@ -144,11 +175,7 @@ fun SettingsScreen(
                         "Notificaciones push", "Recibe alertas importantes",
                         notificationsEnabled
                     ) { notificationsEnabled = it }
-                    SettingsDivider()
-                    SettingsSwitchItem(
-                        "Sonido", "Alertas con sonido",
-                        soundEnabled
-                    ) { soundEnabled = it }
+
                 }
 
                 SettingsSection(title = "INFORMACIÓN", iconColor = EduRachaColors.Secondary) {
@@ -179,7 +206,7 @@ fun SettingsScreen(
                 showEditProfileDialog = false
                 updateUserProfile(context, userUid, name, nickname, userEmail, userRole) {
                     refreshKey++
-                    Toast.makeText(context, "✓ Perfil actualizado exitosamente", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Perfil actualizado exitosamente", Toast.LENGTH_SHORT).show()
                 }
             }
         )
@@ -259,7 +286,7 @@ private fun updateUserProfile(
                     onSuccess()
                     Toast.makeText(
                         context,
-                        "✓ Perfil actualizado exitosamente",
+                        "Perfil actualizado exitosamente",
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
@@ -300,7 +327,7 @@ private fun changePassword(
 
     user.reauthenticate(credential).addOnSuccessListener {
         user.updatePassword(newPassword).addOnSuccessListener {
-            Toast.makeText(context, "✓ Contraseña cambiada exitosamente", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Contraseña cambiada exitosamente", Toast.LENGTH_SHORT).show()
         }.addOnFailureListener { e ->
             Toast.makeText(context, "Error al cambiar contraseña: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -310,7 +337,6 @@ private fun changePassword(
 }
 
 //<editor-fold desc="UI Components">
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsHeader(
     userName: String,
@@ -318,71 +344,55 @@ fun SettingsHeader(
     userEmail: String,
     onBackClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.85f)
-                    )
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Column(Modifier.fillMaxWidth()) {
+        com.stiven.sos.ui.theme.EncabezadoNexo(
+            titulo = "Configuración",
+            subtitulo = "Tu cuenta",
+            onVolver = onBackClick
+        )
+        com.stiven.sos.ui.theme.TarjetaNexo(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 4.dp),
+            acento = nx.marca
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                com.stiven.sos.ui.theme.AvatarNexo(
+                    nombre = userName,
+                    color = nx.ia,
+                    tamano = 60.dp,
+                    modifier = Modifier.border(2.dp, nx.marca, CircleShape)
                 )
-            )
-    ) {
-        Column {
-            TopAppBar(
-                title = { Text("Configuración", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 32.dp, top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = userName.firstOrNull()?.uppercase() ?: "U",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         userName,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        color = nx.texto,
+                        maxLines = 1
                     )
                     if (username.isNotEmpty()) {
                         Text(
                             "@$username",
                             fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.Bold,
+                            color = nx.marcaTexto,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
-                    Text(
-                        userEmail,
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    if (userEmail.isNotEmpty()) {
+                        Text(
+                            userEmail,
+                            fontSize = 13.sp,
+                            color = nx.textoSuave,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
+                com.stiven.sos.ui.theme.RobiNeo(tamano = 56.dp, expresion = com.stiven.sos.ui.theme.ExpresionRobi.SALUDA)
             }
         }
     }
@@ -401,7 +411,7 @@ fun SettingsSection(
             Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             elevation = CardDefaults.cardElevation(2.dp),
-            colors = CardDefaults.cardColors(Color.White)
+            colors = CardDefaults.cardColors(EduRachaColors.Surface)
         ) {
             Column { content() }
         }
@@ -414,16 +424,17 @@ fun SectionHeader(title: String, color: Color) {
         Box(
             Modifier
                 .width(4.dp)
-                .height(24.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(2.dp))
                 .background(color)
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            letterSpacing = 0.5.sp
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Black,
+            color = EduRachaColors.TextSecondary,
+            letterSpacing = 1.sp
         )
     }
 }
@@ -546,7 +557,7 @@ fun SettingsFooter() {
         Text(
             "Autónoma del Cauca",
             fontSize = 14.sp,
-            color = EduRachaColors.Primary,
+            color = EduRachaColors.AccentDark,
             fontWeight = FontWeight.Bold
         )
     }

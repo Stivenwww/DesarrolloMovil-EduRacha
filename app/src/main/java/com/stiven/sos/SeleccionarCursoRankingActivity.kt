@@ -386,7 +386,7 @@ fun TarjetaCursoRankingV2(
             ),
         shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -584,7 +584,7 @@ fun LoadingRankingView() {
             )
 
             Text(
-                "Preparando la competencia 🏆",
+                "Preparando la competencia",
                 fontSize = 14.sp,
                 color = EduRachaV2Colors.TextSecondary,
                 textAlign = TextAlign.Center
@@ -673,7 +673,7 @@ fun EmptyRankingView(onNavigateBack: () -> Unit) {
                 icon = Icons.Outlined.School,
                 iconColor = EduRachaV2Colors.Secondary,
                 title = "No hay cursos disponibles",
-                message = "Los cursos aparecerán aquí una vez sean creados por los docentes. ¡Mantente atento! 📚",
+                message = "Los cursos aparecerán aquí una vez sean creados por los docentes. ¡Mantente atento!",
                 modifier = Modifier.fillMaxWidth()
             )
         }

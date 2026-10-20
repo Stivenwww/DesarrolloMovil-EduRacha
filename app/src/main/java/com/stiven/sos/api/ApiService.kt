@@ -124,6 +124,13 @@ interface ApiService {
     @POST("quiz/explicacion-vista")
     suspend fun marcarExplicacionVista(@Body request: Map<String, String>): Response<Map<String, String>>
 
+    /** {"vista": true|false, "cambio": true|false} — si ya leyó la versión actual de la explicación. */
+    @GET("quiz/explicacion-vista/{cursoId}/{temaId}")
+    suspend fun estadoExplicacion(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<Map<String, Boolean>>
+
     @GET("quiz/{quizId}/retroalimentacion")
     suspend fun obtenerRetroalimentacion(@Path("quizId") quizId: String): Response<RetroalimentacionFallosResponse>
 
@@ -262,4 +269,19 @@ interface ApiService {
         @Query("desde") desde: String,
         @Query("hasta") hasta: String
     ): Response<ResponseBody>
+
+    // ============================================
+    // PREFERENCIAS VISUALES (tema claro/oscuro, sonidos)
+    // El backend toma el UID del token de Firebase (AuthInterceptor).
+    // ============================================
+
+    /** Temas aprobados (>= 80%) del estudiante autenticado en un curso. */
+    @GET("quiz/aprobados/{cursoId}")
+    suspend fun obtenerTemasAprobados(@Path("cursoId") cursoId: String): Response<TemasAprobadosResponse>
+
+    @GET("api/usuarios/me/preferencias")
+    suspend fun obtenerPreferencias(): Response<PreferenciasUsuario>
+
+    @PUT("api/usuarios/me/preferencias")
+    suspend fun guardarPreferencias(@Body preferencias: PreferenciasUsuario): Response<PreferenciasUsuario>
 }

@@ -1,5 +1,6 @@
 package com.stiven.sos
 
+import androidx.compose.foundation.border
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -116,15 +117,10 @@ fun GestionGruposScreen(
         ) {
             when {
                 isLoading && cursos.isEmpty() -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(color = EduRachaColors.Primary)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Cargando cursos...", color = EduRachaColors.TextSecondary)
-                    }
+                    com.stiven.sos.ui.theme.CargandoNexo(
+                        titulo = "Cargando tus grupos",
+                        mensaje = "Revisando cursos y aspirantes"
+                    )
                 }
 
                 errorMessage != null -> {
@@ -162,22 +158,22 @@ fun GestionGruposScreen(
                             totalTemas = cursos.sumOf { it.temas?.size ?: 0 },
                             cursosActivos = cursos.count { it.estado.equals("activo", ignoreCase = true) },
                             totalSolicitudes = solicitudesPorCurso.values.sum(),
-                            modifier = Modifier.padding(20.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
 
                         SectionHeaderGrupos(
-                            title = "CURSOS DISPONIBLES",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                            title = "Tus cursos",
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                         )
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                start = 20.dp,
-                                end = 20.dp,
-                                bottom = 20.dp
+                                start = 16.dp,
+                                end = 16.dp,
+                                bottom = 24.dp
                             ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             items(
                                 items = cursos,
@@ -199,47 +195,14 @@ fun GestionGruposScreen(
 
 @Composable
 fun ErrorStateGrupos(errorMessage: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.ErrorOutline,
-            contentDescription = null,
-            tint = EduRachaColors.Error,
-            modifier = Modifier.size(80.dp)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        com.stiven.sos.ui.theme.EstadoVacioNexo(
+            titulo = "No pudimos cargar tus cursos",
+            mensaje = errorMessage,
+            expresion = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE,
+            textoAccion = "Reintentar",
+            onAccion = onRetry
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Error al cargar",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = errorMessage,
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Reintentar",
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Reintentar")
-        }
     }
 }
 
@@ -248,85 +211,22 @@ fun GestionGruposHeader(
     onNavigateBack: () -> Unit,
     totalCursos: Int
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.85f)
-                    )
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.EncabezadoNexo(
+        titulo = "Gestión de grupos",
+        subtitulo = "Aspirantes y estudiantes",
+        onVolver = onNavigateBack,
+        acciones = {
+            if (totalCursos > 0) {
+                com.stiven.sos.ui.theme.ChipNexo(
+                    texto = "$totalCursos",
+                    color = nx.iaTexto,
+                    icono = Icons.Default.School,
+                    descripcion = "$totalCursos cursos"
                 )
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White
-                    )
-                }
-
-                if (totalCursos > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = EduRachaColors.Secondary
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.School,
-                                null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                "$totalCursos",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Gestión de Grupos",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Aspirantes y estudiantes asignados",
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 14.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
         }
-    }
+    )
 }
 
 @Composable
@@ -337,54 +237,32 @@ fun EstadisticasGruposCard(
     totalSolicitudes: Int,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Row(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            StatItemGrupos(
-                icon = Icons.Default.School,
-                value = totalCursos.toString(),
-                label = "Cursos",
-                color = EduRachaColors.Primary
-            )
-
-            Divider(
-                modifier = Modifier
-                    .height(50.dp)
-                    .width(1.dp),
-                color = EduRachaColors.Background
-            )
-
-            StatItemGrupos(
-                icon = Icons.Default.PersonAdd,
-                value = totalSolicitudes.toString(),
-                label = "Aspirantes",
-                color = EduRachaColors.Accent
-            )
-
-            Divider(
-                modifier = Modifier
-                    .height(50.dp)
-                    .width(1.dp),
-                color = EduRachaColors.Background
-            )
-
-            StatItemGrupos(
-                icon = Icons.Default.CheckCircle,
-                value = cursosActivos.toString(),
-                label = "Activos",
-                color = EduRachaColors.Success
-            )
-        }
+        com.stiven.sos.ui.theme.StatNexo(
+            icono = Icons.Default.School,
+            valor = "$totalCursos",
+            etiqueta = "Cursos",
+            color = nx.marca,
+            modifier = Modifier.weight(1f)
+        )
+        com.stiven.sos.ui.theme.StatNexo(
+            icono = Icons.Default.PersonAdd,
+            valor = "$totalSolicitudes",
+            etiqueta = "Aspirantes",
+            color = nx.racha,
+            modifier = Modifier.weight(1f)
+        )
+        com.stiven.sos.ui.theme.StatNexo(
+            icono = Icons.Default.CheckCircle,
+            valor = "$cursosActivos",
+            etiqueta = "Activos",
+            color = nx.accion,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -428,25 +306,11 @@ fun SectionHeaderGrupos(
     title: String,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(24.dp)
-                .background(EduRachaColors.Success, RoundedCornerShape(2.dp))
-        )
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.Success,
-            letterSpacing = 0.5.sp
-        )
-    }
+    com.stiven.sos.ui.theme.TituloSeccionNexo(
+        texto = title,
+        icono = Icons.Default.Groups,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -455,101 +319,73 @@ fun CursoGrupoCard(
     solicitudesPendientes: Int,
     onClick: () -> Unit
 ) {
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
     val cantidadTemas = curso.temas?.size ?: 0
-
-    Card(
+    val activo = curso.estado.equals("activo", ignoreCase = true)
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+            .clip(RoundedCornerShape(18.dp))
+            .background(nx.superficie)
+            .border(1.dp, if (solicitudesPendientes > 0) nx.racha.copy(alpha = 0.6f) else nx.borde, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    EduRachaColors.Primary,
-                                    EduRachaColors.Primary.copy(alpha = 0.7f)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.School,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = curso.titulo,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Código: ${curso.codigo}",
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Ver más",
-                    tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stiven.sos.ui.theme.InsigniaNexo(Icons.Default.School, nx.marca, tamano = 48.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = curso.titulo,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color = nx.texto,
+                    maxLines = 2
+                )
+                Text(
+                    text = "Código: ${curso.codigo}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = nx.textoSuave
                 )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Badge de solicitudes pendientes
-            if (solicitudesPendientes > 0) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = EduRachaColors.Accent.copy(alpha = 0.1f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.PersonAdd,
-                            contentDescription = null,
-                            tint = EduRachaColors.Accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "$solicitudesPendientes aspirante${if (solicitudesPendientes > 1) "s" else ""} esperando aprobación",
-                            fontSize = 13.sp,
-                            color = EduRachaColors.Accent,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Ver grupo de ${curso.titulo}",
+                tint = nx.textoSuave
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.stiven.sos.ui.theme.ChipNexo(
+                texto = if (activo) "Activo" else curso.estado.ifBlank { "Sin estado" }.replaceFirstChar { it.uppercase() },
+                color = if (activo) nx.accionTexto else nx.textoSuave,
+                icono = if (activo) Icons.Default.CheckCircle else Icons.Default.PauseCircle
+            )
+            com.stiven.sos.ui.theme.ChipNexo(
+                texto = "$cantidadTemas ${if (cantidadTemas == 1) "tema" else "temas"}",
+                color = nx.iaTexto,
+                icono = Icons.Default.MenuBook
+            )
+        }
+        if (solicitudesPendientes > 0) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(nx.racha.copy(alpha = 0.14f))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null, tint = nx.rachaTexto, modifier = Modifier.size(20.dp))
+                Text(
+                    text = "$solicitudesPendientes aspirante${if (solicitudesPendientes > 1) "s" else ""} esperando aprobación",
+                    fontSize = 13.sp,
+                    color = nx.rachaTexto,
+                    fontWeight = FontWeight.Black
+                )
             }
         }
     }
@@ -557,78 +393,12 @@ fun CursoGrupoCard(
 
 @Composable
 fun EmptyStateGrupos(onCrearCurso: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        var isVisible by remember { mutableStateOf(false) }
-
-        LaunchedEffect(Unit) {
-            delay(100)
-            isVisible = true
-        }
-
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = scaleIn() + fadeIn()
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.Success.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.School,
-                    contentDescription = null,
-                    tint = EduRachaColors.Success.copy(alpha = 0.5f),
-                    modifier = Modifier.size(64.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "No hay cursos",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary,
-            textAlign = TextAlign.Center
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        com.stiven.sos.ui.theme.EstadoVacioNexo(
+            titulo = "Aún no tienes cursos",
+            mensaje = "Crea un curso primero para poder gestionar grupos de estudiantes.",
+            textoAccion = "Crear curso",
+            onAccion = onCrearCurso
         )
-
-        Text(
-            text = "Crea un curso primero para poder gestionar grupos de estudiantes",
-            fontSize = 15.sp,
-            color = EduRachaColors.TextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onCrearCurso,
-            modifier = Modifier.height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.AddCircle,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Crear Curso",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
     }
 }

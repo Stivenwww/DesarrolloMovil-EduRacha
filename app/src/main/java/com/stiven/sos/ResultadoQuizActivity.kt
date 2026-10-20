@@ -1,5 +1,7 @@
 package com.stiven.sos
 
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.foundation.clickable
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -113,6 +115,7 @@ class ResultadoQuizActivity : ComponentActivity() {
     }
 }
 
+/** Partícula de confeti (estado mutable solo para la animación). */
 data class ConfettiParticle(
     var x: Float,
     var y: Float,
@@ -124,11 +127,18 @@ data class ConfettiParticle(
     var rotationSpeed: Float
 )
 
-/**
- * ========================================
- * PANTALLA PRINCIPAL DE RESULTADOS V2
- * ========================================
- */
+/** Estrellas según el porcentaje (solo visual): 90%+ = 3, 80%+ = 2, 50%+ = 1. */
+private fun estrellasPorPorcentaje(porcentaje: Int): Int = when {
+    porcentaje >= 90 -> 3
+    porcentaje >= 80 -> 2
+    porcentaje >= 50 -> 1
+    else -> 0
+}
+
+// ============================================================================
+// PANTALLA DE RESULTADOS — diseño Nexo
+// ============================================================================
+
 @Composable
 fun ResultadoQuizScreenV2(
     preguntasCorrectas: Int,
@@ -147,9 +157,12 @@ fun ResultadoQuizScreenV2(
     onVolverACursos: () -> Unit,
     onIniciarPractica: () -> Unit
 ) {
+    val p = LocalNexo.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val totalPreguntas = preguntasCorrectas + preguntasIncorrectas
     val porcentaje = if (totalPreguntas > 0) (preguntasCorrectas * 100) / totalPreguntas else 0
     val aprobo = porcentaje >= 80
+    val estrellas = estrellasPorPorcentaje(porcentaje)
 
     var mostrarVentanaRacha by remember { mutableStateOf(false) }
     var mostrarVentanaRachaPerdida by remember { mutableStateOf(false) }
@@ -159,35 +172,25 @@ fun ResultadoQuizScreenV2(
 
     val uiState by quizViewModel.uiState.collectAsState()
 
-    // Determinar gradiente y mensaje según resultado
-    val (gradiente, mensaje, emoji) = when {
-        porcentaje >= 90 -> Triple(
-            EduRachaV2Gradients.Green,
-            "¡EXCELENTE TRABAJO!",
-            "🎉"
-        )
-        porcentaje >= 80 -> Triple(
-            EduRachaV2Gradients.Purple,
-            "¡MUY BIEN HECHO!",
-            "🌟"
-        )
-        porcentaje >= 70 -> Triple(
-            EduRachaV2Gradients.Yellow,
-            "¡APROBADO!",
-            "👏"
-        )
-        else -> Triple(
-            EduRachaV2Gradients.Pink,
-            "SIGUE INTENTÁNDOLO",
-            "💪"
-        )
+    val (titulo, subtitulo) = when {
+        porcentaje >= 90 -> "¡Excelente trabajo!" to "Dominaste esta isla."
+        porcentaje >= 80 -> "¡Isla conquistada!" to "Aprobaste el quiz."
+        porcentaje >= 50 -> "Casi lo logras" to "Necesitas 80% para aprobar."
+        else -> "Sigue intentándolo" to "Repasa la explicación y vuelve a intentarlo."
+    }
+    val colorResultado = when {
+        porcentaje >= 80 -> p.accion
+        porcentaje >= 50 -> p.racha
+        else -> p.error
     }
 
-    val colorResultado = when {
-        porcentaje >= 90 -> EduRachaV2Colors.Success
-        porcentaje >= 80 -> EduRachaV2Colors.Secondary
-        porcentaje >= 70 -> EduRachaV2Colors.Accent
-        else -> EduRachaV2Colors.Pink
+    // Sonido de cierre (respeta la preferencia de sonidos)
+    LaunchedEffect(Unit) {
+        com.stiven.sos.services.GestorSonidos.reproducir(
+            context,
+            if (aprobo) com.stiven.sos.services.GestorSonidos.Sonido.FIN
+            else com.stiven.sos.services.GestorSonidos.Sonido.AVANCE
+        )
     }
 
     LaunchedEffect(Unit) {
@@ -224,7 +227,179 @@ fun ResultadoQuizScreenV2(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    FondoNexo(conCuadricula = false) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Héroe: Robi + estrellas + porcentaje
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.height(190.dp).fillMaxWidth()) {
+                        IslaFlotante(
+                            modifier = Modifier.size(width = 220.dp, height = 90.dp),
+                            tipo = if (aprobo) TipoIsla.CONQUISTADA else TipoIsla.ACTIVA
+                        )
+                        RobiNeo(
+                            tamano = 140.dp,
+                            expresion = when {
+                                aprobo -> ExpresionRobi.CELEBRA
+                                porcentaje >= 50 -> ExpresionRobi.PIENSA
+                                else -> ExpresionRobi.TRISTE
+                            },
+                            modifier = Modifier.padding(bottom = 46.dp)
+                        )
+                    }
+                    EstrellasNexo(ganadas = estrellas, tamano = 48.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        titulo,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        color = p.texto,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        subtitulo,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textoSuave,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Fila de métricas
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StatNexo(
+                        icono = Icons.Filled.TrackChanges,
+                        valor = "$porcentaje%",
+                        etiqueta = "Precisión",
+                        color = colorResultado,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatNexo(
+                        icono = Icons.Filled.CheckCircle,
+                        valor = "$preguntasCorrectas",
+                        etiqueta = "Correctas",
+                        color = p.accion,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatNexo(
+                        icono = Icons.Filled.Cancel,
+                        valor = "$preguntasIncorrectas",
+                        etiqueta = "Incorrectas",
+                        color = p.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Experiencia (valores entregados por el servidor)
+            item {
+                TarjetaExperienciaNexo(
+                    experienciaGanada = experienciaGanada,
+                    bonificacionRapidez = bonificacionRapidez,
+                    bonificacionPrimeraVez = bonificacionPrimeraVez,
+                    bonificacionTodoCorrecto = bonificacionTodoCorrecto
+                )
+            }
+
+            // Racha y vidas
+            if (diasRacha > 0 || modo == "oficial") {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (diasRacha > 0) {
+                            StatNexo(
+                                icono = Icons.Filled.LocalFireDepartment,
+                                valor = "$diasRacha",
+                                etiqueta = if (diasRacha == 1) "día de racha" else "días de racha",
+                                color = p.racha,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (modo == "oficial") {
+                            StatNexo(
+                                icono = Icons.Filled.Favorite,
+                                valor = "$vidasRestantes/5",
+                                etiqueta = "Vidas",
+                                color = p.error,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Modo práctica desbloqueado
+            if (aprobo && modo == "oficial") {
+                item {
+                    TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.ia) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            InsigniaNexo(Icons.Filled.FitnessCenter, p.ia, tamano = 52.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Modo práctica desbloqueado", fontSize = 17.sp, fontWeight = FontWeight.Black, color = p.texto)
+                                Text(
+                                    "Repasa este tema cuando quieras para dominar todos los conceptos.",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = p.textoSuave
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        BotonNexo(
+                            texto = "Seguir practicando",
+                            onClick = onIniciarPractica,
+                            tipo = TipoBoton.IA,
+                            icono = Icons.Filled.PlayArrow,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // Acciones
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (preguntasIncorrectas > 0) {
+                        BotonNexo(
+                            texto = "Ver retroalimentación",
+                            onClick = onVerRetroalimentacion,
+                            tipo = TipoBoton.MARCA,
+                            icono = Icons.Filled.Lightbulb,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    BotonNexo(
+                        texto = "Continuar",
+                        onClick = onVolverACursos,
+                        tipo = TipoBoton.ACCION,
+                        icono = Icons.Filled.ArrowForward,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        if (mostrarConfetti) {
+            ConfettiAnimacionV2()
+        }
+
         if (mostrarVentanaRacha && diasRacha > 0) {
             VentanaRachaDuolingoV2(
                 diasRacha = diasRacha,
@@ -238,1014 +413,112 @@ fun ResultadoQuizScreenV2(
                 onDismiss = { mostrarVentanaRachaPerdida = false }
             )
         }
-
-        // Todo hace scroll incluyendo el header
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(EduRachaV2Colors.Background),
-            contentPadding = PaddingValues(bottom = 0.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header con celebración como primer item
-            item {
-                HeaderCelebracionV2(
-                    gradiente = gradiente,
-                    mensaje = mensaje,
-                    emoji = emoji,
-                    porcentaje = porcentaje
-                )
-            }
-
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    TarjetaCirculoProgresoV2(
-                        porcentaje = porcentaje,
-                        preguntasCorrectas = preguntasCorrectas,
-                        totalPreguntas = totalPreguntas,
-                        colorResultado = colorResultado
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    TarjetaEstadisticaCompactaV2(
-                        icon = Icons.Outlined.CheckCircle,
-                        valor = "$preguntasCorrectas",
-                        label = "Correctas",
-                        color = EduRachaV2Colors.Success,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    TarjetaEstadisticaCompactaV2(
-                        icon = Icons.Outlined.Cancel,
-                        valor = "$preguntasIncorrectas",
-                        label = "Incorrectas",
-                        color = EduRachaV2Colors.Pink,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    TarjetaExperienciaV2(
-                        experienciaGanada = experienciaGanada,
-                        bonificacionRapidez = bonificacionRapidez,
-                        bonificacionPrimeraVez = bonificacionPrimeraVez,
-                        bonificacionTodoCorrecto = bonificacionTodoCorrecto
-                    )
-                }
-            }
-
-            if (diasRacha > 0) {
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        TarjetaRachaV2(
-                            diasRacha = diasRacha,
-                            aprobo = aprobo
-                        )
-                    }
-                }
-            }
-
-            if (modo == "oficial") {
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        EduRachaV2VidasCard(
-                            vidasActuales = vidasRestantes,
-                            vidasMax = 5,
-                            minutosParaProxima = 30
-                        )
-                    }
-                }
-            }
-
-            if (aprobo && modo == "oficial") {
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        TarjetaModoPracticaV2(
-                            onIniciarPractica = onIniciarPractica
-                        )
-                    }
-                }
-            }
-
-            // Botones de acción - sin padding horizontal para que ocupen todo el ancho
-            item {
-                BotonesAccionV2(
-                    preguntasIncorrectas = preguntasIncorrectas,
-                    onVerRetroalimentacion = onVerRetroalimentacion,
-                    onVolverACursos = onVolverACursos
-                )
-            }
-        }
-
-        // Confetti sobre todo
-        if (mostrarConfetti) {
-            ConfettiAnimacionV2()
-        }
-    }
-}
-
-/**
- * ========================================
- * HEADER DE CELEBRACIÓN V2
- * ========================================
- */
-@Composable
-fun HeaderCelebracionV2(
-    gradiente: Brush,
-    mensaje: String,
-    emoji: String,
-    porcentaje: Int
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.Transparent,
-        shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    gradiente,
-                    shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-                )
-                .padding(top = 48.dp, bottom = 48.dp, start = 24.dp, end = 24.dp)
-        ) {
-            // Burbujas decorativas animadas (limitadas al header)
-            Box(modifier = Modifier.matchParentSize()) {
-                AnimatedBubblesDecoration(color = Color.White)
-            }
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Emoji animado grande
-                EmojiAnimadoGrande(emoji)
-
-                // Mensaje principal
-                Text(
-                    text = mensaje,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    letterSpacing = 1.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 32.sp
-                )
-
-                // Píldora con mensaje motivador
-                PildoraMensajeMotivador(porcentaje)
-            }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(16.dp))
-}
-
-@Composable
-fun EmojiAnimadoGrande(emoji: String) {
-    val infiniteTransition = rememberInfiniteTransition(label = "emoji")
-
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotation"
-    )
-
-    Text(
-        text = emoji,
-        fontSize = 64.sp,
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                rotationZ = rotation
-            }
-    )
-}
-
-@Composable
-fun PildoraMensajeMotivador(porcentaje: Int) {
-    val mensaje = when {
-        porcentaje >= 90 -> "¡Eres increíble! Sigue así"
-        porcentaje >= 80 -> "Gran trabajo, lo estás logrando"
-        porcentaje >= 70 -> "Buen esfuerzo, sigue mejorando"
-        else -> "No te rindas, tú puedes"
-    }
-
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.25f)
-    ) {
-        Text(
-            text = mensaje,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-        )
-    }
-}
-
-/**
- * ========================================
- * TARJETA CÍRCULO DE PROGRESO V2
- * ========================================
- */
-@Composable
-fun TarjetaCirculoProgresoV2(
-    porcentaje: Int,
-    preguntasCorrectas: Int,
-    totalPreguntas: Int,
-    colorResultado: Color
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp)
-        ) {
-            CirculoProgresoV2(
-                porcentaje = porcentaje,
-                colorResultado = colorResultado
-            )
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "$preguntasCorrectas de $totalPreguntas",
-                    fontSize = 20.sp,
-                    color = EduRachaV2Colors.TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "respuestas correctas",
-                    fontSize = 14.sp,
-                    color = EduRachaV2Colors.TextSecondary
-                )
-            }
-        }
     }
 }
 
 @Composable
-fun CirculoProgresoV2(
-    porcentaje: Int,
-    colorResultado: Color
-) {
-    val porcentajeAnimado by animateFloatAsState(
-        targetValue = porcentaje.toFloat(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "porcentaje"
-    )
-
-    Box(
-        modifier = Modifier.size(200.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 16.dp.toPx()
-            val radius = (size.minDimension - strokeWidth) / 2
-
-            // Fondo del círculo
-            drawCircle(
-                color = EduRachaV2Colors.SoftGray.copy(alpha = 0.3f),
-                radius = radius,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // Arco de progreso con gradiente
-            drawArc(
-                color = colorResultado,
-                startAngle = -90f,
-                sweepAngle = (porcentajeAnimado / 100f) * 360f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                size = size
-            )
-        }
-
-        // Porcentaje animado
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "${porcentajeAnimado.toInt()}%",
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Black,
-                color = colorResultado
-            )
-        }
-    }
-}
-
-/**
- * ========================================
- * TARJETAS DE ESTADÍSTICAS COMPACTAS V2
- * ========================================
- */
-@Composable
-fun TarjetaEstadisticaCompactaV2(
-    icon: ImageVector,
-    valor: String,
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            color.copy(alpha = 0.12f),
-                            Color.White
-                        )
-                    )
-                )
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Text(
-                text = valor,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                color = color
-            )
-
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                color = EduRachaV2Colors.TextSecondary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-/**
- * ========================================
- * TARJETA DE EXPERIENCIA V2
- * ========================================
- */
-@Composable
-fun TarjetaExperienciaV2(
+fun TarjetaExperienciaNexo(
     experienciaGanada: Int,
     bonificacionRapidez: Int,
     bonificacionPrimeraVez: Int,
     bonificacionTodoCorrecto: Int
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(EduRachaV2Gradients.Yellow),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-
-                Text(
-                    text = "Experiencia Ganada",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary
-                )
-            }
-
-            // XP Total
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = EduRachaV2Colors.Accent.copy(alpha = 0.15f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val infiniteTransition = rememberInfiniteTransition(label = "star")
-                        val rotation by infiniteTransition.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(3000, easing = LinearEasing),
-                                repeatMode = RepeatMode.Restart
-                            ),
-                            label = "rotation"
-                        )
-
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = EduRachaV2Colors.Accent,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer { rotationZ = rotation }
-                        )
-                        Text(
-                            text = "Total XP",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaV2Colors.TextPrimary
-                        )
-                    }
-                    Text(
-                        text = "+$experienciaGanada",
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Black,
-                        color = EduRachaV2Colors.Accent
-                    )
-                }
-            }
-
-            // Bonificaciones
-            if (bonificacionRapidez > 0 || bonificacionPrimeraVez > 0 || bonificacionTodoCorrecto > 0) {
-                Divider(
-                    color = EduRachaV2Colors.SoftGray.copy(alpha = 0.3f),
-                    thickness = 1.dp
-                )
-
-                Text(
-                    text = "🎁 Bonificaciones",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (bonificacionRapidez > 0) {
-                        FilaBonificacionV2(
-                            icono = Icons.Outlined.Speed,
-                            texto = "Velocidad relámpago",
-                            puntos = bonificacionRapidez,
-                            color = EduRachaV2Colors.Primary
-                        )
-                    }
-                    if (bonificacionPrimeraVez > 0) {
-                        FilaBonificacionV2(
-                            icono = Icons.Outlined.Celebration,
-                            texto = "Primera vez perfecto",
-                            puntos = bonificacionPrimeraVez,
-                            color = EduRachaV2Colors.Secondary
-                        )
-                    }
-                    if (bonificacionTodoCorrecto > 0) {
-                        FilaBonificacionV2(
-                            icono = Icons.Outlined.EmojiEvents,
-                            texto = "100% sin errores",
-                            puntos = bonificacionTodoCorrecto,
-                            color = EduRachaV2Colors.Accent
-                        )
-                    }
-                }
-            }
-        }
+    val p = LocalNexo.current
+    // Conteo animado del XP recibido del servidor
+    val xpAnimado = remember { Animatable(0f) }
+    LaunchedEffect(experienciaGanada) {
+        xpAnimado.animateTo(experienciaGanada.toFloat(), tween(1200, easing = FastOutSlowInEasing))
     }
-}
-
-@Composable
-fun FilaBonificacionV2(
-    icono: ImageVector,
-    texto: String,
-    puntos: Int,
-    color: Color
-) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = color.copy(alpha = 0.1f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    icono,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = texto,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = EduRachaV2Colors.TextPrimary
-                )
+    TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.ia) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InsigniaNexo(Icons.Filled.Bolt, p.ia, tamano = 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("EXPERIENCIA", fontSize = 12.sp, fontWeight = FontWeight.Black, color = p.iaTexto, letterSpacing = 1.sp)
+                Text("Ganada en este quiz", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
             }
             Text(
-                text = "+$puntos XP",
-                fontSize = 16.sp,
+                "+${xpAnimado.value.toInt()}",
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Black,
-                color = color
+                color = p.iaTexto
             )
         }
-    }
-}
-
-/**
- * ========================================
- * TARJETA DE RACHA V2
- * ========================================
- */
-@Composable
-fun TarjetaRachaV2(
-    diasRacha: Int,
-    aprobo: Boolean
-) {
-    val gradiente = if (aprobo) {
-        Brush.horizontalGradient(
-            listOf(
-                Color(0xFFFF6B35),
-                Color(0xFFFF9600)
-            )
+        val bonos = listOfNotNull(
+            if (bonificacionRapidez > 0) Triple(Icons.Filled.Speed, "Velocidad relámpago", bonificacionRapidez) else null,
+            if (bonificacionPrimeraVez > 0) Triple(Icons.Filled.Celebration, "Primera vez", bonificacionPrimeraVez) else null,
+            if (bonificacionTodoCorrecto > 0) Triple(Icons.Filled.EmojiEvents, "100% sin errores", bonificacionTodoCorrecto) else null
         )
-    } else {
-        Brush.horizontalGradient(
-            listOf(
-                EduRachaV2Colors.SoftGray,
-                EduRachaV2Colors.Background
-            )
-        )
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        shadowElevation = if (aprobo) 6.dp else 2.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(gradiente)
-        ) {
-            // Burbujas decorativas
-            if (aprobo) {
-                AnimatedBubblesDecoration(color = Color.White)
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        if (bonos.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text("Bonificaciones", fontSize = 14.sp, fontWeight = FontWeight.Black, color = p.texto)
+            Spacer(Modifier.height(6.dp))
+            bonos.forEach { (icono, texto, puntos) ->
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconoLlamaAnimadoV2(aprobo = aprobo)
-
-                    Column {
-                        Text(
-                            text = "🔥 Racha actual",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (aprobo) Color.White else EduRachaV2Colors.TextPrimary
-                        )
-                        Text(
-                            text = if (aprobo) "¡Racha aumentada!" else "Mantén tu racha",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (aprobo) Color.White.copy(0.9f) else EduRachaV2Colors.TextSecondary
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (aprobo) Color.White.copy(alpha = 0.25f) else Color.White
-                ) {
-                    Text(
-                        text = "$diasRacha días",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (aprobo) Color.White else Color(0xFFFF9600),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun IconoLlamaAnimadoV2(aprobo: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "llama")
-
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (aprobo) 1.2f else 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotation"
-    )
-
-    Box(
-        modifier = Modifier
-            .size(56.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                rotationZ = if (aprobo) rotation else 0f
-            }
-            .clip(CircleShape)
-            .background(if (aprobo) Color.White.copy(alpha = 0.2f) else EduRachaV2Colors.SoftGray),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "🔥",
-            fontSize = 28.sp
-        )
-    }
-}
-
-/**
- * ========================================
- * TARJETA MODO PRÁCTICA V2
- * ========================================
- */
-@Composable
-fun TarjetaModoPracticaV2(
-    onIniciarPractica: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        shadowElevation = 6.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduRachaV2Gradients.Purple)
-        ) {
-            AnimatedBubblesDecoration(color = Color.White)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color.White.copy(alpha = 0.25f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "💪",
-                            fontSize = 32.sp
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Modo Práctica",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "¡Desbloqueado!",
-                            fontSize = 15.sp,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Sigue practicando este tema para dominar todos los conceptos y ganar más experiencia",
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.95f),
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 20.sp
-                )
-
-                EduRachaV2Button(
-                    text = "Seguir Practicando",
-                    onClick = onIniciarPractica,
-                    icon = Icons.Outlined.PlayArrow,
-                    variant = EduRachaV2ButtonVariant.Outline,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-/**
- * ========================================
- * BOTONES DE ACCIÓN V2
- * ========================================
- */
-@Composable
-fun BotonesAccionV2(
-    preguntasIncorrectas: Int,
-    onVerRetroalimentacion: () -> Unit,
-    onVolverACursos: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        if (preguntasIncorrectas > 0) {
-            Button(
-                onClick = onVerRetroalimentacion,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                ),
-                contentPadding = PaddingValues(0.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 4.dp,
-                    pressedElevation = 2.dp
-                )
-            ) {
-                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            EduRachaV2Gradients.Blue,
-                            shape = RoundedCornerShape(16.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Outlined.Lightbulb,
-                            contentDescription = null,
-                            modifier = Modifier.size(26.dp),
-                            tint = Color.White
-                        )
-                        Text(
-                            "Ver Retroalimentación",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-
-        Button(
-            onClick = onVolverACursos,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent
-            ),
-            contentPadding = PaddingValues(0.dp),
-            shape = RoundedCornerShape(16.dp),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 6.dp,
-                pressedElevation = 3.dp
-            )
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        EduRachaV2Gradients.Green,
-                        shape = RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(p.racha.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Outlined.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                        tint = Color.White
-                    )
-                    Text(
-                        "CONTINUAR",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        letterSpacing = 1.2.sp
-                    )
+                    Icon(icono, contentDescription = null, tint = p.rachaTexto, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(texto, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = p.texto, modifier = Modifier.weight(1f))
+                    Text("+$puntos XP", fontSize = 14.sp, fontWeight = FontWeight.Black, color = p.rachaTexto)
                 }
             }
         }
     }
 }
 
-/**
- * ========================================
- * VENTANAS EMERGENTES V2
- * ========================================
- */
+// ============================================================================
+// VENTANAS EMERGENTES
+// ============================================================================
+
 @Composable
 fun VentanaRachaDuolingoV2(
     diasRacha: Int,
     onDismiss: () -> Unit
 ) {
+    val p = LocalNexo.current
+    val escala = remember { Animatable(0.6f) }
+    LaunchedEffect(Unit) {
+        escala.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f))
+            .background(Color.Black.copy(alpha = 0.65f))
+            .clickable(onClick = onDismiss)
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            shadowElevation = 12.dp
+        TarjetaNexo(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { scaleX = escala.value; scaleY = escala.value },
+            acento = p.racha,
+            padding = 28.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFFFF6B35),
-                                Color(0xFFFF9600)
-                            )
-                        )
-                    )
-            ) {
-                AnimatedBubblesDecoration(color = Color.White)
-
-                Column(
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                IconoLlamaNexo(tamano = 96.dp)
+                Spacer(Modifier.height(12.dp))
+                Text("¡Racha aumentada!", fontSize = 26.sp, fontWeight = FontWeight.Black, color = p.texto, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "$diasRacha ${if (diasRacha == 1) "día" else "días"} seguidos",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    color = p.rachaTexto,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
-                ) {
-                    Text(
-                        text = "🔥",
-                        fontSize = 80.sp,
-                        modifier = Modifier.scale(1.2f)
-                    )
-
-                    Text(
-                        text = "¡RACHA AUMENTADA!",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        letterSpacing = 1.sp
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = "$diasRacha días consecutivos",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                        )
-                    }
-
-                    Text(
-                        text = "¡Sigue así! 🎉",
-                        fontSize = 16.sp,
-                        color = Color.White.copy(alpha = 0.95f),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(p.racha.copy(alpha = 0.15f))
+                        .padding(horizontal = 18.dp, vertical = 8.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("Sigue así para no perderla.", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
             }
         }
     }
@@ -1256,96 +529,77 @@ fun VentanaRachaPerdidaV2(
     porcentaje: Int,
     onDismiss: () -> Unit
 ) {
+    val p = LocalNexo.current
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f))
+            .background(Color.Black.copy(alpha = 0.65f))
+            .clickable(onClick = onDismiss)
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            shadowElevation = 12.dp,
-            color = Color.White
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(40.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape)
-                        .background(EduRachaV2Colors.Warning.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
+        TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.racha, padding = 28.dp) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                RobiNeo(tamano = 110.dp, expresion = ExpresionRobi.PIENSA)
+                Spacer(Modifier.height(10.dp))
+                Text("¡No te rindas!", fontSize = 24.sp, fontWeight = FontWeight.Black, color = p.texto, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(p.racha.copy(alpha = 0.12f))
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "💪",
-                        fontSize = 48.sp
-                    )
+                    Text("Tu puntuación: $porcentaje%", fontSize = 18.sp, fontWeight = FontWeight.Black, color = p.texto)
+                    Text("Necesitas 80% para aprobar", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave)
                 }
-
-                Text(
-                    text = "¡Sigue Intentándolo!",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Black,
-                    color = EduRachaV2Colors.TextPrimary,
-                    textAlign = TextAlign.Center
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = EduRachaV2Colors.Warning.copy(alpha = 0.1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Tu puntuación: $porcentaje%",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaV2Colors.TextPrimary
-                        )
-                        Text(
-                            text = "Necesitas 80% para aprobar",
-                            fontSize = 14.sp,
-                            color = EduRachaV2Colors.TextSecondary
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Tu racha se mantiene. ¡No te rindas!",
-                    fontSize = 14.sp,
-                    color = EduRachaV2Colors.TextSecondary,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
+                Spacer(Modifier.height(10.dp))
+                Text("Tu racha se mantiene.", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textoSuave, textAlign = TextAlign.Center)
             }
         }
     }
 }
 
-/**
- * ========================================
- * ANIMACIÓN DE CONFETTI V2
- * ========================================
- */
+/** Llama dibujada (sin emoji) con latido suave. */
+@Composable
+fun IconoLlamaNexo(tamano: androidx.compose.ui.unit.Dp = 64.dp) {
+    val p = LocalNexo.current
+    val t = rememberInfiniteTransition(label = "llama")
+    val latido by t.animateFloat(
+        initialValue = 0.94f, targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "latido"
+    )
+    Canvas(Modifier.size(tamano).graphicsLayer { scaleX = latido; scaleY = latido }) {
+        val w = size.width
+        val h = size.height
+        fun llama(escala: Float): androidx.compose.ui.graphics.Path = androidx.compose.ui.graphics.Path().apply {
+            val cx = w / 2f
+            val base = h * 0.95f
+            val alto = h * 0.9f * escala
+            val ancho = w * 0.42f * escala
+            moveTo(cx, base - alto)
+            cubicTo(cx + ancho * 0.2f, base - alto * 0.7f, cx + ancho * 1.1f, base - alto * 0.55f, cx + ancho, base - alto * 0.25f)
+            cubicTo(cx + ancho * 0.9f, base, cx - ancho * 0.9f, base, cx - ancho, base - alto * 0.25f)
+            cubicTo(cx - ancho * 1.05f, base - alto * 0.5f, cx - ancho * 0.4f, base - alto * 0.55f, cx, base - alto)
+            close()
+        }
+        drawPath(llama(1f), p.racha)
+        drawPath(llama(0.62f), p.error.copy(alpha = 0.85f))
+        drawPath(llama(0.32f), Color.White.copy(alpha = 0.85f))
+    }
+}
+
+// ============================================================================
+// CONFETI
+// ============================================================================
+
 @Composable
 fun ConfettiAnimacionV2() {
-    val colores = listOf(
-        EduRachaV2Colors.Success,
-        EduRachaV2Colors.Primary,
-        EduRachaV2Colors.Accent,
-        EduRachaV2Colors.Secondary,
-        EduRachaV2Colors.Pink,
-        EduRachaV2Colors.Warning
-    )
+    val p = LocalNexo.current
+    val colores = listOf(p.accion, p.marca, p.racha, p.ia, p.error)
 
     val particles = remember {
         List(80) {
@@ -1353,7 +607,7 @@ fun ConfettiAnimacionV2() {
                 x = Random.nextFloat() * 1200,
                 y = -Random.nextFloat() * 1000,
                 color = colores.random(),
-                size = Random.nextFloat() * 14 + 8,
+                size = Random.nextFloat() * 12 + 6,
                 velocityX = Random.nextFloat() * 5 - 2.5f,
                 velocityY = Random.nextFloat() * 7 + 4,
                 rotation = Random.nextFloat() * 360,
@@ -1374,6 +628,8 @@ fun ConfettiAnimacionV2() {
     )
 
     Canvas(modifier = Modifier.fillMaxSize()) {
+        @Suppress("UNUSED_VARIABLE")
+        val tick = time // fuerza el redibujado en cada cuadro
         particles.forEach { particle ->
             particle.y += particle.velocityY
             particle.x += particle.velocityX
@@ -1383,16 +639,18 @@ fun ConfettiAnimacionV2() {
                 particle.y = -150f
                 particle.x = Random.nextFloat() * size.width
             }
-
             if (particle.x < -100) particle.x = size.width + 100
             if (particle.x > size.width + 100) particle.x = -100f
 
-            drawCircle(
-                color = particle.color,
-                radius = particle.size,
-                center = Offset(particle.x, particle.y),
-                alpha = 0.9f
-            )
+            rotate(particle.rotation, pivot = Offset(particle.x, particle.y)) {
+                drawRoundRect(
+                    color = particle.color,
+                    topLeft = Offset(particle.x - particle.size / 2f, particle.y - particle.size / 4f),
+                    size = androidx.compose.ui.geometry.Size(particle.size, particle.size / 2f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f),
+                    alpha = 0.95f
+                )
+            }
         }
     }
 }

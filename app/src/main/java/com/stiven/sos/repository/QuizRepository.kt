@@ -95,7 +95,7 @@ class QuizRepository(private val application: Application) {
         }
     }
 
-    suspend fun marcarExplicacionVista(temaId: String): Result<Unit> = withContext(NonCancellable) {
+    suspend fun marcarExplicacionVista(temaId: String, cursoId: String = ""): Result<Unit> = withContext(NonCancellable) {
         return@withContext try {
             val currentUser = auth.currentUser
             if (currentUser == null) {
@@ -118,7 +118,8 @@ class QuizRepository(private val application: Application) {
                 return@withContext Result.failure(Exception("Error de autenticacion: ${e.message}"))
             }
 
-            val request = mapOf("temaId" to temaId)
+            val request = if (cursoId.isNotBlank()) mapOf("temaId" to temaId, "cursoId" to cursoId)
+                          else mapOf("temaId" to temaId)
             val response = ApiClient.apiService.marcarExplicacionVista(request)
 
             when (response.code()) {

@@ -181,7 +181,7 @@ fun GestionSolicitudesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary
+                    containerColor = EduRachaColors.BarraSuperior
                 )
             )
         },
@@ -714,7 +714,7 @@ fun SolicitudAspiranteCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
     ) {
         Column(
             modifier = Modifier

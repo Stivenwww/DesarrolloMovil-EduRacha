@@ -112,7 +112,7 @@ fun PreviewReporteScreenPremium(
     LaunchedEffect(estadoDescarga) {
         when (val estado = estadoDescarga) {
             is ReporteEstado.Exito -> {
-                Toast.makeText(context, " Reporte descargado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Reporte descargado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
                 when (tipoReporte) {
                     TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
                     TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
@@ -121,7 +121,7 @@ fun PreviewReporteScreenPremium(
                 }
             }
             is ReporteEstado.Error -> {
-                Toast.makeText(context, " Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
                 when (tipoReporte) {
                     TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
                     TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
@@ -159,7 +159,7 @@ fun PreviewReporteScreenPremium(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.Primary,
+                    containerColor = EduRachaColors.BarraSuperior,
                     titleContentColor = Color.White
                 )
             )
@@ -478,14 +478,14 @@ fun DataTableCardPremium(datos: DatosReporte) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(16.dp)
         ) {
             Text(
-                text = " Datos del Reporte",
+                text = "Datos del Reporte",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = EduRachaColors.TextPrimary,

@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local: copias de respaldo y cache de Kotlin
+_respaldo_rediseno/
+.kotlin/

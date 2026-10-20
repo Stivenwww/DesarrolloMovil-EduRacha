@@ -1232,11 +1232,11 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun marcarExplicacionVista(temaId: String, onComplete: () -> Unit) {
+    fun marcarExplicacionVista(temaId: String, cursoId: String = "", onComplete: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            repository.marcarExplicacionVista(temaId).fold(
+            repository.marcarExplicacionVista(temaId, cursoId).fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     Log.d(TAG, "Explicacion marcada como vista")

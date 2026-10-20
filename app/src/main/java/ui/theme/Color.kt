@@ -5,7 +5,14 @@ package com.stiven.sos.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
+import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.graphics.Color
 
 // ============================================
@@ -26,98 +33,101 @@ object Uniautonoma {
 }
 
 object EduRachaColors {
+    // Todos los colores de interfaz leen la paleta activa (claro/oscuro).
+    private val p: NexoPaleta get() = TemaApp.paleta
+
     // Colores Primarios Institucionales (Azul Profundo)
-    val Primary = Color(0xFF003D82)
-    val PrimaryVariant = Color(0xFF002A5C)
-    val PrimaryLight = Color(0xFF1565C0)
-    val PrimaryDark = Color(0xFF001E3C)
-    val PrimaryContainer = Color(0xFFE3F2FD)
+    val Primary: Color get() = p.marca
+    val PrimaryVariant: Color get() = p.marcaSombra
+    val PrimaryLight: Color get() = p.marca
+    val PrimaryDark: Color get() = p.marcaSombra
+    val PrimaryContainer: Color get() = p.marca.copy(alpha = 0.14f)
 
     // Colores Secundarios (Dorado Académico)
-    val Secondary = Color(0xFFFFB300)
-    val SecondaryVariant = Color(0xFFFF8F00)
-    val SecondaryLight = Color(0xFFFFC107)
-    val SecondaryDark = Color(0xFFFF6F00)
-    val SecondaryContainer = Color(0xFFFFF8E1)
+    val Secondary: Color get() = p.racha
+    val SecondaryVariant: Color get() = p.rachaSombra
+    val SecondaryLight: Color get() = p.racha
+    val SecondaryDark: Color get() = p.rachaSombra
+    val SecondaryContainer: Color get() = p.racha.copy(alpha = 0.16f)
 
     // Colores de Acento (Celeste Educativo)
-    val Accent = Color(0xFF42A5F5)
-    val AccentLight = Color(0xFF81D4FA)
-    val AccentDark = Color(0xFF1976D2)
-    val AccentContainer = Color(0xFFE1F5FE)
+    val Accent: Color get() = p.marca
+    val AccentLight: Color get() = p.marca
+    val AccentDark: Color get() = p.marcaTexto
+    val AccentContainer: Color get() = p.marca.copy(alpha = 0.14f)
 
     // Verde Institucional
-    val Success = Color(0xFF2E7D32)
-    val SuccessLight = Color(0xFF4CAF50)
-    val SuccessContainer = Color(0xFFC8E6C9)
-    val SuccessDark = Color(0xFF1B5E20)
+    val Success: Color get() = p.accion
+    val SuccessLight: Color get() = p.accion
+    val SuccessContainer: Color get() = p.accion.copy(alpha = 0.16f)
+    val SuccessDark: Color get() = p.accionTexto
 
     // Advertencia
-    val Warning = Color(0xFFFF6F00)
-    val WarningLight = Color(0xFFFFB74D)
-    val WarningContainer = Color(0xFFFFE0B2)
-    val WarningDark = Color(0xFFE65100)
+    val Warning: Color get() = p.racha
+    val WarningLight: Color get() = p.racha
+    val WarningContainer: Color get() = p.racha.copy(alpha = 0.16f)
+    val WarningDark: Color get() = p.rachaTexto
 
     // Error
-    val Error = Color(0xFFE80909)
-    val ErrorLight = Color(0xFFEF5350)
-    val ErrorContainer = Color(0xFFFFCDD2)
-    val ErrorDark = Color(0xFFC62828)
+    val Error: Color get() = p.error
+    val ErrorLight: Color get() = p.error
+    val ErrorContainer: Color get() = p.error.copy(alpha = 0.14f)
+    val ErrorDark: Color get() = p.errorTexto
 
     // Info
-    val Info = Color(0xFF0288D1)
-    val InfoLight = Color(0xFF4FC3F7)
-    val InfoContainer = Color(0xFFE1F5FE)
+    val Info: Color get() = p.marca
+    val InfoLight: Color get() = p.marca
+    val InfoContainer: Color get() = p.marca.copy(alpha = 0.14f)
 
     // Fondos y Superficies
-    val Background = Color(0xFFF8F9FA)
-    val BackgroundSecondary = Color(0xFFF1F3F4)
-    val Surface = Color(0xFFFFFFFF)
-    val SurfaceVariant = Color(0xFFF5F5F5)
-    val SurfaceContainer = Color(0xFFFAFAFA)
-    val SurfaceElevated = Color(0xFFFFFFFF)
+    val Background: Color get() = p.fondo
+    val BackgroundSecondary: Color get() = p.superficieAlt
+    val Surface: Color get() = p.superficie
+    val SurfaceVariant: Color get() = p.superficieAlt
+    val SurfaceContainer: Color get() = p.superficieAlt
+    val SurfaceElevated: Color get() = p.superficie
 
     // Textos
-    val OnPrimary = Color(0xFFFFFFFF)
-    val OnSecondary = Color(0xFF000000)
-    val OnBackground = Color(0xFF1A1A1A)
-    val OnSurface = Color(0xFF1A1A1A)
-    val OnSurfaceVariant = Color(0xFF5F6368)
-    val TextPrimary = Color(0xFF1A1A1A)
-    val TextSecondary = Color(0xFF5F6368)
-    val TextTertiary = Color(0xFF9AA0A6)
-    val TextDisabled = Color(0xFFBDBDBD)
-    val TextHint = Color(0xFFAAAAAA)
+    val OnPrimary: Color get() = p.sobreMarca
+    val OnSecondary: Color get() = p.texto
+    val OnBackground: Color get() = p.texto
+    val OnSurface: Color get() = p.texto
+    val OnSurfaceVariant: Color get() = p.textoSuave
+    val TextPrimary: Color get() = p.texto
+    val TextSecondary: Color get() = p.textoSuave
+    val TextTertiary: Color get() = p.textoTenue
+    val TextDisabled: Color get() = p.textoTenue
+    val TextHint: Color get() = p.textoTenue
 
     // Ranking y Gamificación
     val RankingGold = Color(0xFFFFD700)
     val RankingSilver = Color(0xFFC0C0C0)
     val RankingBronze = Color(0xFFCD7F32)
-    val StreakFire = Color(0xFFFF5722)
-    val XpBar = Color(0xFF42A5F5)
-    val XpBarBackground = Color(0xFFE3F2FD)
+    val StreakFire: Color get() = p.racha
+    val XpBar: Color get() = p.ia
+    val XpBarBackground: Color get() = p.borde
 
     // Niveles
     val LevelBronze = Color(0xFFCD7F32)
     val LevelSilver = Color(0xFF90A4AE)
     val LevelGold = Color(0xFFFFB300)
     val LevelPlatinum = Color(0xFF78909C)
-    val LevelDiamond = Color(0xFF42A5F5)
+    val LevelDiamond = Color(0xFF14C8D6)
 
     // Quiz
-    val QuizCorrect = Color(0xFF2E7D32)
-    val QuizIncorrect = Color(0xFFD32F2F)
-    val QuizNeutral = Color(0xFFE3F2FD)
-    val QuizSelected = Color(0xFF1976D2)
-    val AIExplanation = Color(0xFFE8F4FD)
-    val AIBackground = Color(0xFFF0F8FF)
+    val QuizCorrect: Color get() = p.accion
+    val QuizIncorrect: Color get() = p.error
+    val QuizNeutral: Color get() = p.superficieAlt
+    val QuizSelected: Color get() = p.marca
+    val AIExplanation: Color get() = p.ia.copy(alpha = 0.12f)
+    val AIBackground: Color get() = p.ia.copy(alpha = 0.08f)
 
     // Calendario
-    val CalendarToday = Color(0xFFFFB300)
-    val CalendarCompleted = Color(0xFF42A5F5)
-    val CalendarPending = Color(0xFFB0BEC5)
-    val CalendarMissed = Color(0xFFEF5350)
-    val CalendarExtended = Color(0xFF78909C)
+    val CalendarToday: Color get() = p.racha
+    val CalendarCompleted: Color get() = p.marca
+    val CalendarPending: Color get() = p.textoTenue
+    val CalendarMissed: Color get() = p.error
+    val CalendarExtended: Color get() = p.textoSuave
 
     // Asignaturas
     val SubjectMath = Color(0xFF1976D2)
@@ -132,10 +142,12 @@ object EduRachaColors {
     val SubjectDefault = Color(0xFF546E7A)
 
     // Bordes y Divisores
-    val Border = Color(0xFFE0E0E0)
-    val BorderLight = Color(0xFFEEEEEE)
-    val Divider = Color(0xFFE0E0E0)
-    val DividerLight = Color(0xFFF5F5F5)
+    val Border: Color get() = p.borde
+    /** Barras superiores con texto blanco: violeta oscuro (contraste AA en claro y oscuro). */
+    val BarraSuperior: Color get() = p.iaSombra
+    val BorderLight: Color get() = p.borde
+    val Divider: Color get() = p.borde
+    val DividerLight: Color get() = p.borde
 
     // Overlays y Sombras
     val OverlayLight = Color(0x0D000000)
@@ -146,77 +158,18 @@ object EduRachaColors {
     val Scrim = Color(0x80000000)
 
     // Gradientes
-    val GradientStart = Color(0xFF003D82)
-    val GradientEnd = Color(0xFF1565C0)
-    val GradientAccent = Color(0xFF42A5F5)
+    val GradientStart: Color get() = p.marcaSombra
+    val GradientEnd: Color get() = p.ia
+    val GradientAccent: Color get() = p.marca
 }
 
 // ============================================
 // ESQUEMA DE COLORES LIGHT PREMIUM
 // ============================================
-private val LightColorScheme = lightColorScheme(
-    primary = EduRachaColors.Primary,
-    onPrimary = EduRachaColors.OnPrimary,
-    primaryContainer = EduRachaColors.PrimaryContainer,
-    onPrimaryContainer = EduRachaColors.PrimaryDark,
-
-    secondary = EduRachaColors.Secondary,
-    onSecondary = EduRachaColors.OnSecondary,
-    secondaryContainer = EduRachaColors.SecondaryContainer,
-    onSecondaryContainer = EduRachaColors.SecondaryDark,
-
-    tertiary = EduRachaColors.Accent,
-    onTertiary = EduRachaColors.OnPrimary,
-    tertiaryContainer = EduRachaColors.AccentContainer,
-    onTertiaryContainer = EduRachaColors.AccentDark,
-
-    error = EduRachaColors.Error,
-    onError = EduRachaColors.OnPrimary,
-    errorContainer = EduRachaColors.ErrorContainer,
-    onErrorContainer = EduRachaColors.ErrorDark,
-
-    background = EduRachaColors.Background,
-    onBackground = EduRachaColors.OnBackground,
-
-    surface = EduRachaColors.Surface,
-    onSurface = EduRachaColors.OnSurface,
-    surfaceVariant = EduRachaColors.SurfaceVariant,
-    onSurfaceVariant = EduRachaColors.OnSurfaceVariant,
-    surfaceContainer = EduRachaColors.SurfaceContainer,
-
-    outline = EduRachaColors.Border,
-    outlineVariant = EduRachaColors.BorderLight,
-    scrim = EduRachaColors.Scrim
-)
 
 // ============================================
 // ESQUEMA DARK (Opcional)
 // ============================================
-private val DarkColorScheme = darkColorScheme(
-    primary = EduRachaColors.PrimaryLight,
-    onPrimary = Color(0xFF001E3C),
-    primaryContainer = EduRachaColors.Primary,
-    onPrimaryContainer = EduRachaColors.PrimaryContainer,
-
-    secondary = EduRachaColors.Secondary,
-    onSecondary = Color(0xFF3E2D00),
-    secondaryContainer = EduRachaColors.SecondaryDark,
-    onSecondaryContainer = EduRachaColors.SecondaryContainer,
-
-    tertiary = EduRachaColors.AccentLight,
-    onTertiary = Color(0xFF003258),
-
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFE1E1E1),
-
-    surface = Color(0xFF1E1E1E),
-    onSurface = Color(0xFFE1E1E1),
-    surfaceVariant = Color(0xFF2C2C2C),
-    onSurfaceVariant = Color(0xFFCACACA),
-
-    error = EduRachaColors.ErrorLight,
-    onError = Color(0xFF690005)
-)
 
 
 // Colores semánticos de la App
@@ -235,12 +188,65 @@ fun EduRachaTheme(
     darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val context = LocalContext.current
+    TemaApp.inicializar(context)
+    val sistemaOscuro = isSystemInDarkTheme()
+    val oscuro = when (TemaApp.preferencia) {
+        PreferenciaTema.SISTEMA -> sistemaOscuro
+        PreferenciaTema.CLARO -> false
+        PreferenciaTema.OSCURO -> true
+    }
+    val paleta = if (oscuro) NexoOscuro else NexoClaro
+    SideEffect { TemaApp.sistemaOscuro = sistemaOscuro }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = EduRachaTypography,
-        shapes = EduRachaShapes,
-        content = content
-    )
+    // Iconos de la barra de estado legibles en ambos modos
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !oscuro
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !oscuro
+        }
+    }
+
+    CompositionLocalProvider(LocalNexo provides paleta) {
+        MaterialTheme(
+            colorScheme = esquemaNexo(paleta),
+            typography = EduRachaTypography,
+            shapes = EduRachaShapes,
+            content = content
+        )
+    }
 }
+
+private fun esquemaNexo(p: NexoPaleta) = if (p.esOscuro) darkColorScheme(
+    primary = p.marca, onPrimary = p.sobreMarca,
+    primaryContainer = p.superficieAlt, onPrimaryContainer = p.texto,
+    secondary = p.racha, onSecondary = p.fondo,
+    secondaryContainer = p.superficieAlt, onSecondaryContainer = p.texto,
+    tertiary = p.ia, onTertiary = Color.White,
+    error = p.error, onError = p.fondo,
+    errorContainer = p.superficieAlt, onErrorContainer = p.errorTexto,
+    background = p.fondo, onBackground = p.texto,
+    surface = p.superficie, onSurface = p.texto,
+    surfaceVariant = p.superficieAlt, onSurfaceVariant = p.textoSuave,
+    surfaceContainer = p.superficie, surfaceContainerHigh = p.superficieAlt,
+    surfaceContainerHighest = p.superficieAlt, surfaceContainerLow = p.superficie,
+    surfaceContainerLowest = p.fondo,
+    outline = p.borde, outlineVariant = p.borde
+) else lightColorScheme(
+    primary = p.marca, onPrimary = p.sobreMarca,
+    primaryContainer = p.marca.copy(alpha = 0.14f), onPrimaryContainer = p.texto,
+    secondary = p.racha, onSecondary = p.texto,
+    secondaryContainer = p.racha.copy(alpha = 0.16f), onSecondaryContainer = p.texto,
+    tertiary = p.ia, onTertiary = Color.White,
+    error = p.error, onError = Color.White,
+    errorContainer = p.error.copy(alpha = 0.14f), onErrorContainer = p.errorTexto,
+    background = p.fondo, onBackground = p.texto,
+    surface = p.superficie, onSurface = p.texto,
+    surfaceVariant = p.superficieAlt, onSurfaceVariant = p.textoSuave,
+    surfaceContainer = p.superficie, surfaceContainerHigh = p.superficie,
+    surfaceContainerHighest = p.superficieAlt, surfaceContainerLow = p.superficie,
+    surfaceContainerLowest = p.superficie,
+    outline = p.borde, outlineVariant = p.borde
+)
