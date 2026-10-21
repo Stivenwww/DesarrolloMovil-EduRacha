@@ -110,10 +110,19 @@ fun calcularFechaFin(fechaInicio: Long, duracionDias: Int): Long {
     return fechaInicio + TimeUnit.DAYS.toMillis(duracionDias.toLong())
 }
 
-private suspend fun simularSubidaPdf(context: Context, uri: Uri): Result<String> {
-    return withContext(Dispatchers.IO) {
-        delay(1500)
-        Result.success("https://example.com/${obtenerNombreArchivo(context, uri)}")
+/**
+ * Lee el PDF en el servidor y devuelve su texto real.
+ * Si el servidor no puede leerlo (escaneado, protegido, dañado) devuelve el motivo como error.
+ */
+private suspend fun leerPdfEnServidor(context: Context, uri: Uri): Result<com.stiven.sos.models.ResultadoPdf> {
+    val parte = com.stiven.sos.utils.ArchivosPdf.prepararParte(context, uri).getOrElse { return Result.failure(it) }
+    return try {
+        val resp = com.stiven.sos.api.ApiClient.apiService.extraerPdf(parte)
+        val cuerpo = resp.body()
+        if (resp.isSuccessful && cuerpo != null && cuerpo.error == null) Result.success(cuerpo)
+        else Result.failure(Exception(cuerpo?.error ?: com.stiven.sos.api.mensajeDeError(resp)))
+    } catch (e: Exception) {
+        Result.failure(Exception("No se pudo conectar con el servidor para leer el PDF."))
     }
 }
 
@@ -1136,19 +1145,24 @@ fun AgregarTemaDialog(
             uri?.let { pdfUri ->
                 isUploading = true
                 coroutineScope.launch {
-                    val result = simularSubidaPdf(context, pdfUri)
+                    val result = leerPdfEnServidor(context, pdfUri)
                     withContext(Dispatchers.Main) {
                         isUploading = false
-                        if (result.isSuccess) {
-                            archivoUrl = result.getOrThrow()
-                            archivoNombre = obtenerNombreArchivo(context, pdfUri)
-                            Toast.makeText(context, "PDF cargado correctamente", Toast.LENGTH_SHORT).show()
-                        } else {
+                        result.onSuccess { pdf ->
+                            archivoNombre = pdf.nombre.ifBlank { obtenerNombreArchivo(context, pdfUri) }
+                            archivoUrl = "pdf://$archivoNombre"
+                            // El texto real del PDF pasa al contenido del tema: la IA lo usa para la explicación
+                            val extracto = pdf.texto.take(20_000)
+                            contenido = if (contenido.isBlank()) extracto else contenido.trimEnd() + "\n\n" + extracto
+                            contenidoError = false
+                            val aviso = if (pdf.truncado || pdf.texto.length > 20_000) " Se usó la primera parte del documento." else ""
                             Toast.makeText(
                                 context,
-                                "Error al cargar PDF: ${result.exceptionOrNull()?.message}",
+                                "PDF leído: ${pdf.paginas} páginas. El texto se agregó al contenido del tema.$aviso",
                                 Toast.LENGTH_LONG
                             ).show()
+                        }.onFailure { e ->
+                            Toast.makeText(context, e.message ?: "No se pudo leer el PDF", Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -1279,7 +1293,7 @@ fun AgregarTemaDialog(
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text("Subiendo PDF...", color = Color.White)
+                            Text("Leyendo PDF...", color = Color.White)
                         } else {
                             Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(10.dp))
@@ -2319,4 +2333,4 @@ private suspend fun generarExplicacionesConReintentos(
     }
 
     Log.d("CREAR_CURSO", " Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
-}
+}

@@ -65,10 +65,8 @@ class CrearPreguntaActivity : ComponentActivity() {
                     temaViewModel = temaViewModel,
                     preguntaViewModel = preguntaViewModel,
                     onBack = { finish() },
-                    onSuccess = {
-                        Toast.makeText(this, "Pregunta creada exitosamente", Toast.LENGTH_LONG).show()
-                        finish()
-                    }
+                    // Ya no se cierra al guardar: el docente sigue agregando preguntas
+                    onSuccess = {}
                 )
             }
         }
@@ -84,6 +82,34 @@ data class OpcionEditable(
     val texto: String,
     val esCorrecta: Boolean
 )
+
+/** Pregunta creada en esta sesión del formulario (para revisarla, editarla o eliminarla sin salir). */
+data class PreguntaSesion(
+    val id: String,
+    val texto: String,
+    val opciones: List<OpcionEditable>,
+    val dificultad: String,
+    val explicacion: String
+)
+
+private fun opcionesVacias() = listOf(
+    OpcionEditable(0, "", false),
+    OpcionEditable(1, "", false),
+    OpcionEditable(2, "", false)
+)
+
+/** Lista de problemas del formulario manual, en el orden en que el docente los ve. */
+fun validarPreguntaManual(texto: String, opciones: List<OpcionEditable>, explicacion: String): List<String> {
+    val errores = mutableListOf<String>()
+    if (texto.isBlank()) errores += "Escribe el texto de la pregunta."
+    if (opciones.size < 2) errores += "Agrega al menos dos opciones."
+    if (opciones.any { it.texto.isBlank() }) errores += "Todas las opciones deben tener texto."
+    val repetidas = opciones.map { it.texto.trim().lowercase() }.filter { it.isNotEmpty() }
+    if (repetidas.size != repetidas.toSet().size) errores += "Hay opciones repetidas."
+    if (opciones.count { it.esCorrecta } != 1) errores += "Marca exactamente una respuesta correcta."
+    if (explicacion.isBlank()) errores += "Explica por qué la respuesta es correcta."
+    return errores
+}
 
 // Clase para dimensiones responsivas
 data class ResponsiveDimensions(
@@ -209,6 +235,21 @@ fun CrearPreguntaScreen(
 
     // Estados de validación
     var preguntaError by remember { mutableStateOf(false) }
+    var erroresFormulario by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // Preguntas creadas en esta sesión y la que se está editando
+    val preguntasSesion = remember { mutableStateListOf<PreguntaSesion>() }
+    var editandoId by remember { mutableStateOf<String?>(null) }
+    var preguntaPorEliminar by remember { mutableStateOf<PreguntaSesion?>(null) }
+
+    fun limpiarFormulario() {
+        textoPregunta = ""
+        opciones = opcionesVacias()
+        explicacionCorrecta = ""
+        preguntaError = false
+        erroresFormulario = emptyList()
+        editandoId = null
+    }
 
     // Estados para generación con IA
     var cantidadPreguntas by remember { mutableStateOf(5) }
@@ -226,10 +267,11 @@ fun CrearPreguntaScreen(
         }
     }
 
-    // Observar éxito
+    // Mensaje de confirmación: se muestra unos segundos dentro del formulario y se limpia
     LaunchedEffect(preguntaUiState.successMessage) {
-        preguntaUiState.successMessage?.let {
-            onSuccess()
+        if (preguntaUiState.successMessage != null) {
+            kotlinx.coroutines.delay(3500)
+            preguntaViewModel.clearMessages()
         }
     }
 
@@ -260,8 +302,8 @@ fun CrearPreguntaScreen(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFF8B5CF6),
-                                Color(0xFF8B5CF6).copy(alpha = 0.85f)
+                                EduRachaColors.BarraSuperior,
+                                EduRachaColors.BarraSuperior.copy(alpha = 0.9f)
                             )
                         )
                     )
@@ -409,12 +451,7 @@ fun CrearPreguntaScreen(
                             modoCreacion = null
                             cursoSeleccionado = null
                             temaSeleccionado = null
-                            textoPregunta = ""
-                            opciones = listOf(
-                                OpcionEditable(0, "", false),
-                                OpcionEditable(1, "", false),
-                                OpcionEditable(2, "", false)
-                            )
+                            limpiarFormulario()
                         }
                     )
 
@@ -445,34 +482,55 @@ fun CrearPreguntaScreen(
                                     onExplicacionChange = { explicacionCorrecta = it },
                                     onCrear = {
                                         preguntaError = textoPregunta.isBlank()
-
-                                        if (!preguntaError &&
-                                            opciones.any { it.esCorrecta } &&
-                                            opciones.all { it.texto.isNotEmpty() } &&
-                                            explicacionCorrecta.isNotBlank()) {
+                                        erroresFormulario = validarPreguntaManual(textoPregunta, opciones, explicacionCorrecta)
+                                        if (erroresFormulario.isEmpty()) {
+                                            val textoGuardado = textoPregunta.trim()
+                                            val opcionesGuardadas = opciones.map { it.copy(texto = it.texto.trim()) }
+                                            val explicacionGuardada = explicacionCorrecta.trim()
+                                            val dificultadGuardada = dificultadSeleccionada
+                                            val idEdicion = editandoId
                                             crearPreguntaManual(
                                                 context = context,
                                                 preguntaViewModel = preguntaViewModel,
                                                 curso = cursoSeleccionado!!,
                                                 tema = temaSeleccionado!!,
-                                                textoPregunta = textoPregunta,
-                                                opciones = opciones,
-                                                dificultad = dificultadSeleccionada,
-                                                explicacion = explicacionCorrecta
+                                                textoPregunta = textoGuardado,
+                                                opciones = opcionesGuardadas,
+                                                dificultad = dificultadGuardada,
+                                                explicacion = explicacionGuardada,
+                                                idEdicion = idEdicion,
+                                                onGuardada = { id ->
+                                                    val registro = PreguntaSesion(id, textoGuardado, opcionesGuardadas, dificultadGuardada, explicacionGuardada)
+                                                    val pos = preguntasSesion.indexOfFirst { it.id == id }
+                                                    if (pos >= 0) preguntasSesion[pos] = registro else preguntasSesion.add(0, registro)
+                                                    limpiarFormulario()
+                                                }
                                             )
-                                        } else {
-                                            val mensaje = when {
-                                                preguntaError -> "El texto de la pregunta es obligatorio"
-                                                !opciones.any { it.esCorrecta } -> "Debes marcar una respuesta correcta"
-                                                !opciones.all { it.texto.isNotEmpty() } -> "Todas las opciones deben tener texto"
-                                                explicacionCorrecta.isBlank() -> "La explicación de la respuesta es obligatoria"
-                                                else -> "Completa todos los campos obligatorios"
-                                            }
-                                            Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
                                         }
                                     },
-                                    isLoading = preguntaUiState.isLoading
+                                    isLoading = preguntaUiState.isLoading,
+                                    editando = editandoId != null,
+                                    errores = erroresFormulario,
+                                    mensajeExito = preguntaUiState.successMessage,
+                                    onCancelarEdicion = { limpiarFormulario() }
                                 )
+
+                                if (preguntasSesion.isNotEmpty()) {
+                                    PreguntasDeLaSesion(
+                                        dims,
+                                        preguntas = preguntasSesion,
+                                        editandoId = editandoId,
+                                        onEditar = { pq ->
+                                            editandoId = pq.id
+                                            textoPregunta = pq.texto
+                                            opciones = pq.opciones
+                                            dificultadSeleccionada = pq.dificultad
+                                            explicacionCorrecta = pq.explicacion
+                                            erroresFormulario = emptyList()
+                                        },
+                                        onEliminar = { preguntaPorEliminar = it }
+                                    )
+                                }
                             }
                             ModoCreacion.IA -> {
                                 FormularioIASection(
@@ -489,6 +547,19 @@ fun CrearPreguntaScreen(
                                         )
                                     },
                                     isLoading = preguntaUiState.isLoading
+                                )
+                                GenerarDesdePdfSection(
+                                    dims,
+                                    cantidad = cantidadPreguntas,
+                                    isLoading = preguntaUiState.isLoading,
+                                    mensajeExito = preguntaUiState.successMessage,
+                                    onGenerar = { parte, dificultad ->
+                                        val cId = cursoSeleccionado?.id
+                                        val tId = temaSeleccionado?.id
+                                        if (cId != null && !tId.isNullOrEmpty()) {
+                                            preguntaViewModel.generarPreguntasDesdePdf(parte, cId, tId, cantidadPreguntas, dificultad) {}
+                                        }
+                                    }
                                 )
                             }
                             null -> {}
@@ -519,9 +590,12 @@ fun CrearPreguntaScreen(
 
     // Diálogos
     if (showCursoDialog) {
+        // Solo los cursos del docente que inicia sesión (si no hay coincidencias se muestran todos)
+        val uidDocente = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        val cursosDelDocente = cursoUiState.cursos.filter { it.docenteId == uidDocente }
         SelectorCursoDialogSimple(
             dims,
-            cursos = cursoUiState.cursos,
+            cursos = cursosDelDocente.ifEmpty { cursoUiState.cursos },
             isLoading = cursoUiState.isLoading,
             error = cursoUiState.error,
             onRetry = { cursoViewModel.obtenerCursos() },
@@ -529,8 +603,29 @@ fun CrearPreguntaScreen(
                 cursoSeleccionado = it
                 temaSeleccionado = null
                 showCursoDialog = false
+                preguntasSesion.clear()
+                limpiarFormulario()
             },
             onDismiss = { showCursoDialog = false }
+        )
+    }
+
+    preguntaPorEliminar?.let { pq ->
+        AlertDialog(
+            onDismissRequest = { preguntaPorEliminar = null },
+            title = { Text("Eliminar pregunta") },
+            text = { Text("Se eliminará \"${pq.texto.take(80)}\". Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    preguntaViewModel.eliminarPregunta(pq.id) {
+                        preguntasSesion.removeAll { it.id == pq.id }
+                        if (editandoId == pq.id) limpiarFormulario()
+                    }
+                    preguntaPorEliminar = null
+                }) { Text("Eliminar", color = EduRachaColors.Error) }
+            },
+            dismissButton = { TextButton(onClick = { preguntaPorEliminar = null }) { Text("Cancelar") } },
+            containerColor = EduRachaColors.Surface
         )
     }
 
@@ -722,7 +817,7 @@ fun SelectorCard(
             containerColor = if (isSelected)
                 EduRachaColors.Success.copy(alpha = 0.1f)
             else
-                Color.White
+                EduRachaColors.Surface
         ),
         elevation = CardDefaults.cardElevation(dims.cardElevation)
     ) {
@@ -788,10 +883,41 @@ fun FormularioManualSection(
     explicacionCorrecta: String,
     onExplicacionChange: (String) -> Unit,
     onCrear: () -> Unit,
-    isLoading: Boolean
+    isLoading: Boolean,
+    editando: Boolean = false,
+    errores: List<String> = emptyList(),
+    mensajeExito: String? = null,
+    onCancelarEdicion: () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
-        SectionHeaderSimple(dims, "DETALLES DE LA PREGUNTA", Icons.Default.Edit)
+        // Confirmación del último guardado (dentro del formulario, sin tapar contenido)
+        AnimatedVisibility(visible = mensajeExito != null, enter = fadeIn(), exit = fadeOut()) {
+            Surface(
+                shape = RoundedCornerShape(dims.borderRadius),
+                color = EduRachaColors.Success.copy(alpha = 0.14f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(dims.cardPadding * 0.8f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.6f)
+                ) {
+                    Icon(Icons.Default.CheckCircle, null, tint = EduRachaColors.Success, modifier = Modifier.size(dims.iconSize))
+                    Text(mensajeExito ?: "", color = EduRachaColors.TextPrimary, fontSize = dims.bodyFontSize.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            SectionHeaderSimple(dims, if (editando) "EDITANDO PREGUNTA" else "NUEVA PREGUNTA", Icons.Default.Edit)
+            if (editando) {
+                TextButton(onClick = onCancelarEdicion) { Text("Cancelar edición", color = EduRachaColors.TextSecondary) }
+            }
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -910,6 +1036,25 @@ fun FormularioManualSection(
             }
         }
 
+        // Resumen de lo que falta antes de guardar
+        if (errores.isNotEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(dims.borderRadius),
+                color = EduRachaColors.Error.copy(alpha = 0.10f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(dims.cardPadding * 0.8f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Revisa antes de guardar", fontWeight = FontWeight.Bold, color = EduRachaColors.Error, fontSize = dims.bodyFontSize.sp)
+                    errores.forEach { e ->
+                        Text("• $e", color = EduRachaColors.TextPrimary, fontSize = (dims.bodyFontSize - 1).sp)
+                    }
+                }
+            }
+        }
+
         // Botón
         Button(
             onClick = onCrear,
@@ -927,11 +1072,11 @@ fun FormularioManualSection(
                     strokeWidth = 2.dp
                 )
                 Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text("Creando...", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
+                Text("Guardando...", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
             } else {
-                Icon(Icons.Default.Check, null, modifier = Modifier.size(dims.iconSize))
+                Icon(if (editando) Icons.Default.Save else Icons.Default.Add, null, modifier = Modifier.size(dims.iconSize))
                 Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text("Crear Pregunta", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
+                Text(if (editando) "Guardar cambios" else "Guardar y agregar otra", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -994,7 +1139,7 @@ fun OpcionesSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SectionHeaderSimple(dims, "OPCIONES DE RESPUESTA", Icons.Default.ListAlt)
-            if (opciones.size < 5) {
+            if (opciones.size < 6) {
                 IconButton(
                     onClick = {
                         onOpcionesChange(opciones + OpcionEditable(opciones.size, "", false))
@@ -1061,7 +1206,7 @@ fun OpcionCard(
             containerColor = if (opcion.esCorrecta)
                 EduRachaColors.Success.copy(alpha = 0.1f)
             else
-                Color.White
+                EduRachaColors.Surface
         ),
         elevation = CardDefaults.cardElevation(dims.cardElevation)
     ) {
@@ -1135,6 +1280,117 @@ fun OpcionCard(
                 ),
                 textStyle = LocalTextStyle.current.copy(fontSize = dims.bodyFontSize.sp)
             )
+        }
+    }
+}
+
+/**
+ * Generar preguntas a partir de un PDF: el servidor lee el texto real del documento
+ * y la IA crea las preguntas con ese contenido. Si el PDF no se puede leer, se muestra el motivo.
+ */
+@Composable
+fun GenerarDesdePdfSection(
+    dims: ResponsiveDimensions,
+    cantidad: Int,
+    isLoading: Boolean,
+    mensajeExito: String?,
+    onGenerar: (okhttp3.MultipartBody.Part, String?) -> Unit
+) {
+    val context = LocalContext.current
+    val alcance = rememberCoroutineScope()
+    var pdfUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var pdfNombre by remember { mutableStateOf("") }
+    var dificultad by remember { mutableStateOf<String?>(null) }   // null = mixta
+    var errorLocal by remember { mutableStateOf<String?>(null) }
+
+    val selector = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            pdfUri = uri
+            pdfNombre = com.stiven.sos.utils.ArchivosPdf.nombre(context, uri)
+            errorLocal = null
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
+        SectionHeaderSimple(dims, "DESDE UN DOCUMENTO PDF", Icons.Default.PictureAsPdf)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(dims.borderRadius),
+            colors = CardDefaults.cardColors(EduRachaColors.Surface),
+            elevation = CardDefaults.cardElevation(dims.cardElevation)
+        ) {
+            Column(
+                modifier = Modifier.padding(dims.cardPadding),
+                verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.8f)
+            ) {
+                Text(
+                    "Sube el material del tema (PDF con texto). La IA crea las preguntas solo con su contenido y quedan pendientes de revisión.",
+                    fontSize = dims.bodyFontSize.sp,
+                    color = EduRachaColors.TextSecondary,
+                    lineHeight = (dims.bodyFontSize + 4).sp
+                )
+                OutlinedButton(
+                    onClick = { selector.launch("application/pdf") },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(dims.borderRadius)
+                ) {
+                    Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(dims.iconSize))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (pdfUri == null) "Elegir PDF" else pdfNombre,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+
+                Text("Dificultad", fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary, fontSize = dims.bodyFontSize.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf(null to "Mixta", "facil" to "Fácil", "medio" to "Medio", "dificil" to "Difícil").forEach { (valor, etiqueta) ->
+                        FilterChip(
+                            selected = dificultad == valor,
+                            onClick = { dificultad = valor },
+                            label = { Text(etiqueta, fontSize = (dims.bodyFontSize - 1).sp, maxLines = 1) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                (errorLocal)?.let {
+                    Text(it, color = EduRachaColors.Error, fontSize = (dims.bodyFontSize - 1).sp)
+                }
+                if (mensajeExito != null && !isLoading) {
+                    Surface(shape = RoundedCornerShape(dims.borderRadius), color = EduRachaColors.Success.copy(alpha = 0.14f)) {
+                        Text(
+                            mensajeExito,
+                            color = EduRachaColors.TextPrimary,
+                            fontSize = (dims.bodyFontSize - 1).sp,
+                            modifier = Modifier.padding(dims.cardPadding * 0.7f)
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        val uri = pdfUri ?: run { errorLocal = "Primero elige un archivo PDF."; return@Button }
+                        alcance.launch {
+                            com.stiven.sos.utils.ArchivosPdf.prepararParte(context, uri)
+                                .onSuccess { parte -> onGenerar(parte, dificultad) }
+                                .onFailure { errorLocal = it.message }
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth().height(dims.buttonHeight),
+                    shape = RoundedCornerShape(dims.borderRadius),
+                    colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(dims.iconSize))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Generar $cantidad preguntas del PDF", fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -1215,7 +1471,7 @@ fun FormularioIASection(
                                         if (cantidad > 1)
                                             EduRachaColors.Accent.copy(alpha = 0.1f)
                                         else
-                                            Color.Gray.copy(alpha = 0.1f)
+                                            EduRachaColors.TextSecondary.copy(alpha = 0.12f)
                                     )
                             ) {
                                 Icon(
@@ -1225,7 +1481,7 @@ fun FormularioIASection(
                                     tint = if (cantidad > 1)
                                         EduRachaColors.Accent
                                     else
-                                        Color.Gray
+                                        EduRachaColors.TextSecondary
                                 )
                             }
                             IconButton(
@@ -1238,7 +1494,7 @@ fun FormularioIASection(
                                         if (cantidad < 10)
                                             EduRachaColors.Accent.copy(alpha = 0.1f)
                                         else
-                                            Color.Gray.copy(alpha = 0.1f)
+                                            EduRachaColors.TextSecondary.copy(alpha = 0.12f)
                                     )
                             ) {
                                 Icon(
@@ -1248,7 +1504,7 @@ fun FormularioIASection(
                                     tint = if (cantidad < 10)
                                         EduRachaColors.Accent
                                     else
-                                        Color.Gray
+                                        EduRachaColors.TextSecondary
                                 )
                             }
                         }
@@ -1555,6 +1811,81 @@ fun SelectorTemaDialogSimple(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PreguntasDeLaSesion(
+    dims: ResponsiveDimensions,
+    preguntas: List<PreguntaSesion>,
+    editandoId: String?,
+    onEditar: (PreguntaSesion) -> Unit,
+    onEliminar: (PreguntaSesion) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.6f)) {
+        SectionHeaderSimple(dims, "CREADAS EN ESTA SESIÓN (${preguntas.size})", Icons.Default.ListAlt)
+        Text(
+            "Quedan pendientes de revisión en Validación de preguntas.",
+            fontSize = (dims.bodyFontSize - 1).sp,
+            color = EduRachaColors.TextSecondary
+        )
+        preguntas.forEachIndexed { i, pq ->
+            val correcta = pq.opciones.firstOrNull { it.esCorrecta }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(dims.borderRadius),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (pq.id == editandoId) EduRachaColors.Primary.copy(alpha = 0.10f) else EduRachaColors.Surface
+                ),
+                elevation = CardDefaults.cardElevation(dims.cardElevation)
+            ) {
+                Column(
+                    modifier = Modifier.padding(dims.cardPadding),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "${preguntas.size - i}. ${pq.texto}",
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        fontSize = dims.bodyFontSize.sp,
+                        maxLines = 3
+                    )
+                    correcta?.let {
+                        Text(
+                            "Correcta: ${it.texto}",
+                            color = EduRachaColors.Success,
+                            fontSize = (dims.bodyFontSize - 1).sp,
+                            maxLines = 2
+                        )
+                    }
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "${pq.opciones.size} opciones · ${pq.dificultad.replaceFirstChar { it.uppercase() }}",
+                            color = EduRachaColors.TextSecondary,
+                            fontSize = (dims.bodyFontSize - 2).sp,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                        Row {
+                            TextButton(onClick = { onEditar(pq) }) {
+                                Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(dims.smallIconSize))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Editar")
+                            }
+                            TextButton(onClick = { onEliminar(pq) }) {
+                                Icon(Icons.Outlined.Delete, null, tint = EduRachaColors.Error, modifier = Modifier.size(dims.smallIconSize))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Eliminar", color = EduRachaColors.Error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ================== FUNCIONES ==================
 
 private fun crearPreguntaManual(
@@ -1565,7 +1896,9 @@ private fun crearPreguntaManual(
     textoPregunta: String,
     opciones: List<OpcionEditable>,
     dificultad: String,
-    explicacion: String
+    explicacion: String,
+    idEdicion: String? = null,
+    onGuardada: (String) -> Unit = {}
 ) {
     val cursoId = curso.id ?: run {
         Toast.makeText(context, "Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
@@ -1605,7 +1938,7 @@ private fun crearPreguntaManual(
         explicacionCorrecta = explicacion
     )
 
-    preguntaViewModel.crearPregunta(pregunta)
+    preguntaViewModel.guardarPreguntaManual(pregunta, idEdicion, onGuardada)
 }
 
 private fun generarPreguntasIA(

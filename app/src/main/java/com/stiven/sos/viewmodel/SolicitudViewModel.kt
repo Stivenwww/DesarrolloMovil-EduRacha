@@ -36,9 +36,11 @@ class SolicitudViewModel : ViewModel() {
             _uiState.update { it.copy(isLoading = true, error = null, mensajeExito = null) }
 
             try {
+                // El UID real es el de la sesión de Firebase (el guardado en preferencias puede estar vacío o ser de otra cuenta)
+                val uidSesion = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: estudianteId
                 val request = SolicitudRequest(
-                    codigoCurso = codigoCurso,
-                    estudianteId = estudianteId,
+                    codigoCurso = codigoCurso.trim(),
+                    estudianteId = uidSesion,
                     estudianteNombre = estudianteNombre,
                     estudianteEmail = estudianteEmail,
                     mensaje = mensaje
@@ -54,14 +56,10 @@ class SolicitudViewModel : ViewModel() {
                         )
                     }
                     // Recargar solicitudes
-                    cargarSolicitudesEstudiante(estudianteId)
+                    cargarSolicitudesEstudiante(uidSesion)
                 } else {
-                    // Manejo específico de error 409 (Conflict)
-                    val errorMsg = when (response.code()) {
-                        409 -> "Ya has enviado una solicitud para este curso. Espera la respuesta del docente."
-                        404 -> "Curso no encontrado. Verifica el código."
-                        else -> "Error al enviar solicitud: ${response.code()}"
-                    }
+                    // El backend explica el motivo (ya inscrito, solicitud pendiente, código inválido...)
+                    val errorMsg = com.stiven.sos.api.mensajeDeError(response)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -73,7 +71,7 @@ class SolicitudViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Error: ${e.message}"
+                        error = "No se pudo enviar la solicitud. Revisa tu conexión e inténtalo de nuevo."
                     )
                 }
             }
@@ -216,4 +214,4 @@ class SolicitudViewModel : ViewModel() {
     fun clearMessages() {
         _uiState.update { it.copy(error = null, mensajeExito = null) }
     }
-}
+}

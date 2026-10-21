@@ -37,8 +37,8 @@ object ApiClient {
         .addInterceptor(loggingInterceptor)
         .addInterceptor(authInterceptor)
         .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)   // generar preguntas desde un PDF largo puede tardar
+        .writeTimeout(120, TimeUnit.SECONDS)  // subida de PDF de hasta 20 MB
         .retryOnConnectionFailure(true)
         .build()
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -71,8 +72,10 @@ fun PerfilDocenteScreen(
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
 
-        userName = prefs.getString("user_name", null) ?: "Docente"
-        userEmail = prefs.getString("user_email", null) ?: "correo@uniautonoma.edu.co"
+        val sesion = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        userName = prefs.getString("user_name", null) ?: sesion?.displayName ?: "Docente"
+        // Sin datos inventados: el correo sale de la sesión si no está guardado
+        userEmail = prefs.getString("user_email", null) ?: sesion?.email ?: ""
         userRole = prefs.getString("user_role", null) ?: "docente"
         userNickname = prefs.getString("user_nickname", null) ?: ""
 
@@ -85,7 +88,9 @@ fun PerfilDocenteScreen(
 
     // Se observa el uiState unificado del ViewModel
     val uiState by viewModel.uiState.collectAsState()
-    val cursos = uiState.cursos
+    // Solo los cursos de este docente (antes se contaban los de toda la plataforma)
+    val uidDocente = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+    val cursos = uiState.cursos.filter { it.docenteId == uidDocente }
 
     // Cargar cursos al iniciar
     LaunchedEffect(Unit) {
@@ -207,6 +212,35 @@ fun PerfilDocenteScreen(
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
 
+            // Contenido académico: una tarjeta por curso con su avance real de preparación
+            if (totalCursos > 0) {
+                item {
+                    Text(
+                        text = "Contenido académico",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = EduRachaColors.TextPrimary,
+                        modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                    )
+                }
+                items(cursos.size) { i ->
+                    TarjetaContenidoAcademico(
+                        curso = cursos[i],
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .widthIn(max = 720.dp)
+                            .fillMaxWidth()
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+            } else if (!uiState.isLoading) {
+                item {
+                    EstadoVacioNexo(
+                        titulo = "Aún no tienes cursos",
+                        mensaje = "Cuando crees un curso verás aquí sus temas y el avance de sus explicaciones."
+                    )
+                }
+            }
+
             // Resumen de cursos por estado
             if (totalCursos > 0) {
                 item {
@@ -269,8 +303,8 @@ fun PerfilDocenteHeader(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            EduRachaColors.Primary.copy(0.9f),
-                            EduRachaColors.Primary
+                            EduRachaColors.BarraSuperior.copy(0.92f),
+                            EduRachaColors.BarraSuperior
                         )
                     )
                 )
@@ -321,7 +355,7 @@ fun PerfilDocenteHeader(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
+                    if (userEmail.isNotBlank()) Text(
                         userEmail,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.9f),
@@ -485,5 +519,99 @@ fun FooterInstitucional() {
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+/**
+ * Tarjeta del contenido académico de un curso: temas, explicaciones aprobadas y pendientes.
+ * Todos los números salen del curso real (temas y estado de sus explicaciones).
+ */
+@Composable
+fun TarjetaContenidoAcademico(curso: com.stiven.sos.models.Curso, modifier: Modifier = Modifier) {
+    val temas = curso.getTemasLista()
+    val aprobadas = temas.count { it.explicacionEstado.equals("aprobada", ignoreCase = true) }
+    val pendientes = temas.count { it.explicacionEstado.equals("pendiente", ignoreCase = true) }
+    val sinExplicacion = temas.size - aprobadas - pendientes
+    val avance = if (temas.isEmpty()) 0f else aprobadas.toFloat() / temas.size
+    val colorEstado = when (curso.estado.lowercase()) {
+        "activo" -> EduRachaColors.Success
+        "borrador" -> EduRachaColors.Warning
+        else -> EduRachaColors.TextSecondary
+    }
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        curso.titulo.ifBlank { "Curso sin título" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = EduRachaColors.TextPrimary,
+                        maxLines = 2
+                    )
+                    if (curso.codigo.isNotBlank()) {
+                        Text("Código ${curso.codigo}", style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
+                    }
+                }
+                Surface(shape = RoundedCornerShape(50), color = colorEstado.copy(alpha = 0.14f)) {
+                    Text(
+                        curso.estado.ifBlank { "sin estado" }.replaceFirstChar { it.uppercase() },
+                        color = colorEstado,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DatoContenido("Temas", temas.size, EduRachaColors.Primary, Modifier.weight(1f))
+                DatoContenido("Aprobadas", aprobadas, EduRachaColors.Success, Modifier.weight(1f))
+                DatoContenido("Por revisar", pendientes, EduRachaColors.Warning, Modifier.weight(1f))
+                DatoContenido("Sin explicación", sinExplicacion, EduRachaColors.TextSecondary, Modifier.weight(1f))
+            }
+
+            if (temas.isNotEmpty()) {
+                Text(
+                    "Explicaciones aprobadas: ${(avance * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EduRachaColors.TextSecondary
+                )
+                LinearProgressIndicator(
+                    progress = { avance },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                    color = EduRachaColors.Success,
+                    trackColor = EduRachaColors.Success.copy(alpha = 0.18f)
+                )
+            } else {
+                Text("Este curso aún no tiene temas.", style = MaterialTheme.typography.bodySmall, color = EduRachaColors.TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DatoContenido(etiqueta: String, valor: Int, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.10f))
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("$valor", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+        Text(
+            etiqueta,
+            style = MaterialTheme.typography.labelSmall,
+            color = EduRachaColors.TextSecondary,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
     }
 }

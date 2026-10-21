@@ -822,8 +822,13 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             Log.d(TAG, "Vidas actuales (local): $vidasActuales")
             Log.d(TAG, "========================================")
 
-            // Mostrar loading mientras procesa
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            // Mostrar loading mientras procesa y olvidar el resultado de la pregunta anterior
+            // (si no, la opción nueva se pintaba un instante con el color de la respuesta previa)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                ultimaRespuestaCorrecta = null,
+                mostrarAnimacionRespuesta = false
+            )
 
             // ENVIAR AL BACKEND INMEDIATAMENTE
             val result = repository.procesarRespuestaIndividual(
@@ -983,11 +988,16 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                             isLoading = false
                         )
 
-                        if (_uiState.value.modoActual == "oficial") {
+                        // El quiz final cuenta igual que un oficial: guarda el mejor porcentaje y, si aprueba, queda cerrado
+                        val modoCuenta = _uiState.value.modoActual == "oficial" || _uiState.value.modoActual == "final"
+                        if (modoCuenta) {
                             guardarPorcentajeQuizOficial(porcentaje)
                         }
+                        if (porcentaje >= 80 && _uiState.value.modoActual == "final") {
+                            _uiState.value = _uiState.value.copy(quizFinalYaCompletado = true)
+                        }
 
-                        if (porcentaje >= 80 && _uiState.value.modoActual == "oficial") {
+                        if (porcentaje >= 80 && modoCuenta) {
                             _uiState.value = _uiState.value.copy(mostrarConfetti = true)
                             verificarYActualizarRacha()
                         }
@@ -1404,7 +1414,9 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun avanzarSiguientePregunta() {
         _uiState.value = _uiState.value.copy(
-            preguntaActual = _uiState.value.preguntaActual + 1
+            preguntaActual = _uiState.value.preguntaActual + 1,
+            ultimaRespuestaCorrecta = null,
+            mostrarAnimacionRespuesta = false
         )
     }
 
@@ -1415,4 +1427,4 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         cursoIdActual = null
         temaIdActual = null
     }
-}
+}

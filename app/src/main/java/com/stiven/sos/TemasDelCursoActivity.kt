@@ -69,6 +69,7 @@ class TemasDelCursoActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
+                com.stiven.sos.services.ConMensajesQuiz(quizViewModel) {
                 TemasDelCursoScreenFinal(
                     cursoNombre = cursoNombre,
                     cursoId = cursoId,
@@ -105,6 +106,7 @@ class TemasDelCursoActivity : ComponentActivity() {
                         startActivity(intent)
                     }
                 )
+                }
             }
         }
     }
@@ -159,8 +161,20 @@ fun TemasDelCursoScreenFinal(
     var mostrarDialogoRacha by remember { mutableStateOf(false) }
     var mostrarDialogoXP by remember { mutableStateOf(false) }
 
+    // Recargar el progreso cada vez que la pantalla vuelve a primer plano
+    // (al regresar de un quiz, la isla siguiente debe abrirse sin salir del curso)
+    var recargaProgreso by remember { mutableStateOf(0) }
+    val ciclo = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(ciclo) {
+        val observador = androidx.lifecycle.LifecycleEventObserver { _, evento ->
+            if (evento == androidx.lifecycle.Lifecycle.Event.ON_RESUME) recargaProgreso++
+        }
+        ciclo.addObserver(observador)
+        onDispose { ciclo.removeObserver(observador) }
+    }
+
     // Cargar estado de temas aprobados (calculado en el servidor)
-    LaunchedEffect(cursoId) {
+    LaunchedEffect(cursoId, recargaProgreso) {
         val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
         val userUid = prefs.getString("user_uid", "") ?: ""
 
@@ -581,4 +595,4 @@ fun DialogoXPCompacto(
         textoBoton = "Continuar",
         onDismiss = onDismiss
     )
-}
+}

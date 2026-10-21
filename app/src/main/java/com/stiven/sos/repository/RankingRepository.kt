@@ -27,7 +27,7 @@ class RankingRepository {
                 Log.d("RankingRepository", "Ranking obtenido: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
-                val error = "Error ${response.code()}: ${response.message()}"
+                val error = com.stiven.sos.api.mensajeDeError(response)
                 Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
@@ -51,7 +51,7 @@ class RankingRepository {
                 Log.d("RankingRepository", " Ranking por racha: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
-                val error = "Error ${response.code()}: ${response.message()}"
+                val error = com.stiven.sos.api.mensajeDeError(response)
                 Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
@@ -75,7 +75,7 @@ class RankingRepository {
                 Log.d("RankingRepository", " Ranking por vidas: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
-                val error = "Error ${response.code()}: ${response.message()}"
+                val error = com.stiven.sos.api.mensajeDeError(response)
                 Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
@@ -103,7 +103,7 @@ class RankingRepository {
                 Log.d("RankingRepository", " Ranking general: ${ranking.size} estudiantes")
                 Result.success(ranking)
             } else {
-                val error = "Error ${response.code()}: ${response.message()}"
+                val error = com.stiven.sos.api.mensajeDeError(response)
                 Log.e("RankingRepository", " $error")
                 Result.failure(Exception(error))
             }
@@ -112,4 +112,4 @@ class RankingRepository {
             Result.failure(e)
         }
     }
-}
+}

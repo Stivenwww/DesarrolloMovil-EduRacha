@@ -104,7 +104,7 @@ fun GestionExplicacionesScreen(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { com.stiven.sos.ui.theme.AvisosNexoHost(snackbarHostState) }
     ) { paddingValues ->
         Box(
             modifier = Modifier

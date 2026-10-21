@@ -91,6 +91,7 @@ class QuizActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
+                com.stiven.sos.services.ConMensajesQuiz(quizViewModel) {
                 val uiState by quizViewModel.uiState.collectAsState()
 
                 LaunchedEffect(uiState.quizInterrumpidoPorVidas) {
@@ -149,6 +150,7 @@ class QuizActivity : ComponentActivity() {
                         regresarATemasDelCurso()
                     }
                 )
+                }
             }
         }
     }
@@ -623,10 +625,14 @@ fun PreguntaScreenFigma(
     var mostrarExplicacion by remember(pregunta.id) { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
+    // Resultado de ESTA pregunta (el servidor lo confirma; null mientras se evalúa).
+    // Se usa en lugar de ultimaRespuestaCorrecta, que podía traer el valor de la pregunta anterior.
+    val resultadoPregunta: Boolean? = respuestasEstado[numeroPregunta - 1]
+
     // Estado del búho
     val estadoBuho = when {
-        mostrarAnimacionRespuesta && ultimaRespuestaCorrecta == true -> EstadoBuho.FELIZ
-        mostrarAnimacionRespuesta && ultimaRespuestaCorrecta == false -> EstadoBuho.TRISTE
+        mostrarAnimacionRespuesta && resultadoPregunta == true -> EstadoBuho.FELIZ
+        mostrarAnimacionRespuesta && resultadoPregunta == false -> EstadoBuho.TRISTE
         else -> EstadoBuho.PENSATIVO
     }
 
@@ -642,11 +648,11 @@ fun PreguntaScreenFigma(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // Sonido al conocer el resultado de la respuesta (respeta la preferencia del usuario)
-    LaunchedEffect(mostrarAnimacionRespuesta, ultimaRespuestaCorrecta) {
-        if (mostrarAnimacionRespuesta && ultimaRespuestaCorrecta != null && !sinVidas) {
+    LaunchedEffect(mostrarAnimacionRespuesta, resultadoPregunta) {
+        if (mostrarAnimacionRespuesta && resultadoPregunta != null && !sinVidas) {
             com.stiven.sos.services.GestorSonidos.reproducir(
                 context,
-                if (ultimaRespuestaCorrecta == true) com.stiven.sos.services.GestorSonidos.Sonido.CORRECTO
+                if (resultadoPregunta == true) com.stiven.sos.services.GestorSonidos.Sonido.CORRECTO
                 else com.stiven.sos.services.GestorSonidos.Sonido.ERROR
             )
         }
@@ -708,10 +714,10 @@ fun PreguntaScreenFigma(
 
                 val letras = listOf("A", "B", "C", "D", "E", "F")
                 pregunta.opciones.forEachIndexed { index, opcion ->
-                    val esCorrecta = mostrarExplicacion && respuestaSeleccionada != null &&
-                            ultimaRespuestaCorrecta == true && respuestaSeleccionada == index
-                    val esIncorrecta = mostrarExplicacion && respuestaSeleccionada != null &&
-                            ultimaRespuestaCorrecta == false && respuestaSeleccionada == index
+                    // Un único estado por opción: mientras el servidor evalúa se ve solo "seleccionada";
+                    // al llegar el resultado se pinta verde o rojo y ya no cambia.
+                    val esCorrecta = mostrarExplicacion && respuestaSeleccionada == index && resultadoPregunta == true
+                    val esIncorrecta = mostrarExplicacion && respuestaSeleccionada == index && resultadoPregunta == false
 
                     OpcionRespuestaFigma(
                         opcion = opcion,
@@ -742,7 +748,7 @@ fun PreguntaScreenFigma(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 MensajeFeedbackFigma(
-                    esCorrecta = if (mostrarAnimacionRespuesta) ultimaRespuestaCorrecta else null,
+                    esCorrecta = if (mostrarAnimacionRespuesta) resultadoPregunta else null,
                     xpGanado = 0,
                     combo = combo
                 )
@@ -1189,4 +1195,4 @@ fun DialogoQuizFinalCompletadoFigma(
         onPrincipal = onAceptar,
         onDismiss = onAceptar
     )
-}
+}

@@ -58,6 +58,7 @@ class ExplicacionTemaActivity : ComponentActivity() {
 
         setContent {
             EduRachaTheme {
+                com.stiven.sos.services.ConMensajesQuiz(quizViewModel) {
                 LaunchedEffect(cursoId, temaId) {
                     quizViewModel.iniciarObservadores(cursoId, temaId)
                 }
@@ -85,6 +86,7 @@ class ExplicacionTemaActivity : ComponentActivity() {
                         finish()
                     }
                 )
+                }
             }
         }
     }

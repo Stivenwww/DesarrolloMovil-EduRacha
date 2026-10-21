@@ -658,3 +658,56 @@ fun EntradaEscalonada(indice: Int, content: @Composable () -> Unit) {
 
 private fun Modifier.graphicsLayerCompat(t: Float): Modifier =
     this.then(Modifier.graphicsLayer { alpha = t; translationY = (1f - t) * 40f })
+
+/**
+ * Avisos inferiores con el estilo Nexo (reemplaza el snackbar gris de Material).
+ * Quedan por encima de la barra de navegación, con ancho máximo en tablets, y no tapan los botones.
+ */
+@Composable
+fun AvisosNexoHost(
+    hostState: androidx.compose.material3.SnackbarHostState,
+    modifier: Modifier = Modifier
+) {
+    val p = LocalNexo.current
+    androidx.compose.material3.SnackbarHost(
+        hostState = hostState,
+        modifier = modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
+    ) { datos ->
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = p.superficie,
+            border = BorderStroke(1.5.dp, p.marca.copy(alpha = 0.55f)),
+            shadowElevation = 6.dp,
+            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(p.marca)
+                )
+                Text(
+                    datos.visuals.message,
+                    color = p.texto,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                datos.visuals.actionLabel?.let { etiqueta ->
+                    Text(
+                        etiqueta,
+                        color = p.marcaTexto,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.clickable { datos.performAction() }.padding(4.dp)
+                    )
+                }
+            }
+        }
+    }
+}

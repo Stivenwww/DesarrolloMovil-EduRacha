@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Pantalla de inicio de Android 12+ en modo oscuro -->
+    <style name="Theme.DesarrolloMovil" parent="Base.Theme.DesarrolloMovil">
+        <item name="android:windowSplashScreenBackground">@color/nexo_fondo</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_round</item>
+    </style>
+</resources>

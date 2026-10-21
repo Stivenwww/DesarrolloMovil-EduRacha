@@ -693,7 +693,7 @@ fun FilterDialog(
                                     color = if (selectedCurso == curso.id)
                                         EduRachaColors.Primary
                                     else
-                                        Color.Gray.copy(alpha = 0.3f)
+                                        EduRachaColors.TextSecondary.copy(alpha = 0.3f)
                                 )
                             ) {
                                 Row(
@@ -890,7 +890,7 @@ fun PreguntaDetailDialog(
                                     color = if (opcion.esCorrecta)
                                         EduRachaColors.Success.copy(alpha = 0.1f)
                                     else
-                                        Color.Gray.copy(alpha = 0.05f),
+                                        EduRachaColors.TextSecondary.copy(alpha = 0.08f),
                                     modifier = Modifier.fillMaxWidth(),
                                     border = if (opcion.esCorrecta)
                                         BorderStroke(2.dp, EduRachaColors.Success)
@@ -909,7 +909,7 @@ fun PreguntaDetailDialog(
                                                     if (opcion.esCorrecta)
                                                         EduRachaColors.Success
                                                     else
-                                                        Color.Gray.copy(alpha = 0.3f)
+                                                        EduRachaColors.TextSecondary.copy(alpha = 0.3f)
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1247,4 +1247,4 @@ fun DetailInfoRow(
             color = EduRachaColors.TextPrimary
         )
     }
-}
+}

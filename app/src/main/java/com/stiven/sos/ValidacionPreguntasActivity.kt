@@ -100,7 +100,7 @@ fun ValidacionPreguntasScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = { com.stiven.sos.ui.theme.AvisosNexoHost(snackbarHostState) },
         topBar = {
             ValidacionTopAppBar(
                 cursoTitulo = cursoTitulo,
@@ -185,10 +185,14 @@ fun ValidacionPreguntasScreen(
                     val cardSpacing = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
 
                     LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(cardSpacing)
+                        verticalArrangement = Arrangement.spacedBy(cardSpacing),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         items(preguntasFiltradas, key = { it.id ?: it.texto }) { pregunta ->
+                          // En tablets las tarjetas no se estiran de borde a borde
+                          Box(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
                             PreguntaCard(
                                 pregunta = pregunta,
                                 onAprobar = {
@@ -230,6 +234,7 @@ fun ValidacionPreguntasScreen(
                                     )
                                 }
                             )
+                          }
                         }
                     }
                 }
@@ -264,7 +269,7 @@ fun ValidacionTopAppBar(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(4.dp),
-        color = EduRachaColors.Primary
+        color = EduRachaColors.BarraSuperior
     ) {
         // Usamos un Box para poder alinear el contenido y los iconos de forma independiente.
         // El padding superior se aplica aquí para respetar la barra de estado.
@@ -1027,4 +1032,4 @@ fun InfoRow(icon: ImageVector, label: String, value: String) {
             modifier = Modifier.weight(1f, fill = false)
         )
     }
-}
+}

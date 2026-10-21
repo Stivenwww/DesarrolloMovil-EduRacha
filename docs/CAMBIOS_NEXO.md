@@ -125,3 +125,65 @@ En `C:\Users\STIVEN\.gradle\eduracha_verificacion` quedaron copias de las librer
   - La IA ahora recibe la instrucción de responder en texto plano.
   - Toda explicación se guarda sin Markdown (`utils/TextoPlano.kt`).
   - La app también limpia las explicaciones antiguas al mostrarlas.
+
+## Fase 4: correcciones de EduRacha 2.0 (portátil de Laura)
+
+### Errores corregidos (causa → solución)
+- **"Acceso denegado" para docentes:** el backend leía el rol de un claim del token que casi nunca existe, así que todos quedaban como "estudiante".
+  - Ahora lee `usuarios/{uid}/rol` (con caché de 60 s).
+  - Los reportes verifican además que el curso sea del docente.
+- **Solicitudes de inscripción:**
+  - Se usa el UID del token, no el de las preferencias.
+  - El id del curso sale de la clave del nodo.
+  - Solo bloquean las solicitudes PENDIENTE o ACEPTADA; una RECHAZADA permite volver a pedir.
+  - Detecta si el estudiante ya está inscrito.
+  - Los mensajes de error son claros.
+- **Quiz final repetido y progreso que no se guardaba:**
+  - El backend nunca guardaba `temasCompletados`, porque Firebase no acepta `Set`. Ahora guarda solo los campos que cambian, con listas.
+  - El quiz final cuenta como aprobado y no se puede volver a abrir una vez aprobado.
+  - El mapa de islas se recarga al volver del quiz.
+- **Destellos rojo/verde en las respuestas:** cada opción se pinta con el resultado de su propia pregunta y se limpia el resultado anterior.
+- **Ranking docente vacío o colgado:**
+  - Lectura tolerante a formatos.
+  - Incluye estudiantes sin el campo `estado`.
+  - El ranking general suma la experiencia por estudiante.
+  - Usa el mismo podio Nexo que el estudiante.
+- **Excel:**
+  - Cabecera `Content-Disposition` válida con acentos.
+  - Celdas numéricas en lugar de texto "NaN".
+  - Prueba real de `.xlsx` con acentos.
+- **Mensajes del quiz:** antes no se mostraban en ninguna pantalla. Ahora aparecen arriba (`ConMensajesQuiz`).
+
+### Funciones nuevas o rehechas
+- **Creación manual de preguntas:**
+  - Ya no cierra la pantalla al guardar.
+  - Agrega preguntas seguidas, con la lista de la sesión para editar o eliminar.
+  - Valida antes de guardar (opciones repetidas, exactamente una correcta).
+  - Evita el doble envío.
+  - Hasta 6 opciones.
+  - El selector muestra solo los cursos del docente.
+- **PDF con IA (real):**
+  - `POST /api/pdf/extraer` y `POST /api/preguntas/ia/generar-desde-pdf`, con PDFBox 2.0.32.
+  - Valida firma, tamaño (20 MB), contraseña, archivo dañado y PDF escaneado.
+  - Los documentos largos se dividen en hasta 6 fragmentos repartidos.
+  - En Crear curso, el texto extraído pasa al contenido del tema; antes la carga era simulada con `example.com`.
+- **Perfil docente:**
+  - Estadísticas solo de sus cursos.
+  - Sin correo inventado.
+  - Nueva sección "Contenido académico" por curso.
+- **Modo oscuro y tema:**
+  - Chips y filtros seleccionados con el tinte de la marca.
+  - Grises fijos reemplazados por los del tema.
+  - Avisos inferiores con estilo Nexo (`AvisosNexoHost`).
+  - Pantalla de inicio sin destello y con fondo Nexo (`values*/themes.xml`, `values-v31`).
+- **Validación de preguntas:** cabecera legible y tarjetas con ancho máximo en tablets.
+
+### Verificación
+- **App:** *Build → Assemble Project* en el portátil terminó con **BUILD SUCCESSFUL** (1 min 32 s, solo advertencias de APIs obsoletas).
+- **Backend:**
+  - Compilado con kotlinc y 27 pruebas JUnit en verde, entre ellas `LectorPdfTest`, `DocumentoIaTest` y `ReportesExcelTest`.
+  - PDFBox se verificó con una API de prueba, porque Maven Central no era accesible desde el entorno de trabajo. Al ejecutar `gradlew build` en el PC, Gradle descarga la librería real.
+
+### Pendiente o limitaciones
+- **OCR de PDF escaneados:** necesita Tesseract instalado en el servidor. Hoy se informa al docente y no se finge el procesamiento.
+- **Pruebas manuales en el emulador:** quedan por hacer con usuarios reales (estudiante y docente). Sin acceso a sus cuentas no se pudo probar el flujo completo de punta a punta.

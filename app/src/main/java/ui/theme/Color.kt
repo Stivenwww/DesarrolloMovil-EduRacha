@@ -223,7 +223,8 @@ private fun esquemaNexo(p: NexoPaleta) = if (p.esOscuro) darkColorScheme(
     primary = p.marca, onPrimary = p.sobreMarca,
     primaryContainer = p.superficieAlt, onPrimaryContainer = p.texto,
     secondary = p.racha, onSecondary = p.fondo,
-    secondaryContainer = p.superficieAlt, onSecondaryContainer = p.texto,
+    // Chips y filtros seleccionados: tinte de la marca, distinguible del fondo en modo oscuro
+    secondaryContainer = p.marca.copy(alpha = 0.22f), onSecondaryContainer = p.texto,
     tertiary = p.ia, onTertiary = Color.White,
     error = p.error, onError = p.fondo,
     errorContainer = p.superficieAlt, onErrorContainer = p.errorTexto,
@@ -238,7 +239,8 @@ private fun esquemaNexo(p: NexoPaleta) = if (p.esOscuro) darkColorScheme(
     primary = p.marca, onPrimary = p.sobreMarca,
     primaryContainer = p.marca.copy(alpha = 0.14f), onPrimaryContainer = p.texto,
     secondary = p.racha, onSecondary = p.texto,
-    secondaryContainer = p.racha.copy(alpha = 0.16f), onSecondaryContainer = p.texto,
+    // Chips y filtros seleccionados: mismo tinte de la marca que en modo oscuro
+    secondaryContainer = p.marca.copy(alpha = 0.16f), onSecondaryContainer = p.texto,
     tertiary = p.ia, onTertiary = Color.White,
     error = p.error, onError = Color.White,
     errorContainer = p.error.copy(alpha = 0.14f), onErrorContainer = p.errorTexto,

@@ -407,11 +407,11 @@ fun ContenidoRankingMejorado(
         // Podio Top 3
         if (ranking.isNotEmpty()) {
             item {
-                PodioMejorado(
+                // Mismo podio Nexo (islas 2.º, 1.º, 3.º) que ve el estudiante
+                PodioV2(
                     ranking = ranking,
                     usuarioActualId = usuarioActualId,
-                    tipoRanking = tipoRanking,
-                    onEstudianteClick = onEstudianteClick
+                    tipoRanking = tipoRanking
                 )
             }
         }
@@ -426,8 +426,8 @@ fun ContenidoRankingMejorado(
             }
         }
 
-        // Lista de todos los estudiantes
-        if (ranking.size > 3) {
+        // Lista de todos los estudiantes (toca uno para ver su perfil)
+        if (ranking.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -1462,4 +1462,4 @@ fun ItemPerfilEstudiante(
             )
         }
     }
-}
+}

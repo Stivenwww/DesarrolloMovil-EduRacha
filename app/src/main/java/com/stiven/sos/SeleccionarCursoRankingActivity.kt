@@ -66,6 +66,9 @@ fun SeleccionarCursoRankingScreen(
     onCursoSelected: (Curso) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // El docente ve los rankings de SUS cursos (si no hay coincidencias se muestran todos)
+    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+    val cursosVisibles = uiState.cursos.filter { it.docenteId == uid }.ifEmpty { uiState.cursos }
 
     EduRachaV2Container {
         when {
@@ -81,13 +84,13 @@ fun SeleccionarCursoRankingScreen(
                 )
             }
 
-            uiState.cursos.isEmpty() -> {
+            cursosVisibles.isEmpty() -> {
                 EmptyRankingView(onNavigateBack = onNavigateBack)
             }
 
             else -> {
                 ListadoCursosRankingV2(
-                    cursos = uiState.cursos,
+                    cursos = cursosVisibles,
                     onCursoClick = onCursoSelected,
                     onNavigateBack = onNavigateBack
                 )
@@ -678,4 +681,4 @@ fun EmptyRankingView(onNavigateBack: () -> Unit) {
             )
         }
     }
-}
+}

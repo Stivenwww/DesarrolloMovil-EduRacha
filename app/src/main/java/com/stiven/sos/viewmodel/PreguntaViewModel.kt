@@ -118,6 +118,34 @@ class PreguntaViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Guarda una pregunta del formulario manual: la crea (idEdicion = null) o actualiza una existente.
+     * Ignora toques repetidos mientras guarda, para no crear duplicados.
+     * onGuardada recibe el id definitivo de la pregunta.
+     */
+    fun guardarPreguntaManual(pregunta: Pregunta, idEdicion: String?, onGuardada: (String) -> Unit) {
+        if (_uiState.value.isLoading) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
+            val resultado = if (idEdicion == null) repository.crearPregunta(pregunta)
+                            else repository.actualizarPregunta(idEdicion, pregunta.copy(id = idEdicion)).let { r ->
+                                if (r is ApiResult.Success) ApiResult.Success(idEdicion) else r
+                            }
+            when (resultado) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        successMessage = if (idEdicion == null) "Pregunta guardada. Ya puedes escribir la siguiente."
+                                         else "Cambios guardados."
+                    )
+                    onGuardada(resultado.data)
+                }
+                is ApiResult.Error -> _uiState.value = _uiState.value.copy(isLoading = false, error = resultado.message)
+                is ApiResult.Loading -> {}
+            }
+        }
+    }
+
     fun actualizarPregunta(id: String, pregunta: Pregunta, onSuccess: (() -> Unit)? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -235,6 +263,42 @@ class PreguntaViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Genera preguntas con IA usando el contenido real de un PDF (lo lee el servidor).
+     * Si el PDF no se puede leer, el error del servidor llega tal cual (escaneado, protegido, dañado...).
+     */
+    fun generarPreguntasDesdePdf(
+        archivo: okhttp3.MultipartBody.Part,
+        cursoId: String,
+        temaId: String,
+        cantidad: Int,
+        dificultad: String?,
+        onListo: (PreguntasIAResponse) -> Unit
+    ) {
+        if (_uiState.value.isLoading) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
+            try {
+                val t = com.stiven.sos.utils.ArchivosPdf::texto
+                val resp = com.stiven.sos.api.ApiClient.apiService.generarPreguntasDesdePdf(
+                    archivo, t(cursoId), t(temaId), t(cantidad.toString()), t(dificultad ?: "mixta")
+                )
+                val cuerpo = resp.body()
+                if (resp.isSuccessful && cuerpo != null) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, successMessage = cuerpo.message)
+                    onListo(cuerpo)
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = com.stiven.sos.api.mensajeDeError(resp))
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "No se pudo conectar con el servidor. Revisa que el backend esté encendido."
+                )
+            }
+        }
+    }
+
     fun limpiarCache() {
         viewModelScope.launch {
             when (val result = repository.limpiarCache()) {
@@ -260,4 +324,4 @@ class PreguntaViewModel : ViewModel() {
     fun clearSelectedPregunta() {
         _uiState.value = _uiState.value.copy(preguntaSeleccionada = null)
     }
-}
+}

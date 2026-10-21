@@ -55,6 +55,7 @@ fun MensajeFlotante(
                 .padding(16.dp),
             shape = RoundedCornerShape(12.dp),
             color = obtenerColorFondo(tipo),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, obtenerColorIcono(tipo).copy(alpha = 0.6f)),
             shadowElevation = 8.dp
         ) {
             Row(
@@ -95,23 +96,20 @@ fun MensajeFlotante(
 }
 
 @Composable
-private fun obtenerColorFondo(tipo: TipoMensaje): Color {
-    return when (tipo) {
-        TipoMensaje.EXITO -> EduRachaColors.Success.copy(alpha = 0.95f)
-        TipoMensaje.ERROR -> EduRachaColors.Error.copy(alpha = 0.95f)
-        TipoMensaje.INFO -> EduRachaColors.Info.copy(alpha = 0.95f)
-        TipoMensaje.ADVERTENCIA -> EduRachaColors.Warning.copy(alpha = 0.95f)
-    }
-}
+private fun obtenerColorFondo(tipo: TipoMensaje): Color = com.stiven.sos.ui.theme.LocalNexo.current.superficie
 
 @Composable
-private fun obtenerColorTexto(tipo: TipoMensaje): Color {
-    return Color.White
-}
+private fun obtenerColorTexto(tipo: TipoMensaje): Color = com.stiven.sos.ui.theme.LocalNexo.current.texto
 
 @Composable
 private fun obtenerColorIcono(tipo: TipoMensaje): Color {
-    return Color.White
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    return when (tipo) {
+        TipoMensaje.EXITO -> p.accionTexto
+        TipoMensaje.ERROR -> p.errorTexto
+        TipoMensaje.INFO -> p.marcaTexto
+        TipoMensaje.ADVERTENCIA -> p.rachaTexto
+    }
 }
 
 @Composable
@@ -121,5 +119,30 @@ private fun obtenerIcono(tipo: TipoMensaje): androidx.compose.ui.graphics.vector
         TipoMensaje.ERROR -> Icons.Default.Error
         TipoMensaje.INFO -> Icons.Default.Info
         TipoMensaje.ADVERTENCIA -> Icons.Default.Warning
+    }
+}
+
+/**
+ * Muestra arriba de la pantalla (bajo la barra de estado) los mensajes del QuizViewModel.
+ * Antes esos mensajes ("No tienes vidas disponibles", errores al iniciar) no se mostraban en ninguna pantalla.
+ */
+@Composable
+fun ConMensajesQuiz(
+    quizViewModel: com.stiven.sos.viewmodel.QuizViewModel,
+    contenido: @Composable () -> Unit
+) {
+    val estado by quizViewModel.uiState.collectAsState()
+    Box(Modifier.fillMaxSize()) {
+        contenido()
+        MensajeFlotante(
+            mensaje = estado.mensajeFlotante ?: "",
+            tipo = estado.tipoMensaje,
+            visible = estado.mostrarMensajeFlotante && !estado.mensajeFlotante.isNullOrBlank(),
+            onDismiss = { quizViewModel.ocultarMensaje() },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .widthIn(max = 560.dp)
+        )
     }
 }

@@ -1,7 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Tema oscuro: fondo Nexo noche mientras carga la app -->
     <style name="Base.Theme.DesarrolloMovil" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="android:windowBackground">@color/nexo_fondo</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/nexo_fondo</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <color name="nexo_fondo">#070B1F</color>
 </resources>

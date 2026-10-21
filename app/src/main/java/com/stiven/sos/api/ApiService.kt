@@ -121,6 +121,22 @@ interface ApiService {
     @GET("quiz/{quizId}/revision")
     suspend fun obtenerRevisionQuiz(@Path("quizId") quizId: String): Response<RevisionQuizResponse>
 
+    /** Lee un PDF en el servidor y devuelve su texto real (422 con mensaje si no se puede leer). */
+    @Multipart
+    @POST("api/pdf/extraer")
+    suspend fun extraerPdf(@Part archivo: okhttp3.MultipartBody.Part): Response<ResultadoPdf>
+
+    /** Genera preguntas con IA a partir del contenido de un PDF (quedan pendientes de revisión). */
+    @Multipart
+    @POST("api/preguntas/ia/generar-desde-pdf")
+    suspend fun generarPreguntasDesdePdf(
+        @Part archivo: okhttp3.MultipartBody.Part,
+        @Part("cursoId") cursoId: okhttp3.RequestBody,
+        @Part("temaId") temaId: okhttp3.RequestBody,
+        @Part("cantidad") cantidad: okhttp3.RequestBody,
+        @Part("dificultad") dificultad: okhttp3.RequestBody
+    ): Response<PreguntasIAResponse>
+
     @POST("quiz/explicacion-vista")
     suspend fun marcarExplicacionVista(@Body request: Map<String, String>): Response<Map<String, String>>
 
