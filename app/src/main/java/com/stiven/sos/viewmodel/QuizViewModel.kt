@@ -610,7 +610,8 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
                             // Error: Sin vidas
                             mensajeError.contains("sin vidas", ignoreCase = true) ||
-                                    mensajeError.contains("vidas insuficientes", ignoreCase = true) -> {
+                                    mensajeError.contains("vidas insuficientes", ignoreCase = true) ||
+                                    mensajeError.contains("vidas disponibles", ignoreCase = true) -> {
                                 Log.w(TAG, "Tipo de error detectado: SIN_VIDAS")
                                 _uiState.value = _uiState.value.copy(
                                     isLoading = false,
@@ -633,7 +634,8 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
 
                             // Error: Conexión
                             mensajeError.contains("conexión", ignoreCase = true) ||
-                                    mensajeError.contains("red", ignoreCase = true) ||
+                                    mensajeError.contains("conexion", ignoreCase = true) ||
+                                    mensajeError.contains("internet", ignoreCase = true) ||
                                     mensajeError.contains("timeout", ignoreCase = true) -> {
                                 Log.w(TAG, "Tipo de error detectado: ERROR_CONEXION")
                                 _uiState.value = _uiState.value.copy(
@@ -679,7 +681,10 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
             mensaje.contains("no disponible", ignoreCase = true) -> "Tema no disponible"
 
             mensaje.contains("conexión", ignoreCase = true) ||
-                    mensaje.contains("red", ignoreCase = true) -> "Error de conexión"
+                    mensaje.contains("conexion", ignoreCase = true) ||
+                    mensaje.contains("internet", ignoreCase = true) -> "Error de conexión"
+
+            mensaje.isNotBlank() && mensaje.length <= 90 && !mensaje.trimStart().startsWith("{") -> mensaje
 
             else -> "Error al iniciar quiz"
         }

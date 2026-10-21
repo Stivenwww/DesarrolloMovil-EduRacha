@@ -190,7 +190,7 @@ class QuizRepository(private val application: Application) {
                     } ?: Result.failure(Exception("Respuesta vacia del servidor"))
                 }
                 400 -> {
-                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Validacion fallida: $errorBody")
                     Result.failure(Exception(errorBody))
                 }
@@ -199,7 +199,7 @@ class QuizRepository(private val application: Application) {
                     Result.failure(Exception("Sesion expirada. Por favor, vuelve a iniciar sesion."))
                 }
                 403 -> {
-                    val errorBody = response.errorBody()?.string() ?: "No tienes permiso"
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Acceso denegado: $errorBody")
                     Result.failure(Exception(errorBody))
                 }
@@ -208,9 +208,9 @@ class QuizRepository(private val application: Application) {
                     Result.failure(Exception("Curso o tema no encontrado"))
                 }
                 else -> {
-                    val errorBody = response.errorBody()?.string()
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Error ${response.code()}: $errorBody")
-                    Result.failure(Exception(errorBody ?: "Error al iniciar quiz: ${response.code()}"))
+                    Result.failure(Exception(errorBody))
                 }
             }
         } catch (e: Exception) {
@@ -609,7 +609,7 @@ class QuizRepository(private val application: Application) {
                     } ?: Result.failure(Exception("Respuesta vacia del servidor"))
                 }
                 400 -> {
-                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Validacion fallida: $errorBody")
                     Result.failure(Exception(errorBody))
                 }
@@ -618,7 +618,7 @@ class QuizRepository(private val application: Application) {
                     Result.failure(Exception("Sesion expirada. Por favor, vuelve a iniciar sesion."))
                 }
                 403 -> {
-                    val errorBody = response.errorBody()?.string() ?: "No tienes permiso"
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Acceso denegado: $errorBody")
                     Result.failure(Exception(errorBody))
                 }
@@ -627,9 +627,9 @@ class QuizRepository(private val application: Application) {
                     Result.failure(Exception("No se encontro el quiz final"))
                 }
                 else -> {
-                    val errorBody = response.errorBody()?.string()
+                    val errorBody = com.stiven.sos.api.mensajeDeError(response)
                     Log.e(TAG, "Error ${response.code()}: $errorBody")
-                    Result.failure(Exception(errorBody ?: "Error al iniciar quiz final: ${response.code()}"))
+                    Result.failure(Exception(errorBody))
                 }
             }
         } catch (e: Exception) {
