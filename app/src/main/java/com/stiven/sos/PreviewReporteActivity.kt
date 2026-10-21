@@ -32,7 +32,6 @@ import com.stiven.sos.models.ReporteEstado
 import com.stiven.sos.models.TipoReporte
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
-import com.stiven.sos.ui.theme.CustomShapes
 import com.stiven.sos.viewmodel.ReporteViewModel
 
 class PreviewReporteActivity : ComponentActivity() {
@@ -71,7 +70,37 @@ class PreviewReporteActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Columna que se grafica en el Excel y en la vista previa (la misma en los dos). */
+private fun columnaGrafico(tipo: TipoReporte) = when (tipo) {
+    TipoReporte.DIARIO -> "Experiencia Ganada" to "XP ganada en el día"
+    TipoReporte.TEMA -> "Mejor Puntaje" to "Mejor puntaje por estudiante"
+    TipoReporte.GENERAL -> "Experiencia Total" to "XP total por estudiante"
+    TipoReporte.RANGO -> "Experiencia" to "XP ganada en el rango"
+}
+
+private fun tituloReporte(tipo: TipoReporte) = when (tipo) {
+    TipoReporte.DIARIO -> "Reporte diario"
+    TipoReporte.TEMA -> "Reporte por tema"
+    TipoReporte.GENERAL -> "Reporte general del curso"
+    TipoReporte.RANGO -> "Reporte por rango de fechas"
+}
+
+/** Etiquetas cortas y claras para las columnas (las mismas del Excel). */
+private fun etiquetaColumna(c: String) = when (c) {
+    "Quizzes Realizados", "Total Quizzes", "Quizzes en Rango" -> "Quizzes"
+    "Promedio Correctas", "Promedio General" -> "Aciertos prom."
+    "Experiencia Ganada" -> "XP ganada"
+    "Experiencia Total" -> "XP total"
+    "Experiencia" -> "XP"
+    "Temas Completados" -> "Temas"
+    "Promedio Tiempo (seg)", "Tiempo Promedio (seg)" -> "Tiempo (s)"
+    "Mejor Puntaje" -> "Mejor puntaje"
+    "Nombre" -> "Estudiante"
+    else -> c
+}
+
+private fun numero(v: String?): Double = v?.replace(",", ".")?.toDoubleOrNull() ?: 0.0
+
 @Composable
 fun PreviewReporteScreenPremium(
     cursoId: String,
@@ -84,449 +113,292 @@ fun PreviewReporteScreenPremium(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
 
     val cargando by reporteViewModel.cargandoPreview.collectAsState()
     val errorPreview by reporteViewModel.errorPreview.collectAsState()
     val datosReporte by reporteViewModel.datosPreview.collectAsState()
-
     val estadoDescarga by when (tipoReporte) {
         TipoReporte.DIARIO -> reporteViewModel.estadoReporteDiario.collectAsState()
         TipoReporte.TEMA -> reporteViewModel.estadoReporteTema.collectAsState()
         TipoReporte.GENERAL -> reporteViewModel.estadoReporteGeneral.collectAsState()
         TipoReporte.RANGO -> reporteViewModel.estadoReporteRango.collectAsState()
     }
+    // Último archivo descargado en esta pantalla (para abrirlo o compartirlo)
+    var archivo by remember { mutableStateOf<ReporteEstado.Exito?>(null) }
 
-    LaunchedEffect(cursoId) {
+    fun cargar() {
         when (tipoReporte) {
             TipoReporte.DIARIO -> fecha?.let { reporteViewModel.obtenerDatosPreviewDiario(cursoId, it) }
             TipoReporte.TEMA -> temaId?.let { reporteViewModel.obtenerDatosPreviewTema(cursoId, it) }
             TipoReporte.GENERAL -> reporteViewModel.obtenerDatosPreviewGeneral(cursoId)
-            TipoReporte.RANGO -> {
-                if (desde != null && hasta != null) {
-                    reporteViewModel.obtenerDatosPreviewRango(cursoId, desde, hasta)
-                }
-            }
+            TipoReporte.RANGO -> if (desde != null && hasta != null) reporteViewModel.obtenerDatosPreviewRango(cursoId, desde, hasta)
         }
     }
+    fun descargar() {
+        when (tipoReporte) {
+            TipoReporte.DIARIO -> fecha?.let { reporteViewModel.descargarReporteDiario(cursoId, it) }
+            TipoReporte.TEMA -> temaId?.let { reporteViewModel.descargarReporteTema(cursoId, it) }
+            TipoReporte.GENERAL -> reporteViewModel.descargarReporteGeneral(cursoId)
+            TipoReporte.RANGO -> if (desde != null && hasta != null) reporteViewModel.descargarReporteRango(cursoId, desde, hasta)
+        }
+    }
+    fun resetear() = when (tipoReporte) {
+        TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
+        TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
+        TipoReporte.GENERAL -> reporteViewModel.resetearEstadoGeneral()
+        TipoReporte.RANGO -> reporteViewModel.resetearEstadoRango()
+    }
 
+    LaunchedEffect(cursoId) { cargar() }
     LaunchedEffect(estadoDescarga) {
-        when (val estado = estadoDescarga) {
+        when (val e = estadoDescarga) {
             is ReporteEstado.Exito -> {
-                Toast.makeText(context, "Reporte descargado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
-                when (tipoReporte) {
-                    TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
-                    TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
-                    TipoReporte.GENERAL -> reporteViewModel.resetearEstadoGeneral()
-                    TipoReporte.RANGO -> reporteViewModel.resetearEstadoRango()
-                }
+                archivo = e
+                com.stiven.sos.ui.theme.Avisos.mostrar(context, "Excel guardado en Descargas: ${e.nombreArchivo}", com.stiven.sos.ui.theme.TipoAviso.EXITO, "Reporte descargado")
+                resetear()
             }
             is ReporteEstado.Error -> {
-                Toast.makeText(context, "Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
-                when (tipoReporte) {
-                    TipoReporte.DIARIO -> reporteViewModel.resetearEstadoDiario()
-                    TipoReporte.TEMA -> reporteViewModel.resetearEstadoTema()
-                    TipoReporte.GENERAL -> reporteViewModel.resetearEstadoGeneral()
-                    TipoReporte.RANGO -> reporteViewModel.resetearEstadoRango()
-                }
+                com.stiven.sos.ui.theme.Avisos.mostrar(context, e.mensaje, com.stiven.sos.ui.theme.TipoAviso.ERROR, "No se pudo descargar")
+                resetear()
             }
             else -> {}
         }
     }
-
     val descargando = estadoDescarga is ReporteEstado.Descargando
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Vista Previa", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(
-                            when (tipoReporte) {
-                                TipoReporte.DIARIO -> "Reporte Diario"
-                                TipoReporte.TEMA -> "Reporte por Tema"
-                                TipoReporte.GENERAL -> "Reporte General"
-                                TipoReporte.RANGO -> "Reporte por Rango"
-                            },
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior,
-                    titleContentColor = Color.White
-                )
+    com.stiven.sos.ui.theme.FondoNexo {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Vista previa",
+                subtitulo = tituloReporte(tipoReporte),
+                onVolver = onBackClick,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.ACCION
             )
-        },
-        floatingActionButton = {
-            if (!cargando && errorPreview == null && datosReporte != null) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        when (tipoReporte) {
-                            TipoReporte.DIARIO -> fecha?.let { reporteViewModel.descargarReporteDiario(cursoId, it) }
-                            TipoReporte.TEMA -> temaId?.let { reporteViewModel.descargarReporteTema(cursoId, it) }
-                            TipoReporte.GENERAL -> reporteViewModel.descargarReporteGeneral(cursoId)
-                            TipoReporte.RANGO -> {
-                                if (desde != null && hasta != null) {
-                                    reporteViewModel.descargarReporteRango(cursoId, desde, hasta)
-                                }
-                            }
+            Box(Modifier.weight(1f)) {
+                when {
+                    cargando -> com.stiven.sos.ui.theme.CargandoNexo("Preparando el reporte", "Estoy reuniendo los datos de cada estudiante…", p.accion)
+                    errorPreview != null -> com.stiven.sos.ui.theme.EstadoVacioNexo(
+                        titulo = "No se pudo cargar",
+                        mensaje = errorPreview ?: "",
+                        expresion = com.stiven.sos.ui.theme.ExpresionRobi.TRISTE,
+                        textoAccion = "Reintentar",
+                        onAccion = { cargar() },
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    datosReporte != null -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(16.dp)) {
+                            HojaReporteNexo(datosReporte!!)
                         }
-                    },
-                    icon = {
-                        if (descargando) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Default.Download, "Descargar", tint = Color.White)
-                        }
-                    },
-                    text = {
-                        Text(
-                            if (descargando) "Descargando..." else "Descargar Excel",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    containerColor = EduRachaColors.Success,
-                    modifier = Modifier.shadow(12.dp, CustomShapes.Card)
-                )
+                    }
+                }
             }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(EduRachaColors.Background)
-                .padding(paddingValues)
-        ) {
-            when {
-                cargando -> EstadoCargando()
-                errorPreview != null -> EstadoError(
-                    mensaje = errorPreview!!,
-                    onReintentar = {
-                        when (tipoReporte) {
-                            TipoReporte.DIARIO -> fecha?.let { reporteViewModel.obtenerDatosPreviewDiario(cursoId, it) }
-                            TipoReporte.TEMA -> temaId?.let { reporteViewModel.obtenerDatosPreviewTema(cursoId, it) }
-                            TipoReporte.GENERAL -> reporteViewModel.obtenerDatosPreviewGeneral(cursoId)
-                            TipoReporte.RANGO -> {
-                                if (desde != null && hasta != null) {
-                                    reporteViewModel.obtenerDatosPreviewRango(cursoId, desde, hasta)
+            // Barra de acciones
+            if (datosReporte != null && !cargando) {
+                Surface(color = p.superficie, shadowElevation = 8.dp) {
+                    com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.stiven.sos.ui.theme.BotonNexo(
+                                texto = if (archivo == null) "Descargar Excel" else "Descargar de nuevo",
+                                onClick = { descargar() },
+                                tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                                icono = Icons.Filled.Download,
+                                cargando = descargando,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            archivo?.let { a ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    com.stiven.sos.ui.theme.BotonNexo(
+                                        texto = "Abrir",
+                                        onClick = { abrirArchivo(context, a, compartir = false) },
+                                        tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                                        icono = Icons.Outlined.FileOpen,
+                                        alto = 48.dp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    com.stiven.sos.ui.theme.BotonNexo(
+                                        texto = "Compartir",
+                                        onClick = { abrirArchivo(context, a, compartir = true) },
+                                        tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                                        icono = Icons.Outlined.Share,
+                                        alto = 48.dp,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
                         }
                     }
-                )
-                datosReporte != null -> PreviewContentPremium(datos = datosReporte!!)
+                }
             }
         }
     }
 }
 
-@Composable
-fun EstadoCargando() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CircularProgressIndicator(
-            color = EduRachaColors.Primary,
-            strokeWidth = 4.dp,
-            modifier = Modifier.size(64.dp)
+/** Abre el Excel descargado con la app que el docente tenga (Excel, Sheets, WPS…) o lo comparte. */
+private fun abrirArchivo(context: android.content.Context, a: ReporteEstado.Exito, compartir: Boolean) {
+    val uri = a.uri?.let { android.net.Uri.parse(it) }
+    if (uri == null || uri.scheme != "content") {
+        com.stiven.sos.ui.theme.Avisos.mostrar(context, "El archivo está en la carpeta Descargas: ${a.nombreArchivo}", com.stiven.sos.ui.theme.TipoAviso.INFO)
+        return
+    }
+    val tipo = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    val intent = if (compartir) {
+        android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = tipo
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, a.nombreArchivo)
+        }.let { android.content.Intent.createChooser(it, "Compartir reporte") }
+    } else {
+        android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, tipo)
+    }
+    intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (e: android.content.ActivityNotFoundException) {
+        com.stiven.sos.ui.theme.Avisos.mostrar(
+            context, "No hay una app para abrir Excel. El archivo está en Descargas: ${a.nombreArchivo}", com.stiven.sos.ui.theme.TipoAviso.ADVERTENCIA
         )
-        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * La vista previa replica el Excel que se descarga: franja de marca, datos del curso,
+ * indicadores, tabla con estados de color y el mismo gráfico de barras.
+ */
+@Composable
+fun HojaReporteNexo(datos: DatosReporte) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val (colGrafico, tituloGrafico) = columnaGrafico(datos.tipoReporte)
+    val detalle = when (datos.tipoReporte) {
+        TipoReporte.DIARIO -> "Fecha: ${datos.fecha ?: "—"}"
+        TipoReporte.TEMA -> "Tema: ${datos.temaNombre ?: datos.temaId ?: "—"}"
+        TipoReporte.GENERAL -> "Todo el historial del curso"
+        TipoReporte.RANGO -> "Del ${datos.fechaInicio ?: "—"} al ${datos.fechaFin ?: "—"}"
+    }
+    val sumaGrafico = datos.filas.sumOf { numero(it[colGrafico]) }.toInt()
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Franja de marca + título (como las primeras filas del Excel)
+        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), color = p.superficie, shadowElevation = if (p.esOscuro) 0.dp else 2.dp) {
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().background(p.ia).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("EduRacha", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Text("  ·  Aprende en racha", color = Color.White.copy(alpha = 0.85f), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Column(Modifier.fillMaxWidth().background(p.marcaSombra).padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text(tituloReporte(datos.tipoReporte), color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                }
+                Text(
+                    "Curso: ${datos.cursoNombre}  ·  $detalle",
+                    color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+        }
+
+        // Indicadores
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Groups, "${datos.totalRegistros}", "Estudiantes", p.marca, Modifier.weight(1f))
+            com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.DirectionsRun, "${datos.registrosConDatos}", "Con actividad", p.accion, Modifier.weight(1f))
+            com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Bolt, "$sumaGrafico", etiquetaColumna(colGrafico), p.racha, Modifier.weight(1f))
+        }
+
+        // Tabla
+        com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth(), padding = 0.dp) {
+            Text(
+                "Detalle por estudiante (${datos.filas.size})",
+                color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp)
+            )
+            if (datos.filas.isEmpty()) {
+                Text(
+                    "Todavía no hay actividad registrada para este reporte.",
+                    color = p.textoSuave, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                TablaReporte(datos)
+            }
+        }
+
+        // Gráfico (mismo que el Excel)
+        if (datos.filas.isNotEmpty()) {
+            com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth()) {
+                Text(tituloGrafico, color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Text("También va como gráfico dentro del Excel.", color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
+                val max = datos.filas.maxOf { numero(it[colGrafico]) }.coerceAtLeast(1.0)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    datos.filas.take(15).forEach { f ->
+                        val v = numero(f[colGrafico])
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(f["Nombre"] ?: "", color = p.texto, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.width(110.dp))
+                            com.stiven.sos.ui.theme.BarraNexo((v / max).toFloat(), color = p.marca, alto = 12.dp, modifier = Modifier.weight(1f))
+                            Text(
+                                if (v % 1.0 == 0.0) "${v.toInt()}" else "%.1f".format(v),
+                                color = p.texto, fontSize = 13.sp, fontWeight = FontWeight.Black,
+                                textAlign = TextAlign.End, modifier = Modifier.width(52.dp)
+                            )
+                        }
+                    }
+                    if (datos.filas.size > 15) Text("Se muestran los 15 primeros; el Excel incluye a todos.", color = p.textoSuave, fontSize = 12.sp)
+                }
+            }
+        }
         Text(
-            text = "Cargando datos del reporte...",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = EduRachaColors.TextPrimary
+            "Generado por EduRacha · Corporación Universitaria Autónoma del Cauca",
+            color = p.textoTenue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Por favor espera",
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary
-        )
     }
 }
 
 @Composable
-fun EstadoError(mensaje: String, onReintentar: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = EduRachaColors.ErrorContainer,
-            modifier = Modifier.size(80.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Outlined.ErrorOutline,
-                    contentDescription = null,
-                    tint = EduRachaColors.Error,
-                    modifier = Modifier.size(40.dp)
-                )
+private fun TablaReporte(datos: DatosReporte) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val columnas = datos.encabezados
+    val ancho = { c: String -> if (c == "Nombre") 170.dp else if (c == "Estado") 120.dp else 104.dp }
+    Column(Modifier.horizontalScroll(rememberScrollState())) {
+        // Encabezado de color (como en el Excel)
+        Row(Modifier.background(p.marcaSombra)) {
+            Text("#", color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp,
+                modifier = Modifier.width(40.dp).padding(vertical = 10.dp), textAlign = TextAlign.Center)
+            columnas.forEach { c ->
+                Text(etiquetaColumna(c), color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp, maxLines = 1,
+                    modifier = Modifier.width(ancho(c)).padding(horizontal = 8.dp, vertical = 10.dp),
+                    textAlign = if (c == "Nombre") TextAlign.Start else TextAlign.Center)
             }
         }
-        Spacer(Modifier.height(24.dp))
-        Text(
-            text = "Error al cargar datos",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.Error
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = mensaje,
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onReintentar,
-            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary)
-        ) {
-            Icon(Icons.Default.Refresh, null)
-            Spacer(Modifier.width(8.dp))
-            Text("Reintentar", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun PreviewContentPremium(datos: DatosReporte) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        HeaderInfoCard(datos)
-
-        if (datos.filas.isEmpty()) {
-            EmptyStateCardPremium()
-        } else {
-            DataTableCardPremium(datos)
-        }
-
-        Spacer(Modifier.height(80.dp))
-    }
-}
-
-@Composable
-fun HeaderInfoCard(datos: DatosReporte) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = EduRachaColors.PrimaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        datos.filas.forEachIndexed { i, f ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.background(if (i % 2 == 1) p.superficieAlt else p.superficie),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = datos.cursoNombre,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-                    when (datos.tipoReporte) {
-                        TipoReporte.DIARIO -> {
-                            datos.fecha?.let {
-                                InfoChip(icon = Icons.Outlined.CalendarToday, text = "Fecha: $it")
+                Text("${i + 1}", color = p.textoSuave, fontWeight = FontWeight.Black, fontSize = 13.sp,
+                    modifier = Modifier.width(40.dp).padding(vertical = 10.dp), textAlign = TextAlign.Center)
+                columnas.forEach { c ->
+                    val v = f[c] ?: ""
+                    if (c == "Estado") {
+                        Box(Modifier.width(ancho(c)).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                            val color = when {
+                                v.contains("aprob", true) || v.contains("activo", true) || v.contains("complet", true) -> p.accion
+                                v.contains("progreso", true) || v.contains("pendiente", true) -> p.racha
+                                else -> p.textoSuave
                             }
+                            com.stiven.sos.ui.theme.EtiquetaEstadoNexo(v, color)
                         }
-                        TipoReporte.TEMA -> {
-                            datos.temaNombre?.let {
-                                InfoChip(icon = Icons.Outlined.Topic, text = "Tema: $it")
-                            }
-                        }
-                        TipoReporte.GENERAL -> {
-                            InfoChip(icon = Icons.Outlined.Assessment, text = "Reporte General")
-                        }
-                        TipoReporte.RANGO -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                InfoChip(icon = Icons.Outlined.DateRange, text = "Desde: ${datos.fechaInicio}")
-                                InfoChip(icon = Icons.Outlined.DateRange, text = "Hasta: ${datos.fechaFin}")
-                            }
-                        }
+                    } else {
+                        Text(v, color = p.texto, fontSize = 13.sp, fontWeight = if (c == "Nombre") FontWeight.Bold else FontWeight.SemiBold,
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.width(ancho(c)).padding(horizontal = 8.dp, vertical = 10.dp),
+                            textAlign = if (c == "Nombre") TextAlign.Start else TextAlign.Center)
                     }
                 }
-
-                Surface(
-                    shape = CircleShape,
-                    color = EduRachaColors.Primary.copy(alpha = 0.15f),
-                    modifier = Modifier.size(70.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${datos.filas.size}",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Primary
-                            )
-                            Text(
-                                text = "registros",
-                                fontSize = 10.sp,
-                                color = EduRachaColors.Primary
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (datos.totalRegistros > 0) {
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = EduRachaColors.Border)
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    StatsChipPremium(
-                        label = "Total estudiantes",
-                        value = "${datos.totalRegistros}",
-                        icon = Icons.Outlined.Groups
-                    )
-                    StatsChipPremium(
-                        label = "Con actividad",
-                        value = "${datos.registrosConDatos}",
-                        icon = Icons.Outlined.CheckCircle,
-                        color = EduRachaColors.Success
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun InfoChip(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = EduRachaColors.Primary, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text = text, fontSize = 13.sp, color = EduRachaColors.TextSecondary)
-    }
-}
-
-@Composable
-fun StatsChipPremium(label: String, value: String, icon: ImageVector, color: Color = EduRachaColors.Primary) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(text = value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = color)
-        }
-        Text(text = label, fontSize = 11.sp, color = EduRachaColors.TextSecondary, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-fun EmptyStateCardPremium() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = EduRachaColors.WarningContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(Icons.Outlined.Inbox, contentDescription = null, tint = EduRachaColors.Warning, modifier = Modifier.size(64.dp))
-            Spacer(Modifier.height(16.dp))
-            Text(text = "Sin Datos", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = EduRachaColors.Warning)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "No hay datos disponibles para este reporte en el período seleccionado.",
-                fontSize = 14.sp,
-                color = EduRachaColors.TextSecondary,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-fun DataTableCardPremium(datos: DatosReporte) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = CustomShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(16.dp)
-        ) {
-            Text(
-                text = "Datos del Reporte",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = EduRachaColors.TextPrimary,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Row(
-                modifier = Modifier
-                    .background(EduRachaColors.Primary.copy(alpha = 0.1f), CustomShapes.CardSmall)
-                    .padding(12.dp)
-            ) {
-                datos.encabezados.forEach { header ->
-                    Text(
-                        text = header,
-                        modifier = Modifier.width(150.dp).padding(horizontal = 8.dp),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            datos.filas.forEachIndexed { index, fila ->
-                Row(
-                    modifier = Modifier
-                        .background(if (index % 2 == 0) Color.White else EduRachaColors.SurfaceVariant)
-                        .border(1.dp, EduRachaColors.Border, CustomShapes.CardSmall)
-                        .padding(12.dp)
-                ) {
-                    datos.encabezados.forEach { header ->
-                        Text(
-                            text = fila[header] ?: "-",
-                            modifier = Modifier.width(150.dp).padding(horizontal = 8.dp),
-                            fontSize = 13.sp,
-                            color = EduRachaColors.TextPrimary
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
             }
         }
     }

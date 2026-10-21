@@ -91,7 +91,9 @@ fun ListaCursosScreen(
     val cursoUiState by cursoViewModel.uiState.collectAsState()
     val preguntaUiState by preguntaViewModel.uiState.collectAsState()
 
-    val cursos = cursoUiState.cursos
+    // Solo los cursos del docente que inició sesión
+    val uidDocente = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
+    val cursos = cursoUiState.cursos.filter { uidDocente == null || it.docenteId == uidDocente }
     val isLoading = cursoUiState.isLoading
     val errorMessage = cursoUiState.error
     val successMessage = cursoUiState.operationSuccess
@@ -115,11 +117,11 @@ fun ListaCursosScreen(
 
     LaunchedEffect(errorMessage, successMessage) {
         errorMessage?.let {
-            Toast.makeText(context, "Error: $it", Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: $it")
             cursoViewModel.clearError()
         }
         successMessage?.let {
-            Toast.makeText(context, "$it", Toast.LENGTH_SHORT).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, "$it")
             cursoViewModel.clearSuccessMessage()
         }
     }
@@ -150,37 +152,16 @@ fun ListaCursosScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        if (esModoValidacion) "Seleccionar Curso para Validar" else "Mis Cursos Creados",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
-                    }
-                },
-                actions = {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = if (esModoValidacion) "Elige un curso para validar" else "Mis cursos creados",
+                subtitulo = if (esModoValidacion) "Validación de preguntas" else "Docente",
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
                     if (esModoValidacion && preguntasPendientes.isNotEmpty()) {
-                        Surface(
-                            color = EduRachaColors.Warning,
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text(
-                                text = "${preguntasPendientes.size} pendientes",
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
+                        com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("${preguntasPendientes.size} pendientes")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = EduRachaColors.BarraSuperior)
+                }
             )
         },
         containerColor = EduRachaColors.Background
@@ -491,22 +472,172 @@ fun CursoDetailDialogMejorado(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val context = LocalContext.current
+    // Pantalla completa (antes era una ventana emergente pequeña)
     var modoEdicion by remember { mutableStateOf(false) }
+    com.stiven.sos.ui.theme.PantallaSuperpuestaNexo(onAtras = { if (modoEdicion) modoEdicion = false else onDismiss() }) {
+        if (modoEdicion) EditarCursoPantalla(curso, onGuardado = { modoEdicion = false; onDismiss() }, onCancelar = { modoEdicion = false })
+        else DetalleCursoPantalla(curso, onVolver = onDismiss, onEditar = { modoEdicion = true }, onEliminar = onDelete)
+    }
+}
 
-    if (modoEdicion) {
-        EditarCursoDialog(
-            curso = curso,
-            onDismiss = { modoEdicion = false; onDismiss() },
-            onCancel = { modoEdicion = false }
-        )
-    } else {
-        DetallesCursoDialog(
-            curso = curso,
-            onDismiss = onDismiss,
-            onEdit = { modoEdicion = true },
-            onDelete = onDelete
-        )
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DetalleCursoPantalla(curso: Curso, onVolver: () -> Unit, onEditar: () -> Unit, onEliminar: () -> Unit) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val context = LocalContext.current
+    val temas = remember(curso) { curso.getTemasLista() }
+    val estadoColor = when (curso.estado.lowercase()) { "activo" -> p.accion; "borrador" -> p.racha; "archivado", "inactivo" -> p.textoSuave; else -> p.marca }
+    val fmt = remember { java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale("es", "CO")) }
+
+    fun abrir(clase: Class<*>, extras: Map<String, String?> = emptyMap()) {
+        context.startActivity(Intent(context, clase).apply {
+            putExtra("CURSO_ID", curso.id); putExtra("CURSO_TITULO", curso.titulo); putExtra("CURSO_CODIGO", curso.codigo)
+            extras.forEach { (k, v) -> putExtra(k, v) }
+        })
+    }
+
+    com.stiven.sos.ui.theme.FondoNexo {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = curso.titulo,
+                subtitulo = "Curso · ${curso.codigo}",
+                onVolver = onVolver,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.MARCA,
+                acciones = {
+                    com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Default.Edit, "Editar curso", onEditar)
+                }
+            )
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.MenuBook, "${temas.size}", "Temas", p.ia, Modifier.weight(1f))
+                            com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.CalendarToday, "${curso.duracionDias}", "Días", p.marca, Modifier.weight(1f))
+                            com.stiven.sos.ui.theme.StatNexo(obtenerIconoEstado(curso.estado), curso.estado.ifBlank { "—" }.replaceFirstChar { it.uppercase() }, "Estado", estadoColor, Modifier.weight(1f))
+                        }
+                        if (curso.fechaInicio > 0) {
+                            com.stiven.sos.ui.theme.NotaNexo(
+                                "Del ${fmt.format(java.util.Date(curso.fechaInicio))} al ${fmt.format(java.util.Date(curso.fechaFin))}",
+                                p.marca, Icons.Outlined.Event, titulo = "Vigencia"
+                            )
+                        }
+                        if (curso.descripcion.isNotBlank()) {
+                            com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth()) {
+                                Text("Descripción", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                                Spacer(Modifier.height(6.dp))
+                                Text(curso.descripcion, color = p.textoSuave, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp)
+                            }
+                        }
+
+                        com.stiven.sos.ui.theme.TituloSeccionNexo("Accesos rápidos", icono = Icons.Outlined.Bolt)
+                        com.stiven.sos.ui.theme.FilaNexo(Icons.Outlined.Groups, p.accion, "Estudiantes y aspirantes", subtitulo = "Acepta solicitudes y mira quién está inscrito",
+                            onClick = { abrir(AsignarEstudiantesActivity::class.java) },
+                            extremo = { Icon(Icons.Default.ChevronRight, null, tint = p.textoSuave) })
+                        com.stiven.sos.ui.theme.FilaNexo(Icons.Outlined.FactCheck, p.ia, "Validar preguntas", subtitulo = "Revisa o aprueba todas las pendientes",
+                            onClick = { abrir(ValidacionPreguntasActivity::class.java) },
+                            extremo = { Icon(Icons.Default.ChevronRight, null, tint = p.textoSuave) })
+                        com.stiven.sos.ui.theme.FilaNexo(Icons.Outlined.AutoStories, p.ia, "Explicaciones de los temas", subtitulo = "Lee, edita y aprueba",
+                            onClick = { abrir(GestionExplicacionesActivity::class.java) },
+                            extremo = { Icon(Icons.Default.ChevronRight, null, tint = p.textoSuave) })
+                        com.stiven.sos.ui.theme.FilaNexo(Icons.Outlined.Insights, p.racha, "Ranking y estadísticas",
+                            onClick = { abrir(RankingDetalleActivity::class.java) },
+                            extremo = { Icon(Icons.Default.ChevronRight, null, tint = p.textoSuave) })
+
+                        com.stiven.sos.ui.theme.TituloSeccionNexo("Temas (${temas.size})", icono = Icons.Outlined.Topic)
+                        if (temas.isEmpty()) {
+                            Text("Este curso aún no tiene temas.", color = p.textoSuave, fontSize = 14.sp)
+                        }
+                        temas.forEachIndexed { i, t ->
+                            val (txt, col) = when {
+                                t.explicacion.isNullOrBlank() -> "Sin explicación" to p.error
+                                t.explicacionEstado == "aprobada" -> "Explicación aprobada" to p.accion
+                                else -> "Explicación por revisar" to p.racha
+                            }
+                            com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth(), padding = 12.dp) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(p.marca.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                                        Text("${i + 1}", color = p.marcaTexto, fontWeight = FontWeight.Black)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(t.titulo, color = p.texto, fontWeight = FontWeight.Black, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Spacer(Modifier.height(4.dp))
+                                        com.stiven.sos.ui.theme.EtiquetaEstadoNexo(txt, col)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+            Surface(color = p.superficie, shadowElevation = 8.dp) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        com.stiven.sos.ui.theme.BotonNexo("Eliminar", onEliminar, tipo = com.stiven.sos.ui.theme.TipoBoton.PELIGRO,
+                            icono = Icons.Default.Delete, alto = 52.dp, modifier = Modifier.weight(1f))
+                        com.stiven.sos.ui.theme.BotonNexo("Editar", onEditar, tipo = com.stiven.sos.ui.theme.TipoBoton.MARCA,
+                            icono = Icons.Default.Edit, alto = 52.dp, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditarCursoPantalla(curso: Curso, onGuardado: () -> Unit, onCancelar: () -> Unit) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val viewModel: CursoViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    var titulo by remember { mutableStateOf(curso.titulo) }
+    var descripcion by remember { mutableStateOf(curso.descripcion) }
+    var duracionDias by remember { mutableStateOf(curso.duracionDias.toString()) }
+    var estado by remember { mutableStateOf(curso.estado) }
+    val dias = duracionDias.toIntOrNull()
+    val valido = titulo.isNotBlank() && dias != null && dias in 1..365
+
+    com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(titulo = "Editar curso", subtitulo = curso.codigo, onVolver = onCancelar)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).imePadding()) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        com.stiven.sos.ui.theme.CampoNexo(titulo, { titulo = it }, "Título del curso", icono = Icons.Outlined.MenuBook, unaLinea = true,
+                            error = titulo.isBlank(), apoyo = if (titulo.isBlank()) "El título es obligatorio" else null)
+                        com.stiven.sos.ui.theme.CampoNexo(descripcion, { descripcion = it }, "Descripción", lineasMinimas = 4, icono = Icons.Outlined.Description)
+                        val base = if (curso.fechaInicio > 0) curso.fechaInicio else System.currentTimeMillis()
+                        com.stiven.sos.ui.theme.CampoNexo(
+                            duracionDias, { duracionDias = it.filter { c -> c.isDigit() }.take(3) }, "Duración en días (1-365)",
+                            icono = Icons.Outlined.CalendarToday, unaLinea = true,
+                            error = dias == null || dias !in 1..365,
+                            apoyo = if (dias == null || dias !in 1..365) "Debe estar entre 1 y 365 días"
+                            else "Vigencia: ${com.stiven.sos.utils.CursoVigencia.formatearFecha(base)} → ${com.stiven.sos.utils.CursoVigencia.formatearFecha(base + dias * 86_400_000L)}"
+                        )
+                        Text("Estado del curso", color = p.texto, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                        EstadoSelectorMejorado(estadoSeleccionado = estado, onEstadoSeleccionado = { estado = it })
+                    }
+                }
+            }
+            Surface(color = p.superficie, shadowElevation = 8.dp) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        com.stiven.sos.ui.theme.BotonNexo("Cancelar", onCancelar, tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO, alto = 52.dp, modifier = Modifier.weight(1f))
+                        com.stiven.sos.ui.theme.BotonNexo("Guardar", {
+                            val d = dias ?: return@BotonNexo
+                            val inicio = if (curso.fechaInicio > 0) curso.fechaInicio else System.currentTimeMillis()
+                            viewModel.actualizarCurso(
+                                curso.copy(
+                                    titulo = titulo.trim(), descripcion = descripcion.trim(), duracionDias = d,
+                                    fechaInicio = inicio, fechaFin = inicio + d * 86_400_000L, programacion = null, estado = estado
+                                )
+                            )
+                            onGuardado()
+                        }, tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION, icono = Icons.Default.Check, habilitado = valido,
+                            alto = 52.dp, modifier = Modifier.weight(1.3f))
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -75,7 +76,9 @@ fun SeleccionarCursoValidacionScreen(
     val cursoUiState by cursoViewModel.uiState.collectAsState()
     val preguntasUiState by preguntasViewModel.uiState.collectAsState()
 
-    val todosLosCursos = cursoUiState.cursos
+    // Solo los cursos del docente que inició sesión
+    val uidDocente = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
+    val todosLosCursos = cursoUiState.cursos.filter { uidDocente == null || it.docenteId == uidDocente }
     val todasLasPreguntas = preguntasUiState.preguntas
     val isLoading = cursoUiState.isLoading || preguntasUiState.isLoading
 
@@ -114,45 +117,14 @@ fun SeleccionarCursoValidacionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Validar Preguntas IA",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Selecciona un curso",
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 14.sp
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                    }
-                },
-                actions = {
-                    Surface(
-                        color = EduRachaColors.Secondary,
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = "${preguntasPendientes.size} total",
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior
-                )
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Validar preguntas IA",
+                subtitulo = "Elige un curso",
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
+                    com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("${preguntasPendientes.size} en total")
+                }
             )
         },
         containerColor = EduRachaColors.Background
@@ -177,7 +149,8 @@ fun SeleccionarCursoValidacionScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         item {
                             InfoCard(
@@ -305,88 +278,32 @@ fun CursoValidacionCard(
     preguntasPendientes: Int,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-        onClick = onClick
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    com.stiven.sos.ui.theme.TarjetaNexo(
+        Modifier.widthIn(max = 720.dp).fillMaxWidth().clickable(onClick = onClick),
+        acento = p.ia,
+        padding = 14.dp
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stiven.sos.ui.theme.InsigniaNexo(Icons.Default.School, p.ia, tamano = 48.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(curso.titulo, color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp, maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text("Código: ${curso.codigo}", color = p.textoSuave, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$preguntasPendientes", color = p.iaTexto, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                Text("por revisar", color = p.textoSuave, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Row(
-            modifier = Modifier.padding(16.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.ia.copy(alpha = 0.10f)).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(EduRachaColors.PrimaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.School,
-                    contentDescription = null,
-                    tint = EduRachaColors.Primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(Modifier.width(16.dp))
-
-            Column(Modifier.weight(1f)) {
-                Text(
-                    curso.titulo,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
-                )
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Badge de pendientes
-                    Surface(
-                        color = EduRachaColors.WarningContainer,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.HourglassTop,
-                                contentDescription = null,
-                                tint = EduRachaColors.Warning,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                "$preguntasPendientes pendientes",
-                                fontSize = 12.sp,
-                                color = EduRachaColors.Warning,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Text(
-                        "• ${curso.codigo}",
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = "Ir",
-                tint = EduRachaColors.Primary,
-                modifier = Modifier.size(28.dp)
-            )
+            Text("Elegir tema y validar", color = p.iaTexto, fontWeight = FontWeight.Black, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, null, tint = p.iaTexto)
         }
     }
 }

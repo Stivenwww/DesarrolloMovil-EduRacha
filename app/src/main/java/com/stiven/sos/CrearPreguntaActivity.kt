@@ -1,17 +1,17 @@
 package com.stiven.sos
 
-import kotlinx.coroutines.launch
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,32 +21,41 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.*
-import com.stiven.sos.ui.theme.EduRachaColors
-import com.stiven.sos.ui.theme.EduRachaTheme
+import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.CursoViewModel
 import com.stiven.sos.viewmodel.PreguntaViewModel
 import com.stiven.sos.viewmodel.TemaViewModel
 import java.time.Instant
-import kotlin.math.min
+import kotlinx.coroutines.launch
 
+/**
+ * Crear preguntas (docente).
+ * 1. Elige curso y tema.  2. Elige cómo crearlas: escribirlas o generarlas con IA (hasta 30, en lotes de 10).
+ * La pantalla nunca se cierra al guardar: las preguntas creadas quedan listadas abajo para editarlas o eliminarlas,
+ * y desde ahí se puede ir directo a validarlas.
+ * El PDF ya no va aquí: se usa al crear los temas del curso para que la IA escriba la explicación.
+ */
 class CrearPreguntaActivity : ComponentActivity() {
 
     private val cursoViewModel: CursoViewModel by viewModels()
@@ -55,8 +64,7 @@ class CrearPreguntaActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        cursoViewModel.obtenerCursos()
+        if (savedInstanceState == null) cursoViewModel.obtenerCursos()
 
         setContent {
             EduRachaTheme {
@@ -65,8 +73,14 @@ class CrearPreguntaActivity : ComponentActivity() {
                     temaViewModel = temaViewModel,
                     preguntaViewModel = preguntaViewModel,
                     onBack = { finish() },
-                    // Ya no se cierra al guardar: el docente sigue agregando preguntas
-                    onSuccess = {}
+                    onValidar = { curso, tema ->
+                        startActivity(Intent(this, ValidacionPreguntasActivity::class.java).apply {
+                            putExtra("CURSO_ID", curso.id)
+                            putExtra("CURSO_TITULO", curso.titulo)
+                            putExtra("TEMA_ID", tema.id)
+                            putExtra("TEMA_TITULO", tema.titulo)
+                        })
+                    }
                 )
             }
         }
@@ -89,7 +103,8 @@ data class PreguntaSesion(
     val texto: String,
     val opciones: List<OpcionEditable>,
     val dificultad: String,
-    val explicacion: String
+    val explicacion: String,
+    val deIA: Boolean = false
 )
 
 private fun opcionesVacias() = listOf(
@@ -111,96 +126,23 @@ fun validarPreguntaManual(texto: String, opciones: List<OpcionEditable>, explica
     return errores
 }
 
-// Clase para dimensiones responsivas
-data class ResponsiveDimensions(
-    val screenWidth: Dp,
-    val screenHeight: Dp,
-    val horizontalPadding: Dp,
-    val verticalPadding: Dp,
-    val cardPadding: Dp,
-    val headerTopPadding: Dp,
-    val headerBottomPadding: Dp,
-    val titleFontSize: Int,
-    val subtitleFontSize: Int,
-    val bodyFontSize: Int,
-    val buttonHeight: Dp,
-    val iconSize: Dp,
-    val smallIconSize: Dp,
-    val spacing: Dp,
-    val cardElevation: Dp,
-    val borderRadius: Dp
-) {
-    companion object {
-        @Composable
-        fun get(): ResponsiveDimensions {
-            val configuration = LocalConfiguration.current
-            val screenWidth = configuration.screenWidthDp.dp
-            val screenHeight = configuration.screenHeightDp.dp
+/** Gson puede dejar en null campos que Kotlin declara no nulos; esto evita cierres por NullPointerException. */
+private fun seguro(texto: String?): String = texto ?: ""
 
-            // Detectar tipo de dispositivo
-            val isSmallDevice = screenWidth < 360.dp
-            val isMediumDevice = screenWidth in 360.dp..600.dp
-            val isLargeDevice = screenWidth > 600.dp
-
-            return when {
-                isSmallDevice -> ResponsiveDimensions(
-                    screenWidth = screenWidth,
-                    screenHeight = screenHeight,
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 12.dp,
-                    cardPadding = 12.dp,
-                    headerTopPadding = 32.dp,
-                    headerBottomPadding = 16.dp,
-                    titleFontSize = 22,
-                    subtitleFontSize = 13,
-                    bodyFontSize = 13,
-                    buttonHeight = 48.dp,
-                    iconSize = 20.dp,
-                    smallIconSize = 16.dp,
-                    spacing = 12.dp,
-                    cardElevation = 2.dp,
-                    borderRadius = 12.dp
-                )
-                isMediumDevice -> ResponsiveDimensions(
-                    screenWidth = screenWidth,
-                    screenHeight = screenHeight,
-                    horizontalPadding = 16.dp,
-                    verticalPadding = 16.dp,
-                    cardPadding = 16.dp,
-                    headerTopPadding = 40.dp,
-                    headerBottomPadding = 20.dp,
-                    titleFontSize = 26,
-                    subtitleFontSize = 14,
-                    bodyFontSize = 14,
-                    buttonHeight = 56.dp,
-                    iconSize = 24.dp,
-                    smallIconSize = 18.dp,
-                    spacing = 16.dp,
-                    cardElevation = 3.dp,
-                    borderRadius = 16.dp
-                )
-                else -> ResponsiveDimensions(
-                    screenWidth = screenWidth,
-                    screenHeight = screenHeight,
-                    horizontalPadding = 24.dp,
-                    verticalPadding = 20.dp,
-                    cardPadding = 20.dp,
-                    headerTopPadding = 48.dp,
-                    headerBottomPadding = 24.dp,
-                    titleFontSize = 28,
-                    subtitleFontSize = 15,
-                    bodyFontSize = 15,
-                    buttonHeight = 60.dp,
-                    iconSize = 28.dp,
-                    smallIconSize = 20.dp,
-                    spacing = 20.dp,
-                    cardElevation = 4.dp,
-                    borderRadius = 20.dp
-                )
-            }
-        }
-    }
+/** Convierte una pregunta del servidor al registro de la sesión. */
+private fun Pregunta.aSesion(deIA: Boolean): PreguntaSesion? {
+    val idSeguro = id ?: return null
+    return PreguntaSesion(
+        id = idSeguro,
+        texto = seguro(texto),
+        opciones = (opciones as List<Opcion>?).orEmpty().mapIndexed { i, o -> OpcionEditable(i, seguro(o.texto), o.esCorrecta) },
+        dificultad = dificultad ?: DificultadPregunta.MEDIO,
+        explicacion = explicacionCorrecta ?: "",
+        deIA = deIA
+    )
 }
+
+private val LETRAS = listOf("A", "B", "C", "D", "E", "F")
 
 @Composable
 fun CrearPreguntaScreen(
@@ -208,1773 +150,723 @@ fun CrearPreguntaScreen(
     temaViewModel: TemaViewModel,
     preguntaViewModel: PreguntaViewModel,
     onBack: () -> Unit,
-    onSuccess: () -> Unit
+    onValidar: (Curso, Tema) -> Unit
 ) {
+    val p = LocalNexo.current
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
-    val dims = ResponsiveDimensions.get()
+    val cursoUi by cursoViewModel.uiState.collectAsState()
+    val temaUi by temaViewModel.uiState.collectAsState()
+    val preguntaUi by preguntaViewModel.uiState.collectAsState()
+    val progresoIA by preguntaViewModel.progresoIA.collectAsState()
 
-    val cursoUiState by cursoViewModel.uiState.collectAsState()
-    val temaUiState by temaViewModel.uiState.collectAsState()
-    val preguntaUiState by preguntaViewModel.uiState.collectAsState()
+    // Selección (se conserva al girar la pantalla)
+    var cursoId by rememberSaveable { mutableStateOf<String?>(null) }
+    var temaId by rememberSaveable { mutableStateOf<String?>(null) }
+    var modo by rememberSaveable { mutableStateOf(ModoCreacion.MANUAL) }
+    var hoja by rememberSaveable { mutableStateOf(0) } // 0 ninguna, 1 cursos, 2 temas
 
-    // Estados de navegación
-    var modoCreacion by remember { mutableStateOf<ModoCreacion?>(null) }
-    var cursoSeleccionado by remember { mutableStateOf<Curso?>(null) }
-    var temaSeleccionado by remember { mutableStateOf<Tema?>(null) }
+    val uidDocente = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
+    val cursos = remember(cursoUi.cursos, uidDocente) {
+        cursoUi.cursos.filter { it.docenteId == uidDocente }.ifEmpty { cursoUi.cursos }
+    }
+    val curso = cursos.firstOrNull { it.id == cursoId }
+    val tema = temaUi.temas.firstOrNull { it.id == temaId }
 
-    // Estados para creación manual
-    var textoPregunta by remember { mutableStateOf("") }
-    var dificultadSeleccionada by remember { mutableStateOf(DificultadPregunta.MEDIO) }
-    var opciones by remember { mutableStateOf(listOf(
-        OpcionEditable(0, "", false),
-        OpcionEditable(1, "", false),
-        OpcionEditable(2, "", false)
-    )) }
-    var explicacionCorrecta by remember { mutableStateOf("") }
+    // Formulario manual
+    var textoPregunta by rememberSaveable { mutableStateOf("") }
+    var dificultad by rememberSaveable { mutableStateOf(DificultadPregunta.MEDIO) }
+    var opciones by remember { mutableStateOf(opcionesVacias()) }
+    var explicacion by rememberSaveable { mutableStateOf("") }
+    var errores by remember { mutableStateOf<List<String>>(emptyList()) }
+    var editandoId by rememberSaveable { mutableStateOf<String?>(null) }
+    var porEliminar by remember { mutableStateOf<PreguntaSesion?>(null) }
 
-    // Estados de validación
-    var preguntaError by remember { mutableStateOf(false) }
-    var erroresFormulario by remember { mutableStateOf<List<String>>(emptyList()) }
+    // IA
+    var cantidad by rememberSaveable { mutableStateOf(10) }
 
-    // Preguntas creadas en esta sesión y la que se está editando
-    val preguntasSesion = remember { mutableStateListOf<PreguntaSesion>() }
-    var editandoId by remember { mutableStateOf<String?>(null) }
-    var preguntaPorEliminar by remember { mutableStateOf<PreguntaSesion?>(null) }
+    val sesion = preguntaViewModel.preguntasSesion
+    val generando = progresoIA != null
 
     fun limpiarFormulario() {
         textoPregunta = ""
         opciones = opcionesVacias()
-        explicacionCorrecta = ""
-        preguntaError = false
-        erroresFormulario = emptyList()
+        explicacion = ""
+        errores = emptyList()
         editandoId = null
     }
 
-    // Estados para generación con IA
-    var cantidadPreguntas by remember { mutableStateOf(5) }
-
-    // Diálogos
-    var showCursoDialog by remember { mutableStateOf(false) }
-    var showTemaDialog by remember { mutableStateOf(false) }
-
-    // Cargar temas cuando se selecciona un curso
-    LaunchedEffect(cursoSeleccionado) {
-        cursoSeleccionado?.let { curso ->
-            curso.id?.let { cursoId ->
-                temaViewModel.cargarTemasPorCurso(cursoId)
-            }
-        }
+    LaunchedEffect(cursoId) {
+        cursoId?.let { temaViewModel.cargarTemasPorCurso(it, "todos") }
     }
 
-    // Mensaje de confirmación: se muestra unos segundos dentro del formulario y se limpia
-    LaunchedEffect(preguntaUiState.successMessage) {
-        if (preguntaUiState.successMessage != null) {
-            kotlinx.coroutines.delay(3500)
+    // Avisos con el diseño Nexo (no cierran la pantalla)
+    LaunchedEffect(preguntaUi.successMessage) {
+        preguntaUi.successMessage?.let {
+            Avisos.mostrar(context, it, TipoAviso.EXITO)
             preguntaViewModel.clearMessages()
         }
     }
 
-    // Animación
-    val infiniteTransition = rememberInfiniteTransition(label = "questionAnimation")
-    val questionRotation by infiniteTransition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "questionRotation"
-    )
-
-    Scaffold(
-        containerColor = EduRachaColors.Background
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // HEADER
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                EduRachaColors.BarraSuperior,
-                                EduRachaColors.BarraSuperior.copy(alpha = 0.9f)
-                            )
-                        )
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            top = dims.headerTopPadding,
-                            bottom = dims.headerBottomPadding,
-                            start = dims.horizontalPadding,
-                            end = dims.horizontalPadding
-                        )
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .size(dims.iconSize + 16.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                "Volver",
-                                tint = Color.White,
-                                modifier = Modifier.size(dims.iconSize)
-                            )
-                        }
-
-                        // Badge de progreso
-                        if (modoCreacion != null) {
-                            Surface(
-                                shape = RoundedCornerShape(dims.borderRadius),
-                                color = Color.White.copy(alpha = 0.2f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(
-                                        horizontal = dims.cardPadding * 0.75f,
-                                        vertical = dims.cardPadding * 0.4f
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.4f)
-                                ) {
-                                    Icon(
-                                        if (modoCreacion == ModoCreacion.MANUAL)
-                                            Icons.Outlined.Edit
-                                        else
-                                            Icons.Outlined.AutoAwesome,
-                                        null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(dims.smallIconSize)
-                                    )
-                                    Text(
-                                        if (modoCreacion == ModoCreacion.MANUAL) "Manual" else "IA",
-                                        color = Color.White,
-                                        fontSize = dims.bodyFontSize.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(dims.spacing))
-
-                    // Vista previa
-                    AnimatedVisibility(
-                        visible = textoPregunta.isNotEmpty(),
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = dims.spacing * 0.75f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.75f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QuestionAnswer,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(dims.iconSize + 8.dp)
-                                    .rotate(questionRotation)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Vista Previa",
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = (dims.bodyFontSize - 2).sp
-                                )
-                                Text(
-                                    textoPregunta,
-                                    color = Color.White,
-                                    fontSize = (dims.subtitleFontSize + 2).sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2
-                                )
-                            }
-                        }
-                    }
-
-                    if (textoPregunta.isEmpty()) {
-                        Text(
-                            "Crear Pregunta",
-                            color = Color.White,
-                            fontSize = dims.titleFontSize.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Elige cómo deseas crear la pregunta",
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = dims.subtitleFontSize.sp
-                        )
-                    }
-                }
-            }
-
-            // CONTENIDO
+    FondoNexo {
+        Column(Modifier.fillMaxSize()) {
+            EncabezadoNexo(
+                titulo = "Crear preguntas",
+                subtitulo = "Banco de preguntas",
+                onVolver = onBack,
+                tono = TonoEncabezado.IA,
+                acciones = { if (sesion.isNotEmpty()) EtiquetaEncabezadoNexo("${sesion.size} nuevas", Icons.Filled.Quiz) }
+            )
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(
-                        horizontal = dims.horizontalPadding,
-                        vertical = dims.verticalPadding
-                    ),
-                verticalArrangement = Arrangement.spacedBy(dims.spacing)
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
             ) {
-                // PASO 1: Seleccionar modo
-                if (modoCreacion == null) {
-                    ModoCreacionCards(dims, onModoSelected = { modoCreacion = it })
-                } else {
-                    // Modo seleccionado
-                    ModoSeleccionadoHeader(
-                        dims,
-                        modo = modoCreacion!!,
-                        onCambiar = {
-                            modoCreacion = null
-                            cursoSeleccionado = null
-                            temaSeleccionado = null
-                            limpiarFormulario()
+                ContenidoCentradoNexo(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                        // ---------- Paso 1: curso y tema ----------
+                        PasoNexo(1, "Elige el curso y el tema", color = p.ia, completo = tema != null)
+                        SelectorNexo(
+                            etiqueta = "Curso",
+                            valor = curso?.titulo,
+                            ayuda = if (cursoUi.isLoading) "Cargando cursos…" else "Toca para elegir un curso",
+                            icono = Icons.Outlined.MenuBook,
+                            color = p.marca,
+                            onClick = { hoja = 1 }
+                        )
+                        if (curso != null) {
+                            SelectorNexo(
+                                etiqueta = "Tema",
+                                valor = tema?.titulo,
+                                ayuda = if (temaUi.isLoading) "Cargando temas…" else "Toca para elegir un tema",
+                                icono = Icons.Outlined.Topic,
+                                color = p.ia,
+                                onClick = { hoja = 2 },
+                                habilitado = !temaUi.isLoading,
+                                extremo = tema?.let { t -> { EstadoExplicacionChip(t) } }
+                            )
                         }
-                    )
 
-                    // PASO 2: Selección de curso y tema
-                    SelectorsSection(
-                        dims,
-                        cursoSeleccionado = cursoSeleccionado,
-                        temaSeleccionado = temaSeleccionado,
-                        isLoadingTemas = temaUiState.isLoading,
-                        onCursoClick = { showCursoDialog = true },
-                        onTemaClick = { showTemaDialog = true }
-                    )
+                        if (curso != null && tema != null) {
+                            // ---------- Paso 2: modo ----------
+                            PasoNexo(2, "¿Cómo quieres crearlas?", color = p.ia)
+                            SegmentadoNexo(
+                                opciones = listOf(
+                                    Triple(ModoCreacion.MANUAL, "Escribirlas", Icons.Outlined.Edit),
+                                    Triple(ModoCreacion.IA, "Con IA", Icons.Outlined.AutoAwesome)
+                                ),
+                                seleccion = modo,
+                                onCambio = { if (!generando) modo = it },
+                                colores = { if (it == ModoCreacion.IA) p.ia else p.marca }
+                            )
 
-                    // PASO 3: Formulario
-                    if (cursoSeleccionado != null && temaSeleccionado != null) {
-                        when (modoCreacion) {
-                            ModoCreacion.MANUAL -> {
-                                FormularioManualSection(
-                                    dims,
-                                    textoPregunta = textoPregunta,
-                                    onTextoPreguntaChange = { textoPregunta = it; preguntaError = false },
-                                    preguntaError = preguntaError,
-                                    dificultad = dificultadSeleccionada,
-                                    onDificultadChange = { dificultadSeleccionada = it },
+                            // ---------- Paso 3 ----------
+                            when (modo) {
+                                ModoCreacion.MANUAL -> FormularioManualNexo(
+                                    texto = textoPregunta,
+                                    onTexto = { textoPregunta = it },
+                                    dificultad = dificultad,
+                                    onDificultad = { dificultad = it },
                                     opciones = opciones,
-                                    onOpcionesChange = { opciones = it },
-                                    explicacionCorrecta = explicacionCorrecta,
-                                    onExplicacionChange = { explicacionCorrecta = it },
-                                    onCrear = {
-                                        preguntaError = textoPregunta.isBlank()
-                                        erroresFormulario = validarPreguntaManual(textoPregunta, opciones, explicacionCorrecta)
-                                        if (erroresFormulario.isEmpty()) {
-                                            val textoGuardado = textoPregunta.trim()
-                                            val opcionesGuardadas = opciones.map { it.copy(texto = it.texto.trim()) }
-                                            val explicacionGuardada = explicacionCorrecta.trim()
-                                            val dificultadGuardada = dificultadSeleccionada
-                                            val idEdicion = editandoId
-                                            crearPreguntaManual(
-                                                context = context,
-                                                preguntaViewModel = preguntaViewModel,
-                                                curso = cursoSeleccionado!!,
-                                                tema = temaSeleccionado!!,
-                                                textoPregunta = textoGuardado,
-                                                opciones = opcionesGuardadas,
-                                                dificultad = dificultadGuardada,
-                                                explicacion = explicacionGuardada,
-                                                idEdicion = idEdicion,
-                                                onGuardada = { id ->
-                                                    val registro = PreguntaSesion(id, textoGuardado, opcionesGuardadas, dificultadGuardada, explicacionGuardada)
-                                                    val pos = preguntasSesion.indexOfFirst { it.id == id }
-                                                    if (pos >= 0) preguntasSesion[pos] = registro else preguntasSesion.add(0, registro)
-                                                    limpiarFormulario()
-                                                }
-                                            )
-                                        }
-                                    },
-                                    isLoading = preguntaUiState.isLoading,
+                                    onOpciones = { opciones = it },
+                                    explicacion = explicacion,
+                                    onExplicacion = { explicacion = it },
+                                    errores = errores,
                                     editando = editandoId != null,
-                                    errores = erroresFormulario,
-                                    mensajeExito = preguntaUiState.successMessage,
-                                    onCancelarEdicion = { limpiarFormulario() }
-                                )
-
-                                if (preguntasSesion.isNotEmpty()) {
-                                    PreguntasDeLaSesion(
-                                        dims,
-                                        preguntas = preguntasSesion,
-                                        editandoId = editandoId,
-                                        onEditar = { pq ->
-                                            editandoId = pq.id
-                                            textoPregunta = pq.texto
-                                            opciones = pq.opciones
-                                            dificultadSeleccionada = pq.dificultad
-                                            explicacionCorrecta = pq.explicacion
-                                            erroresFormulario = emptyList()
-                                        },
-                                        onEliminar = { preguntaPorEliminar = it }
-                                    )
-                                }
-                            }
-                            ModoCreacion.IA -> {
-                                FormularioIASection(
-                                    dims,
-                                    cantidad = cantidadPreguntas,
-                                    onCantidadChange = { cantidadPreguntas = it },
-                                    onGenerar = {
-                                        generarPreguntasIA(
-                                            context = context,
-                                            preguntaViewModel = preguntaViewModel,
-                                            curso = cursoSeleccionado!!,
-                                            tema = temaSeleccionado!!,
-                                            cantidad = cantidadPreguntas
-                                        )
-                                    },
-                                    isLoading = preguntaUiState.isLoading
-                                )
-                                GenerarDesdePdfSection(
-                                    dims,
-                                    cantidad = cantidadPreguntas,
-                                    isLoading = preguntaUiState.isLoading,
-                                    mensajeExito = preguntaUiState.successMessage,
-                                    onGenerar = { parte, dificultad ->
-                                        val cId = cursoSeleccionado?.id
-                                        val tId = temaSeleccionado?.id
-                                        if (cId != null && !tId.isNullOrEmpty()) {
-                                            preguntaViewModel.generarPreguntasDesdePdf(parte, cId, tId, cantidadPreguntas, dificultad) {}
+                                    guardando = preguntaUi.isLoading,
+                                    onCancelarEdicion = { limpiarFormulario() },
+                                    onGuardar = {
+                                        errores = validarPreguntaManual(textoPregunta, opciones, explicacion)
+                                        if (errores.isEmpty()) {
+                                            val registroBase = PreguntaSesion(
+                                                id = editandoId ?: "",
+                                                texto = textoPregunta.trim(),
+                                                opciones = opciones.map { it.copy(texto = it.texto.trim()) },
+                                                dificultad = dificultad,
+                                                explicacion = explicacion.trim(),
+                                                deIA = sesion.firstOrNull { it.id == editandoId }?.deIA ?: false
+                                            )
+                                            guardarPregunta(context, preguntaViewModel, curso, tema, registroBase, editandoId) { id ->
+                                                val registro = registroBase.copy(id = id)
+                                                val pos = sesion.indexOfFirst { it.id == id }
+                                                if (pos >= 0) sesion[pos] = registro else sesion.add(0, registro)
+                                                limpiarFormulario()
+                                            }
                                         }
                                     }
                                 )
-                            }
-                            null -> {}
-                        }
-                    }
-
-                    // Mensaje de error
-                    preguntaUiState.error?.let { error ->
-                        ErrorMessage(dims, error)
-                        val cursoActual = cursoSeleccionado
-                        val temaActual = temaSeleccionado
-                        if (error.contains("explicación aprobada", ignoreCase = true) && cursoActual != null && temaActual != null) {
-                            Spacer(Modifier.height(12.dp))
-                            GenerarExplicacionTemaCard(curso = cursoActual, tema = temaActual)
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(dims.spacing))
-            }
-        }
-
-        // Loading overlay
-        if (preguntaUiState.isLoading) {
-            LoadingOverlay(dims, modo = modoCreacion)
-        }
-    }
-
-    // Diálogos
-    if (showCursoDialog) {
-        // Solo los cursos del docente que inicia sesión (si no hay coincidencias se muestran todos)
-        val uidDocente = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        val cursosDelDocente = cursoUiState.cursos.filter { it.docenteId == uidDocente }
-        SelectorCursoDialogSimple(
-            dims,
-            cursos = cursosDelDocente.ifEmpty { cursoUiState.cursos },
-            isLoading = cursoUiState.isLoading,
-            error = cursoUiState.error,
-            onRetry = { cursoViewModel.obtenerCursos() },
-            onCursoSelected = {
-                cursoSeleccionado = it
-                temaSeleccionado = null
-                showCursoDialog = false
-                preguntasSesion.clear()
-                limpiarFormulario()
-            },
-            onDismiss = { showCursoDialog = false }
-        )
-    }
-
-    preguntaPorEliminar?.let { pq ->
-        AlertDialog(
-            onDismissRequest = { preguntaPorEliminar = null },
-            title = { Text("Eliminar pregunta") },
-            text = { Text("Se eliminará \"${pq.texto.take(80)}\". Esta acción no se puede deshacer.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    preguntaViewModel.eliminarPregunta(pq.id) {
-                        preguntasSesion.removeAll { it.id == pq.id }
-                        if (editandoId == pq.id) limpiarFormulario()
-                    }
-                    preguntaPorEliminar = null
-                }) { Text("Eliminar", color = EduRachaColors.Error) }
-            },
-            dismissButton = { TextButton(onClick = { preguntaPorEliminar = null }) { Text("Cancelar") } },
-            containerColor = EduRachaColors.Surface
-        )
-    }
-
-    if (showTemaDialog && cursoSeleccionado != null) {
-        SelectorTemaDialogSimple(
-            dims,
-            temas = temaUiState.temas,
-            onTemaSelected = {
-                temaSeleccionado = it
-                showTemaDialog = false
-            },
-            onDismiss = { showTemaDialog = false }
-        )
-    }
-}
-
-// ================== COMPONENTES RESPONSIVOS ==================
-
-@Composable
-fun ModoCreacionCards(dims: ResponsiveDimensions, onModoSelected: (ModoCreacion) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
-        SectionHeaderSimple(dims, "SELECCIONA EL MÉTODO", Icons.Default.TouchApp)
-
-        ModoCard(
-            dims,
-            title = "Creación Manual",
-            description = "Escribe tu pregunta y opciones personalizadas",
-            icon = Icons.Outlined.Edit,
-            color = EduRachaColors.Primary,
-            onClick = { onModoSelected(ModoCreacion.MANUAL) }
-        )
-
-        ModoCard(
-            dims,
-            title = "Generar con IA",
-            description = "La IA generará preguntas automáticamente",
-            icon = Icons.Outlined.AutoAwesome,
-            color = EduRachaColors.Accent,
-            onClick = { onModoSelected(ModoCreacion.IA) }
-        )
-    }
-}
-
-@Composable
-fun ModoCard(
-    dims: ResponsiveDimensions,
-    title: String,
-    description: String,
-    icon: ImageVector,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(dims.borderRadius),
-        elevation = CardDefaults.cardElevation(dims.cardElevation),
-        colors = CardDefaults.cardColors(EduRachaColors.Surface)
-    ) {
-        Row(
-            modifier = Modifier.padding(dims.cardPadding),
-            horizontalArrangement = Arrangement.spacedBy(dims.spacing),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(dims.iconSize * 2.5f)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, modifier = Modifier.size(dims.iconSize + 4.dp), tint = color)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    title,
-                    fontSize = (dims.subtitleFontSize + 2).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
-                )
-                Text(
-                    description,
-                    fontSize = dims.bodyFontSize.sp,
-                    color = EduRachaColors.TextSecondary,
-                    lineHeight = (dims.bodyFontSize + 4).sp
-                )
-            }
-            Icon(
-                Icons.Default.ArrowForward,
-                null,
-                modifier = Modifier.size(dims.iconSize),
-                tint = EduRachaColors.TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-fun ModoSeleccionadoHeader(dims: ResponsiveDimensions, modo: ModoCreacion, onCambiar: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-        color = if (modo == ModoCreacion.MANUAL)
-            EduRachaColors.Primary.copy(alpha = 0.1f)
-        else
-            EduRachaColors.Accent.copy(alpha = 0.1f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(dims.cardPadding * 0.75f),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    if (modo == ModoCreacion.MANUAL) Icons.Outlined.Edit else Icons.Outlined.AutoAwesome,
-                    null,
-                    modifier = Modifier.size(dims.iconSize),
-                    tint = if (modo == ModoCreacion.MANUAL) EduRachaColors.Primary else EduRachaColors.Accent
-                )
-                Text(
-                    if (modo == ModoCreacion.MANUAL) "Creación Manual" else "Generación con IA",
-                    fontSize = dims.bodyFontSize.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (modo == ModoCreacion.MANUAL) EduRachaColors.Primary else EduRachaColors.Accent
-                )
-            }
-            TextButton(onClick = onCambiar) {
-                Text("Cambiar", fontSize = dims.bodyFontSize.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun SelectorsSection(
-    dims: ResponsiveDimensions,
-    cursoSeleccionado: Curso?,
-    temaSeleccionado: Tema?,
-    isLoadingTemas: Boolean,
-    onCursoClick: () -> Unit,
-    onTemaClick: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.75f)) {
-        SelectorCard(
-            dims,
-            title = "Curso",
-            value = cursoSeleccionado?.titulo ?: "Seleccionar curso",
-            icon = Icons.Outlined.MenuBook,
-            isSelected = cursoSeleccionado != null,
-            onClick = onCursoClick
-        )
-
-        if (cursoSeleccionado != null) {
-            SelectorCard(
-                dims,
-                title = "Tema",
-                value = if (isLoadingTemas) "Cargando..." else (temaSeleccionado?.titulo ?: "Seleccionar tema"),
-                icon = Icons.Outlined.Topic,
-                isSelected = temaSeleccionado != null,
-                isLoading = isLoadingTemas,
-                onClick = onTemaClick,
-                enabled = !isLoadingTemas
-            )
-        }
-    }
-}
-
-@Composable
-fun SelectorCard(
-    dims: ResponsiveDimensions,
-    title: String,
-    value: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    isLoading: Boolean = false,
-    onClick: () -> Unit,
-    enabled: Boolean = true
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(dims.borderRadius),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                EduRachaColors.Success.copy(alpha = 0.1f)
-            else
-                EduRachaColors.Surface
-        ),
-        elevation = CardDefaults.cardElevation(dims.cardElevation)
-    ) {
-        Row(
-            modifier = Modifier.padding(dims.cardPadding),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.75f),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(dims.iconSize),
-                        color = EduRachaColors.Primary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        icon,
-                        null,
-                        modifier = Modifier.size(dims.iconSize),
-                        tint = if (isSelected) EduRachaColors.Success else EduRachaColors.TextSecondary
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        fontSize = (dims.bodyFontSize - 2).sp,
-                        color = EduRachaColors.TextSecondary
-                    )
-                    Text(
-                        value,
-                        fontSize = dims.subtitleFontSize.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) EduRachaColors.Success else EduRachaColors.TextPrimary,
-                        maxLines = 2
-                    )
-                }
-            }
-            Icon(
-                if (isSelected) Icons.Default.CheckCircle else Icons.Default.ArrowForward,
-                null,
-                modifier = Modifier.size(dims.iconSize),
-                tint = if (isSelected) EduRachaColors.Success else EduRachaColors.TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-fun FormularioManualSection(
-    dims: ResponsiveDimensions,
-    textoPregunta: String,
-    onTextoPreguntaChange: (String) -> Unit,
-    preguntaError: Boolean,
-    dificultad: String,
-    onDificultadChange: (String) -> Unit,
-    opciones: List<OpcionEditable>,
-    onOpcionesChange: (List<OpcionEditable>) -> Unit,
-    explicacionCorrecta: String,
-    onExplicacionChange: (String) -> Unit,
-    onCrear: () -> Unit,
-    isLoading: Boolean,
-    editando: Boolean = false,
-    errores: List<String> = emptyList(),
-    mensajeExito: String? = null,
-    onCancelarEdicion: () -> Unit = {}
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
-        // Confirmación del último guardado (dentro del formulario, sin tapar contenido)
-        AnimatedVisibility(visible = mensajeExito != null, enter = fadeIn(), exit = fadeOut()) {
-            Surface(
-                shape = RoundedCornerShape(dims.borderRadius),
-                color = EduRachaColors.Success.copy(alpha = 0.14f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(dims.cardPadding * 0.8f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.6f)
-                ) {
-                    Icon(Icons.Default.CheckCircle, null, tint = EduRachaColors.Success, modifier = Modifier.size(dims.iconSize))
-                    Text(mensajeExito ?: "", color = EduRachaColors.TextPrimary, fontSize = dims.bodyFontSize.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            SectionHeaderSimple(dims, if (editando) "EDITANDO PREGUNTA" else "NUEVA PREGUNTA", Icons.Default.Edit)
-            if (editando) {
-                TextButton(onClick = onCancelarEdicion) { Text("Cancelar edición", color = EduRachaColors.TextSecondary) }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(EduRachaColors.Surface),
-            elevation = CardDefaults.cardElevation(dims.cardElevation)
-        ) {
-            Column(
-                modifier = Modifier.padding(dims.cardPadding),
-                verticalArrangement = Arrangement.spacedBy(dims.spacing)
-            ) {
-                // Pregunta
-                OutlinedTextField(
-                    value = textoPregunta,
-                    onValueChange = onTextoPreguntaChange,
-                    label = { Text("Texto de la pregunta *", fontSize = dims.bodyFontSize.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    isError = preguntaError,
-                    shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (preguntaError) EduRachaColors.Error else EduRachaColors.Primary,
-                        focusedLabelColor = if (preguntaError) EduRachaColors.Error else EduRachaColors.Primary
-                    ),
-                    textStyle = LocalTextStyle.current.copy(fontSize = dims.bodyFontSize.sp)
-                )
-
-                // Dificultad
-                DificultadSelector(dims, dificultad = dificultad, onDificultadChange = onDificultadChange)
-            }
-        }
-
-        // Opciones
-        OpcionesSection(dims, opciones = opciones, onOpcionesChange = onOpcionesChange)
-
-        // Explicación
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(EduRachaColors.Surface),
-            elevation = CardDefaults.cardElevation(dims.cardElevation)
-        ) {
-            Column(
-                modifier = Modifier.padding(dims.cardPadding),
-                verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Explicación de la respuesta *",
-                        fontSize = dims.bodyFontSize.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(dims.borderRadius * 0.5f),
-                        color = EduRachaColors.Error.copy(alpha = 0.1f)
-                    ) {
-                        Text(
-                            "OBLIGATORIO",
-                            fontSize = (dims.bodyFontSize - 3).sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Error,
-                            modifier = Modifier.padding(
-                                horizontal = dims.cardPadding * 0.4f,
-                                vertical = dims.cardPadding * 0.2f
-                            )
-                        )
-                    }
-                }
-                Text(
-                    "Explica por qué esta es la respuesta correcta. Esta información ayudará a los estudiantes a comprender mejor el tema.",
-                    fontSize = (dims.bodyFontSize - 1).sp,
-                    color = EduRachaColors.TextSecondary,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    lineHeight = (dims.bodyFontSize + 3).sp
-                )
-                OutlinedTextField(
-                    value = explicacionCorrecta,
-                    onValueChange = onExplicacionChange,
-                    label = { Text("¿Por qué esta es la respuesta correcta?", fontSize = dims.bodyFontSize.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    isError = explicacionCorrecta.isBlank(),
-                    shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Lightbulb,
-                            contentDescription = null,
-                            modifier = Modifier.size(dims.iconSize),
-                            tint = if (explicacionCorrecta.isBlank())
-                                EduRachaColors.Error
-                            else
-                                EduRachaColors.Primary
-                        )
-                    },
-                    supportingText = {
-                        if (explicacionCorrecta.isBlank()) {
-                            Text(
-                                "La explicación es obligatoria",
-                                fontSize = (dims.bodyFontSize - 2).sp,
-                                color = EduRachaColors.Error
-                            )
-                        } else {
-                            Text(
-                                "${explicacionCorrecta.length} caracteres",
-                                fontSize = (dims.bodyFontSize - 2).sp,
-                                color = EduRachaColors.TextSecondary
-                            )
-                        }
-                    },
-                    textStyle = LocalTextStyle.current.copy(fontSize = dims.bodyFontSize.sp)
-                )
-            }
-        }
-
-        // Resumen de lo que falta antes de guardar
-        if (errores.isNotEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(dims.borderRadius),
-                color = EduRachaColors.Error.copy(alpha = 0.10f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(dims.cardPadding * 0.8f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text("Revisa antes de guardar", fontWeight = FontWeight.Bold, color = EduRachaColors.Error, fontSize = dims.bodyFontSize.sp)
-                    errores.forEach { e ->
-                        Text("• $e", color = EduRachaColors.TextPrimary, fontSize = (dims.bodyFontSize - 1).sp)
-                    }
-                }
-            }
-        }
-
-        // Botón
-        Button(
-            onClick = onCrear,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dims.buttonHeight),
-            enabled = !isLoading,
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(dims.iconSize),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text("Guardando...", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
-            } else {
-                Icon(if (editando) Icons.Default.Save else Icons.Default.Add, null, modifier = Modifier.size(dims.iconSize))
-                Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text(if (editando) "Guardar cambios" else "Guardar y agregar otra", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-fun DificultadSelector(dims: ResponsiveDimensions, dificultad: String, onDificultadChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)) {
-        Text(
-            "Dificultad",
-            fontSize = dims.bodyFontSize.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            FilterChip(
-                selected = dificultad == DificultadPregunta.FACIL,
-                onClick = { onDificultadChange(DificultadPregunta.FACIL) },
-                label = { Text("Fácil", fontSize = dims.bodyFontSize.sp) },
-                leadingIcon = if (dificultad == DificultadPregunta.FACIL) {
-                    { Icon(Icons.Default.Check, null, Modifier.size(dims.smallIconSize)) }
-                } else null,
-                modifier = Modifier.weight(1f)
-            )
-            FilterChip(
-                selected = dificultad == DificultadPregunta.MEDIO,
-                onClick = { onDificultadChange(DificultadPregunta.MEDIO) },
-                label = { Text("Medio", fontSize = dims.bodyFontSize.sp) },
-                leadingIcon = if (dificultad == DificultadPregunta.MEDIO) {
-                    { Icon(Icons.Default.Check, null, Modifier.size(dims.smallIconSize)) }
-                } else null,
-                modifier = Modifier.weight(1f)
-            )
-            FilterChip(
-                selected = dificultad == DificultadPregunta.DIFICIL,
-                onClick = { onDificultadChange(DificultadPregunta.DIFICIL) },
-                label = { Text("Difícil", fontSize = dims.bodyFontSize.sp) },
-                leadingIcon = if (dificultad == DificultadPregunta.DIFICIL) {
-                    { Icon(Icons.Default.Check, null, Modifier.size(dims.smallIconSize)) }
-                } else null,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun OpcionesSection(
-    dims: ResponsiveDimensions,
-    opciones: List<OpcionEditable>,
-    onOpcionesChange: (List<OpcionEditable>) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.75f)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionHeaderSimple(dims, "OPCIONES DE RESPUESTA", Icons.Default.ListAlt)
-            if (opciones.size < 6) {
-                IconButton(
-                    onClick = {
-                        onOpcionesChange(opciones + OpcionEditable(opciones.size, "", false))
-                    },
-                    modifier = Modifier
-                        .size(dims.iconSize + 8.dp)
-                        .clip(CircleShape)
-                        .background(EduRachaColors.Success.copy(alpha = 0.1f))
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        "Agregar opción",
-                        modifier = Modifier.size(dims.iconSize),
-                        tint = EduRachaColors.Success
-                    )
-                }
-            }
-        }
-
-        opciones.forEachIndexed { index, opcion ->
-            OpcionCard(
-                dims,
-                opcion = opcion,
-                onTextoChange = { nuevo ->
-                    onOpcionesChange(
-                        opciones.mapIndexed { i, o ->
-                            if (i == index) o.copy(texto = nuevo) else o
-                        }
-                    )
-                },
-                onCorrectaChange = { esCorrecta ->
-                    onOpcionesChange(
-                        opciones.mapIndexed { i, o ->
-                            if (i == index) o.copy(esCorrecta = esCorrecta)
-                            else o.copy(esCorrecta = false)
-                        }
-                    )
-                },
-                onEliminar = if (opciones.size > 2) {
-                    {
-                        onOpcionesChange(
-                            opciones.filterIndexed { i, _ -> i != index }
-                                .mapIndexed { newIndex, o -> o.copy(id = newIndex) }
-                        )
-                    }
-                } else null
-            )
-        }
-    }
-}
-
-@Composable
-fun OpcionCard(
-    dims: ResponsiveDimensions,
-    opcion: OpcionEditable,
-    onTextoChange: (String) -> Unit,
-    onCorrectaChange: (Boolean) -> Unit,
-    onEliminar: (() -> Unit)?
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(dims.borderRadius),
-        colors = CardDefaults.cardColors(
-            containerColor = if (opcion.esCorrecta)
-                EduRachaColors.Success.copy(alpha = 0.1f)
-            else
-                EduRachaColors.Surface
-        ),
-        elevation = CardDefaults.cardElevation(dims.cardElevation)
-    ) {
-        Column(
-            modifier = Modifier.padding(dims.cardPadding),
-            verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Opción ${opcion.id + 1}",
-                    fontSize = (dims.bodyFontSize - 1).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextSecondary
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.4f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.25f)
-                    ) {
-                        Checkbox(
-                            checked = opcion.esCorrecta,
-                            onCheckedChange = onCorrectaChange,
-                            modifier = Modifier.size(dims.iconSize + 4.dp),
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = EduRachaColors.Success
-                            )
-                        )
-                        Text(
-                            "Correcta",
-                            fontSize = (dims.bodyFontSize - 1).sp,
-                            color = if (opcion.esCorrecta)
-                                EduRachaColors.Success
-                            else
-                                EduRachaColors.TextSecondary
-                        )
-                    }
-                    onEliminar?.let {
-                        IconButton(
-                            onClick = it,
-                            modifier = Modifier.size(dims.iconSize + 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                "Eliminar",
-                                modifier = Modifier.size(dims.iconSize),
-                                tint = EduRachaColors.Error
-                            )
-                        }
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                value = opcion.texto,
-                onValueChange = onTextoChange,
-                label = { Text("Texto de la opción", fontSize = dims.bodyFontSize.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = if (opcion.esCorrecta)
-                        EduRachaColors.Success
-                    else
-                        EduRachaColors.Primary
-                ),
-                textStyle = LocalTextStyle.current.copy(fontSize = dims.bodyFontSize.sp)
-            )
-        }
-    }
-}
-
-/**
- * Generar preguntas a partir de un PDF: el servidor lee el texto real del documento
- * y la IA crea las preguntas con ese contenido. Si el PDF no se puede leer, se muestra el motivo.
- */
-@Composable
-fun GenerarDesdePdfSection(
-    dims: ResponsiveDimensions,
-    cantidad: Int,
-    isLoading: Boolean,
-    mensajeExito: String?,
-    onGenerar: (okhttp3.MultipartBody.Part, String?) -> Unit
-) {
-    val context = LocalContext.current
-    val alcance = rememberCoroutineScope()
-    var pdfUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var pdfNombre by remember { mutableStateOf("") }
-    var dificultad by remember { mutableStateOf<String?>(null) }   // null = mixta
-    var errorLocal by remember { mutableStateOf<String?>(null) }
-
-    val selector = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            pdfUri = uri
-            pdfNombre = com.stiven.sos.utils.ArchivosPdf.nombre(context, uri)
-            errorLocal = null
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
-        SectionHeaderSimple(dims, "DESDE UN DOCUMENTO PDF", Icons.Default.PictureAsPdf)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(EduRachaColors.Surface),
-            elevation = CardDefaults.cardElevation(dims.cardElevation)
-        ) {
-            Column(
-                modifier = Modifier.padding(dims.cardPadding),
-                verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.8f)
-            ) {
-                Text(
-                    "Sube el material del tema (PDF con texto). La IA crea las preguntas solo con su contenido y quedan pendientes de revisión.",
-                    fontSize = dims.bodyFontSize.sp,
-                    color = EduRachaColors.TextSecondary,
-                    lineHeight = (dims.bodyFontSize + 4).sp
-                )
-                OutlinedButton(
-                    onClick = { selector.launch("application/pdf") },
-                    enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(dims.borderRadius)
-                ) {
-                    Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(dims.iconSize))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (pdfUri == null) "Elegir PDF" else pdfNombre,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                }
-
-                Text("Dificultad", fontWeight = FontWeight.Bold, color = EduRachaColors.TextPrimary, fontSize = dims.bodyFontSize.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf(null to "Mixta", "facil" to "Fácil", "medio" to "Medio", "dificil" to "Difícil").forEach { (valor, etiqueta) ->
-                        FilterChip(
-                            selected = dificultad == valor,
-                            onClick = { dificultad = valor },
-                            label = { Text(etiqueta, fontSize = (dims.bodyFontSize - 1).sp, maxLines = 1) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                (errorLocal)?.let {
-                    Text(it, color = EduRachaColors.Error, fontSize = (dims.bodyFontSize - 1).sp)
-                }
-                if (mensajeExito != null && !isLoading) {
-                    Surface(shape = RoundedCornerShape(dims.borderRadius), color = EduRachaColors.Success.copy(alpha = 0.14f)) {
-                        Text(
-                            mensajeExito,
-                            color = EduRachaColors.TextPrimary,
-                            fontSize = (dims.bodyFontSize - 1).sp,
-                            modifier = Modifier.padding(dims.cardPadding * 0.7f)
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = {
-                        val uri = pdfUri ?: run { errorLocal = "Primero elige un archivo PDF."; return@Button }
-                        alcance.launch {
-                            com.stiven.sos.utils.ArchivosPdf.prepararParte(context, uri)
-                                .onSuccess { parte -> onGenerar(parte, dificultad) }
-                                .onFailure { errorLocal = it.message }
-                        }
-                    },
-                    enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth().height(dims.buttonHeight),
-                    shape = RoundedCornerShape(dims.borderRadius),
-                    colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Primary)
-                ) {
-                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(dims.iconSize))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Generar $cantidad preguntas del PDF", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun FormularioIASection(
-    dims: ResponsiveDimensions,
-    cantidad: Int,
-    onCantidadChange: (Int) -> Unit,
-    onGenerar: () -> Unit,
-    isLoading: Boolean
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing)) {
-        SectionHeaderSimple(dims, "CONFIGURACIÓN DE IA", Icons.Default.AutoAwesome)
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(EduRachaColors.Surface),
-            elevation = CardDefaults.cardElevation(dims.cardElevation)
-        ) {
-            Column(
-                modifier = Modifier.padding(dims.cardPadding),
-                verticalArrangement = Arrangement.spacedBy(dims.spacing)
-            ) {
-                // Info
-                Surface(
-                    shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                    color = EduRachaColors.Accent.copy(alpha = 0.1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(dims.cardPadding),
-                        horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.75f)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Info,
-                            null,
-                            modifier = Modifier.size(dims.iconSize),
-                            tint = EduRachaColors.Accent
-                        )
-                        Text(
-                            "La IA generará preguntas basadas en el contenido del tema. Todas pasarán a revisión antes de ser aprobadas.",
-                            fontSize = dims.bodyFontSize.sp,
-                            color = EduRachaColors.TextSecondary,
-                            lineHeight = (dims.bodyFontSize + 4).sp
-                        )
-                    }
-                }
-
-                // Selector de cantidad
-                Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)) {
-                    Text(
-                        "Cantidad de preguntas",
-                        fontSize = dims.bodyFontSize.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "$cantidad preguntas",
-                            fontSize = (dims.titleFontSize - 4).sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Accent
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)) {
-                            IconButton(
-                                onClick = { if (cantidad > 1) onCantidadChange(cantidad - 1) },
-                                enabled = cantidad > 1,
-                                modifier = Modifier
-                                    .size(dims.iconSize + 16.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (cantidad > 1)
-                                            EduRachaColors.Accent.copy(alpha = 0.1f)
-                                        else
-                                            EduRachaColors.TextSecondary.copy(alpha = 0.12f)
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    "Disminuir",
-                                    modifier = Modifier.size(dims.iconSize),
-                                    tint = if (cantidad > 1)
-                                        EduRachaColors.Accent
-                                    else
-                                        EduRachaColors.TextSecondary
+                                ModoCreacion.IA -> GeneradorIANexo(
+                                    tema = tema,
+                                    cantidad = cantidad,
+                                    onCantidad = { cantidad = it },
+                                    progreso = progresoIA,
+                                    onGenerar = {
+                                        val cId = curso.id ?: return@GeneradorIANexo
+                                        val textoTema = seguro(tema.titulo) +
+                                            seguro(tema.contenido).let { if (it.isNotBlank()) "\n\n" + it.take(1500) else "" }
+                                        preguntaViewModel.generarPreguntasPorLotes(
+                                            cursoId = cId,
+                                            temaId = tema.id,
+                                            temaTexto = textoTema,
+                                            total = cantidad,
+                                            onLote = { nuevas ->
+                                                nuevas.mapNotNull { it.aSesion(deIA = true) }.forEach { sesion.add(0, it) }
+                                            },
+                                            onFin = { _, _ -> }
+                                        )
+                                    },
+                                    onDetener = { preguntaViewModel.detenerGeneracion() }
                                 )
                             }
-                            IconButton(
-                                onClick = { if (cantidad < 10) onCantidadChange(cantidad + 1) },
-                                enabled = cantidad < 10,
-                                modifier = Modifier
-                                    .size(dims.iconSize + 16.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (cantidad < 10)
-                                            EduRachaColors.Accent.copy(alpha = 0.1f)
-                                        else
-                                            EduRachaColors.TextSecondary.copy(alpha = 0.12f)
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    "Aumentar",
-                                    modifier = Modifier.size(dims.iconSize),
-                                    tint = if (cantidad < 10)
-                                        EduRachaColors.Accent
-                                    else
-                                        EduRachaColors.TextSecondary
-                                )
-                            }
-                        }
-                    }
 
-                    Slider(
-                        value = cantidad.toFloat(),
-                        onValueChange = { onCantidadChange(it.toInt()) },
-                        valueRange = 1f..10f,
-                        steps = 8,
-                        colors = SliderDefaults.colors(
-                            thumbColor = EduRachaColors.Accent,
-                            activeTrackColor = EduRachaColors.Accent
-                        )
-                    )
-                }
-
-                // Advertencia
-                Surface(
-                    shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                    color = EduRachaColors.Warning.copy(alpha = 0.1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(dims.cardPadding * 0.75f),
-                        horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Timer,
-                            null,
-                            tint = EduRachaColors.Warning,
-                            modifier = Modifier.size(dims.iconSize)
-                        )
-                        Text(
-                            "Este proceso puede tomar entre 10-30 segundos.",
-                            fontSize = (dims.bodyFontSize - 1).sp,
-                            color = EduRachaColors.TextSecondary,
-                            lineHeight = (dims.bodyFontSize + 3).sp
-                        )
-                    }
-                }
-            }
-        }
-
-        // Botón generar
-        Button(
-            onClick = onGenerar,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dims.buttonHeight),
-            enabled = !isLoading,
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Accent)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(dims.iconSize),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text("Generando...", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
-            } else {
-                Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(dims.iconSize))
-                Spacer(Modifier.width(dims.spacing * 0.75f))
-                Text("Generar con IA", fontSize = dims.subtitleFontSize.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-fun SectionHeaderSimple(dims: ResponsiveDimensions, title: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-    ) {
-        Icon(
-            icon,
-            null,
-            tint = EduRachaColors.Primary,
-            modifier = Modifier.size(dims.iconSize)
-        )
-        Text(
-            title,
-            fontSize = dims.bodyFontSize.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.Primary
-        )
-    }
-}
-
-@Composable
-fun ErrorMessage(dims: ResponsiveDimensions, error: String) {
-    Surface(
-        shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-        color = EduRachaColors.Error.copy(alpha = 0.1f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(dims.cardPadding * 0.75f),
-            horizontalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-        ) {
-            Icon(
-                Icons.Outlined.Error,
-                null,
-                modifier = Modifier.size(dims.iconSize),
-                tint = EduRachaColors.Error
-            )
-            Text(
-                error,
-                color = EduRachaColors.Error,
-                fontSize = dims.bodyFontSize.sp,
-                lineHeight = (dims.bodyFontSize + 4).sp
-            )
-        }
-    }
-}
-
-@Composable
-fun LoadingOverlay(dims: ResponsiveDimensions, modo: ModoCreacion?) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            shape = RoundedCornerShape(dims.borderRadius),
-            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
-            modifier = Modifier.padding(dims.horizontalPadding)
-        ) {
-            Column(
-                modifier = Modifier.padding(dims.cardPadding * 1.5f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(dims.spacing)
-            ) {
-                CircularProgressIndicator(
-                    color = EduRachaColors.Primary,
-                    modifier = Modifier.size(dims.iconSize + 16.dp)
-                )
-                Text(
-                    text = if (modo == ModoCreacion.IA)
-                        "Generando preguntas con IA..."
-                    else
-                        "Creando pregunta...",
-                    fontSize = dims.subtitleFontSize.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-// DIÁLOGO DE CURSOS
-@Composable
-fun SelectorCursoDialogSimple(
-    dims: ResponsiveDimensions,
-    cursos: List<Curso>,
-    isLoading: Boolean = false,
-    error: String? = null,
-    onRetry: (() -> Unit)? = null,
-    onCursoSelected: (Curso) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "Seleccionar Curso",
-                fontWeight = FontWeight.Bold,
-                fontSize = (dims.subtitleFontSize + 2).sp
-            )
-        },
-        text = {
-            when {
-                isLoading && cursos.isEmpty() -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Cargando cursos...", fontSize = dims.bodyFontSize.sp)
-                    }
-                }
-                error != null && cursos.isEmpty() -> {
-                    Column {
-                        Text(
-                            "Sin conexión con el servidor: $error",
-                            fontSize = dims.bodyFontSize.sp,
-                            color = EduRachaColors.Error
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        if (onRetry != null) {
-                            TextButton(onClick = onRetry) { Text("Reintentar") }
-                        }
-                    }
-                }
-                cursos.isEmpty() -> {
-                    Text(
-                        "No hay cursos disponibles",
-                        fontSize = dims.bodyFontSize.sp
-                    )
-                }
-                else -> {
-                    Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = min(dims.screenHeight * 0.6f, 400.dp))
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-                ) {
-                    cursos.forEach { curso ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onCursoSelected(curso) },
-                            shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                            elevation = CardDefaults.cardElevation(dims.cardElevation * 0.5f)
-                        ) {
-                            Column(modifier = Modifier.padding(dims.cardPadding * 0.75f)) {
-                                Text(
-                                    curso.titulo,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = dims.bodyFontSize.sp
-                                )
-                                if (curso.codigo.isNotEmpty()) {
-                                    Text(
-                                        "Código: ${curso.codigo}",
-                                        fontSize = (dims.bodyFontSize - 2).sp,
-                                        color = EduRachaColors.TextSecondary
-                                    )
+                            // Error (por ejemplo, el tema no tiene explicación aprobada)
+                            preguntaUi.error?.let { error ->
+                                NotaNexo(error, p.error, Icons.Outlined.ErrorOutline, titulo = "No se pudo completar")
+                                if (error.contains("explicación aprobada", ignoreCase = true)) {
+                                    GenerarExplicacionTemaCard(curso = curso, tema = tema)
                                 }
                             }
+
+                            // ---------- Creadas en esta sesión ----------
+                            if (sesion.isNotEmpty()) {
+                                PreguntasDeLaSesion(
+                                    preguntas = sesion,
+                                    editandoId = editandoId,
+                                    onEditar = { pq ->
+                                        modo = ModoCreacion.MANUAL
+                                        editandoId = pq.id
+                                        textoPregunta = pq.texto
+                                        opciones = pq.opciones.ifEmpty { opcionesVacias() }
+                                        dificultad = pq.dificultad
+                                        explicacion = pq.explicacion
+                                        errores = emptyList()
+                                    },
+                                    onEliminar = { porEliminar = it },
+                                    onValidar = { onValidar(curso, tema) }
+                                )
+                            }
+                        } else if (curso == null && !cursoUi.isLoading && cursoUi.error != null) {
+                            EstadoVacioNexo(
+                                titulo = "Sin conexión",
+                                mensaje = cursoUi.error ?: "No se pudieron cargar tus cursos.",
+                                expresion = ExpresionRobi.TRISTE,
+                                textoAccion = "Reintentar",
+                                onAccion = { cursoViewModel.obtenerCursos() }
+                            )
+                        } else if (curso == null) {
+                            GloboRobi(
+                                titulo = "ASISTENTE IA",
+                                mensaje = "Elige un curso y un tema. Luego puedes escribir tus preguntas o pedirme que genere hasta ${PreguntaViewModel.MAX_PREGUNTAS_IA} de una vez.",
+                                expresion = ExpresionRobi.SALUDA,
+                                tamanoRobi = 64.dp
+                            )
                         }
+                        Spacer(Modifier.height(24.dp))
                     }
                 }
             }
         }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar", fontSize = dims.bodyFontSize.sp)
-            }
-        },
-        shape = RoundedCornerShape(dims.borderRadius)
-    )
+    }
+
+    // ---------- Hojas de selección ----------
+    if (hoja == 1) {
+        HojaSeleccionNexo(
+            titulo = "Elige el curso",
+            opciones = cursos.mapNotNull { c ->
+                c.id?.let { OpcionHojaNexo(it, seguro(c.titulo), if (seguro(c.codigo).isNotBlank()) "Código: ${c.codigo}" else null) }
+            },
+            onElegir = { id ->
+                if (id != cursoId) {
+                    cursoId = id
+                    temaId = null
+                    sesion.clear()
+                    limpiarFormulario()
+                    preguntaViewModel.clearMessages()
+                }
+                hoja = 0
+            },
+            onCerrar = { hoja = 0 },
+            icono = Icons.Outlined.MenuBook,
+            color = p.marca,
+            cargando = cursoUi.isLoading && cursos.isEmpty(),
+            vacio = cursoUi.error ?: "Aún no tienes cursos. Crea uno desde el panel docente.",
+            seleccionado = cursoId
+        )
+    }
+    if (hoja == 2 && curso != null) {
+        HojaSeleccionNexo(
+            titulo = "Elige el tema",
+            opciones = temaUi.temas.filter { it.id.isNotBlank() }.map { t ->
+                val (texto, color) = estadoExplicacion(t)
+                OpcionHojaNexo(t.id, seguro(t.titulo), null, texto, color)
+            },
+            onElegir = { id ->
+                if (id != temaId) {
+                    temaId = id
+                    limpiarFormulario()
+                    preguntaViewModel.clearMessages()
+                }
+                hoja = 0
+            },
+            onCerrar = { hoja = 0 },
+            icono = Icons.Outlined.Topic,
+            color = p.ia,
+            cargando = temaUi.isLoading,
+            vacio = "Este curso todavía no tiene temas.",
+            seleccionado = temaId
+        )
+    }
+
+    porEliminar?.let { pq ->
+        DialogoAccionNexo(
+            icono = Icons.Outlined.DeleteOutline,
+            color = p.error,
+            titulo = "¿Eliminar esta pregunta?",
+            mensaje = "\"${pq.texto.take(90)}\" se borrará del banco. Esta acción no se puede deshacer.",
+            textoPrincipal = "Eliminar",
+            tipoPrincipal = TipoBoton.PELIGRO,
+            onPrincipal = {
+                preguntaViewModel.eliminarPregunta(pq.id) {
+                    sesion.removeAll { it.id == pq.id }
+                    if (editandoId == pq.id) limpiarFormulario()
+                }
+                porEliminar = null
+            },
+            textoSecundario = "Cancelar",
+            onSecundario = { porEliminar = null },
+            onDismiss = { porEliminar = null }
+        )
+    }
 }
 
-// DIÁLOGO DE TEMAS CON SCROLL
+/** Texto y color del estado de la explicación del tema (las preguntas con IA necesitan una aprobada). */
 @Composable
-fun SelectorTemaDialogSimple(
-    dims: ResponsiveDimensions,
-    temas: List<Tema>,
-    onTemaSelected: (Tema) -> Unit,
-    onDismiss: () -> Unit
+private fun estadoExplicacion(t: Tema): Pair<String, Color> {
+    val p = LocalNexo.current
+    return when {
+        t.explicacion.isNullOrBlank() -> "Sin explicación" to p.error
+        t.explicacionEstado == "aprobada" -> "Aprobada" to p.accion
+        else -> "Pendiente" to p.racha
+    }
+}
+
+@Composable
+private fun EstadoExplicacionChip(t: Tema) {
+    val (texto, color) = estadoExplicacion(t)
+    EtiquetaEstadoNexo(texto, color)
+}
+
+// ============================================================================
+// FORMULARIO MANUAL
+// ============================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FormularioManualNexo(
+    texto: String,
+    onTexto: (String) -> Unit,
+    dificultad: String,
+    onDificultad: (String) -> Unit,
+    opciones: List<OpcionEditable>,
+    onOpciones: (List<OpcionEditable>) -> Unit,
+    explicacion: String,
+    onExplicacion: (String) -> Unit,
+    errores: List<String>,
+    editando: Boolean,
+    guardando: Boolean,
+    onCancelarEdicion: () -> Unit,
+    onGuardar: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "Seleccionar Tema",
-                fontWeight = FontWeight.Bold,
-                fontSize = (dims.subtitleFontSize + 2).sp
-            )
-        },
-        text = {
-            if (temas.isEmpty()) {
-                Text(
-                    "No hay temas disponibles en este curso",
-                    fontSize = dims.bodyFontSize.sp
+    val p = LocalNexo.current
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.animateContentSize()) {
+        PasoNexo(3, if (editando) "Editando la pregunta" else "Escribe la pregunta", color = p.marca)
+
+        TarjetaNexo(Modifier.fillMaxWidth(), acento = if (editando) p.racha else null) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (editando) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EtiquetaEstadoNexo("Editando", p.racha)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "Cancelar",
+                            color = p.textoSuave,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.sp,
+                            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onCancelarEdicion).padding(8.dp)
+                        )
+                    }
+                }
+                CampoNexo(
+                    valor = texto,
+                    onCambio = onTexto,
+                    etiqueta = "Pregunta",
+                    lineasMinimas = 3,
+                    error = errores.isNotEmpty() && texto.isBlank(),
+                    apoyo = "${texto.length} caracteres"
                 )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = min(dims.screenHeight * 0.6f, 400.dp))
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.5f)
-                ) {
-                    temas.forEach { tema ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onTemaSelected(tema) },
-                            shape = RoundedCornerShape(dims.borderRadius * 0.75f),
-                            elevation = CardDefaults.cardElevation(dims.cardElevation * 0.5f)
-                        ) {
-                            Text(
-                                tema.titulo,
-                                modifier = Modifier.padding(dims.cardPadding * 0.75f),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = dims.bodyFontSize.sp
-                            )
-                        }
+                Text("Dificultad", color = p.texto, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf(
+                        Triple(DificultadPregunta.FACIL, "Fácil", p.accion),
+                        Triple(DificultadPregunta.MEDIO, "Media", p.racha),
+                        Triple(DificultadPregunta.DIFICIL, "Difícil", p.error)
+                    ).forEach { (valor, etiqueta, color) ->
+                        FichaNexo(etiqueta, dificultad == valor, color, { onDificultad(valor) }, Modifier.weight(1f))
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar", fontSize = dims.bodyFontSize.sp)
+        }
+
+        TarjetaNexo(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Opciones de respuesta", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                    Text("Toca el círculo de la opción correcta", color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+                if (opciones.size < LETRAS.size) {
+                    AccionPequenaNexo(Icons.Filled.Add, "Agregar opción", p.accion) {
+                        onOpciones(opciones + OpcionEditable(opciones.size, "", false))
+                    }
+                }
             }
-        },
-        shape = RoundedCornerShape(dims.borderRadius)
-    )
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                opciones.forEachIndexed { index, opcion ->
+                    FilaOpcionNexo(
+                        letra = LETRAS.getOrElse(index) { "${index + 1}" },
+                        opcion = opcion,
+                        onTexto = { nuevo -> onOpciones(opciones.mapIndexed { i, o -> if (i == index) o.copy(texto = nuevo) else o }) },
+                        onCorrecta = { onOpciones(opciones.mapIndexed { i, o -> o.copy(esCorrecta = i == index) }) },
+                        onEliminar = if (opciones.size > 2) {
+                            { onOpciones(opciones.filterIndexed { i, _ -> i != index }.mapIndexed { n, o -> o.copy(id = n) }) }
+                        } else null
+                    )
+                }
+            }
+        }
+
+        TarjetaNexo(Modifier.fillMaxWidth()) {
+            Text("¿Por qué es la correcta?", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+            Text(
+                "Los estudiantes la verán como retroalimentación después de responder.",
+                color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(10.dp))
+            CampoNexo(
+                valor = explicacion,
+                onCambio = onExplicacion,
+                etiqueta = "Explicación de la respuesta",
+                lineasMinimas = 3,
+                icono = Icons.Outlined.Lightbulb,
+                error = errores.isNotEmpty() && explicacion.isBlank(),
+                colorFoco = p.racha
+            )
+        }
+
+        AnimatedVisibility(errores.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+            NotaNexo(
+                errores.joinToString("\n") { "• $it" },
+                p.error,
+                Icons.Outlined.ErrorOutline,
+                titulo = "Revisa antes de guardar"
+            )
+        }
+
+        BotonNexo(
+            texto = if (editando) "Guardar cambios" else "Guardar y crear otra",
+            onClick = onGuardar,
+            tipo = TipoBoton.ACCION,
+            icono = if (editando) Icons.Filled.Save else Icons.Filled.Add,
+            cargando = guardando,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
+
+@Composable
+private fun AccionPequenaNexo(icono: androidx.compose.ui.graphics.vector.ImageVector, descripcion: String, color: Color, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = 0.14f))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = descripcion },
+        contentAlignment = Alignment.Center
+    ) { Icon(icono, null, tint = color) }
+}
+
+@Composable
+private fun FilaOpcionNexo(
+    letra: String,
+    opcion: OpcionEditable,
+    onTexto: (String) -> Unit,
+    onCorrecta: () -> Unit,
+    onEliminar: (() -> Unit)?
+) {
+    val p = LocalNexo.current
+    val color = if (opcion.esCorrecta) p.accion else p.marca
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(if (opcion.esCorrecta) p.accion else p.superficieAlt)
+                .border(2.dp, if (opcion.esCorrecta) p.accion else p.borde, CircleShape)
+                .clickable(role = Role.RadioButton, onClick = onCorrecta)
+                .semantics {
+                    contentDescription = "Marcar opción $letra como correcta"
+                    stateDescription = if (opcion.esCorrecta) "Correcta" else "No marcada"
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (opcion.esCorrecta) Icon(Icons.Filled.Check, null, tint = p.sobreAccion)
+            else Text(letra, color = p.textoSuave, fontWeight = FontWeight.Black, fontSize = 15.sp)
+        }
+        CampoNexo(
+            valor = opcion.texto,
+            onCambio = onTexto,
+            etiqueta = if (opcion.esCorrecta) "Opción $letra · correcta" else "Opción $letra",
+            modifier = Modifier.weight(1f),
+            colorFoco = color,
+            lineasMaximas = 3
+        )
+        if (onEliminar != null) {
+            IconButton(onClick = onEliminar, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Outlined.Close, "Quitar opción $letra", tint = p.textoSuave)
+            }
+        }
+    }
+}
+
+// ============================================================================
+// GENERADOR CON IA (hasta 30, por lotes)
+// ============================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GeneradorIANexo(
+    tema: Tema,
+    cantidad: Int,
+    onCantidad: (Int) -> Unit,
+    progreso: PreguntaViewModel.ProgresoIA?,
+    onGenerar: () -> Unit,
+    onDetener: () -> Unit
+) {
+    val p = LocalNexo.current
+    val max = PreguntaViewModel.MAX_PREGUNTAS_IA
+    val lotes = PreguntaViewModel.lotesPara(cantidad)
+    val segundos = PreguntaViewModel.segundosEstimados(cantidad)
+    val sinExplicacion = tema.explicacionEstado != "aprobada" || tema.explicacion.isNullOrBlank()
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PasoNexo(3, "Genera preguntas con IA", color = p.ia)
+
+        if (progreso != null) {
+            TarjetaNexo(Modifier.fillMaxWidth(), acento = p.ia) {
+                GloboRobi(
+                    titulo = "LOTE ${progreso.lote} DE ${progreso.lotes}",
+                    mensaje = progreso.mensaje,
+                    expresion = if (progreso.esperando) ExpresionRobi.NORMAL else ExpresionRobi.PIENSA,
+                    tamanoRobi = 60.dp
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${progreso.hechas}", color = p.iaTexto, fontSize = 34.sp, fontWeight = FontWeight.Black)
+                    Text(" de ${progreso.total} preguntas", color = p.textoSuave, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 6.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                BarraNexo(progreso.hechas / progreso.total.coerceAtLeast(1).toFloat(), color = p.ia, alto = 12.dp)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Puedes quedarte en esta pantalla: cada lote se guarda apenas termina y aparece abajo.",
+                    color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(12.dp))
+                BotonNexo("Detener", onDetener, tipo = TipoBoton.SECUNDARIO, icono = Icons.Filled.Stop, modifier = Modifier.fillMaxWidth())
+            }
+            return@Column
+        }
+
+        if (sinExplicacion) {
+            NotaNexo(
+                "La IA crea las preguntas a partir de la explicación aprobada del tema. Apruébala primero en Explicaciones (o genérala abajo).",
+                p.racha, Icons.Outlined.Info, titulo = "Este tema aún no tiene explicación aprobada"
+            )
+        }
+
+        TarjetaNexo(Modifier.fillMaxWidth(), acento = p.ia) {
+            Text("¿Cuántas preguntas?", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AccionPequenaNexo(Icons.Filled.Remove, "Menos preguntas", p.ia) { onCantidad((cantidad - 1).coerceAtLeast(1)) }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$cantidad", color = p.iaTexto, fontSize = 40.sp, fontWeight = FontWeight.Black,
+                        modifier = Modifier.semantics { contentDescription = "$cantidad preguntas" })
+                    Text("de $max como máximo", color = p.textoSuave, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                AccionPequenaNexo(Icons.Filled.Add, "Más preguntas", p.ia) { onCantidad((cantidad + 1).coerceAtMost(max)) }
+            }
+            Slider(
+                value = cantidad.toFloat(),
+                onValueChange = { onCantidad(it.toInt().coerceIn(1, max)) },
+                valueRange = 1f..max.toFloat(),
+                steps = max - 2,
+                colors = SliderDefaults.colors(thumbColor = p.ia, activeTrackColor = p.ia, inactiveTrackColor = p.borde,
+                    activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent)
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(5, 10, 20, 30).forEach { n -> FichaNexo("$n", cantidad == n, p.ia, { onCantidad(n) }) }
+            }
+            Spacer(Modifier.height(12.dp))
+            NotaNexo(
+                if (lotes.size == 1) "Se genera en un solo lote. Tiempo aproximado: ${segundos} s."
+                else "Se generan en ${lotes.size} lotes (${lotes.joinToString(" + ")}) con una pausa corta entre cada uno, " +
+                    "para no superar el límite de la IA. Tiempo aproximado: ${if (segundos >= 60) "${segundos / 60} min ${segundos % 60} s" else "$segundos s"}.",
+                p.marca, Icons.Outlined.Timer
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "No se repiten preguntas que el tema ya tenga. Todas quedan pendientes de revisión.",
+                color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        BotonNexo(
+            texto = "Generar $cantidad preguntas",
+            onClick = onGenerar,
+            tipo = TipoBoton.IA,
+            icono = Icons.Filled.AutoAwesome,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+// ============================================================================
+// PREGUNTAS DE LA SESIÓN
+// ============================================================================
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PreguntasDeLaSesion(
-    dims: ResponsiveDimensions,
     preguntas: List<PreguntaSesion>,
     editandoId: String?,
     onEditar: (PreguntaSesion) -> Unit,
-    onEliminar: (PreguntaSesion) -> Unit
+    onEliminar: (PreguntaSesion) -> Unit,
+    onValidar: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(dims.spacing * 0.6f)) {
-        SectionHeaderSimple(dims, "CREADAS EN ESTA SESIÓN (${preguntas.size})", Icons.Default.ListAlt)
-        Text(
-            "Quedan pendientes de revisión en Validación de preguntas.",
-            fontSize = (dims.bodyFontSize - 1).sp,
-            color = EduRachaColors.TextSecondary
-        )
+    val p = LocalNexo.current
+    var expandida by remember { mutableStateOf<String?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TituloSeccionNexo("Creadas ahora (${preguntas.size})", Modifier.weight(1f), Icons.Outlined.Checklist, p.accion)
+        }
+        Text("Quedan pendientes de revisión. Toca una para ver sus opciones.", color = p.textoSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         preguntas.forEachIndexed { i, pq ->
-            val correcta = pq.opciones.firstOrNull { it.esCorrecta }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(dims.borderRadius),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (pq.id == editandoId) EduRachaColors.Primary.copy(alpha = 0.10f) else EduRachaColors.Surface
-                ),
-                elevation = CardDefaults.cardElevation(dims.cardElevation)
+            val abierta = expandida == pq.id
+            TarjetaNexo(
+                Modifier.fillMaxWidth().clickable { expandida = if (abierta) null else pq.id },
+                acento = if (pq.id == editandoId) p.racha else null,
+                padding = 14.dp
             ) {
-                Column(
-                    modifier = Modifier.padding(dims.cardPadding),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        "${preguntas.size - i}. ${pq.texto}",
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary,
-                        fontSize = dims.bodyFontSize.sp,
-                        maxLines = 3
-                    )
-                    correcta?.let {
-                        Text(
-                            "Correcta: ${it.texto}",
-                            color = EduRachaColors.Success,
-                            fontSize = (dims.bodyFontSize - 1).sp,
-                            maxLines = 2
-                        )
-                    }
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalArrangement = Arrangement.Center
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background((if (pq.deIA) p.ia else p.marca).copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "${pq.opciones.size} opciones · ${pq.dificultad.replaceFirstChar { it.uppercase() }}",
-                            color = EduRachaColors.TextSecondary,
-                            fontSize = (dims.bodyFontSize - 2).sp,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                        Row {
-                            TextButton(onClick = { onEditar(pq) }) {
-                                Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(dims.smallIconSize))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Editar")
-                            }
-                            TextButton(onClick = { onEliminar(pq) }) {
-                                Icon(Icons.Outlined.Delete, null, tint = EduRachaColors.Error, modifier = Modifier.size(dims.smallIconSize))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Eliminar", color = EduRachaColors.Error)
-                            }
+                        Text("${preguntas.size - i}", color = if (pq.deIA) p.iaTexto else p.marcaTexto, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(pq.texto, color = p.texto, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                            maxLines = if (abierta) 8 else 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            EtiquetaEstadoNexo(if (pq.deIA) "IA" else "Manual", if (pq.deIA) p.ia else p.marca)
+                            EtiquetaEstadoNexo(
+                                when (pq.dificultad) { DificultadPregunta.FACIL -> "Fácil"; DificultadPregunta.DIFICIL -> "Difícil"; else -> "Media" },
+                                when (pq.dificultad) { DificultadPregunta.FACIL -> p.accion; DificultadPregunta.DIFICIL -> p.error; else -> p.racha }
+                            )
                         }
                     }
                 }
+                AnimatedVisibility(abierta) {
+                    Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        pq.opciones.forEachIndexed { k, o ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(LETRAS.getOrElse(k) { "${k + 1}" }, color = if (o.esCorrecta) p.accionTexto else p.textoSuave,
+                                    fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                Text(o.texto, color = if (o.esCorrecta) p.accionTexto else p.texto, fontSize = 14.sp,
+                                    fontWeight = if (o.esCorrecta) FontWeight.Black else FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                if (o.esCorrecta) Icon(Icons.Filled.CheckCircle, "Correcta", tint = p.accion, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        if (pq.explicacion.isNotBlank()) {
+                            NotaNexo(pq.explicacion, p.racha, Icons.Outlined.Lightbulb)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    FichaNexo("Editar", false, p.marca, { onEditar(pq) }, Modifier.weight(1f))
+                    FichaNexo("Eliminar", false, p.error, { onEliminar(pq) }, Modifier.weight(1f))
+                }
             }
         }
+        BotonNexo(
+            texto = "Revisar y aprobar",
+            onClick = onValidar,
+            tipo = TipoBoton.MARCA,
+            icono = Icons.Filled.FactCheck,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
-// ================== FUNCIONES ==================
+// ============================================================================
+// FUNCIONES
+// ============================================================================
 
-private fun crearPreguntaManual(
+private fun guardarPregunta(
     context: Context,
     preguntaViewModel: PreguntaViewModel,
     curso: Curso,
     tema: Tema,
-    textoPregunta: String,
-    opciones: List<OpcionEditable>,
-    dificultad: String,
-    explicacion: String,
-    idEdicion: String? = null,
-    onGuardada: (String) -> Unit = {}
+    datos: PreguntaSesion,
+    idEdicion: String?,
+    onGuardada: (String) -> Unit
 ) {
     val cursoId = curso.id ?: run {
-        Toast.makeText(context, "Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
+        Avisos.mostrar(context, "El curso no tiene un identificador válido.", TipoAviso.ERROR)
         return
     }
-
-    val temaId = tema.id.takeIf { it.isNotEmpty() } ?: run {
-        Toast.makeText(context, "Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
+    if (tema.id.isBlank()) {
+        Avisos.mostrar(context, "El tema no tiene un identificador válido.", TipoAviso.ERROR)
         return
     }
-
     val prefs = context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
     val docenteNombre = prefs.getString("user_name", null) ?: "Docente"
 
     val pregunta = Pregunta(
         id = null,
         cursoId = cursoId,
-        temaId = temaId,
-        texto = textoPregunta,
-        opciones = opciones.map { opcion ->
-            Opcion(
-                id = opcion.id,
-                texto = opcion.texto,
-                esCorrecta = opcion.esCorrecta
-            )
-        },
-        fuente = FuentePregunta.DOCENTE,
+        temaId = tema.id,
+        texto = datos.texto,
+        opciones = datos.opciones.mapIndexed { i, o -> Opcion(id = i, texto = o.texto, esCorrecta = o.esCorrecta) },
+        fuente = if (datos.deIA) FuentePregunta.IA else FuentePregunta.DOCENTE,
         estado = EstadoPregunta.PENDIENTE_REVISION,
-        dificultad = dificultad,
+        dificultad = datos.dificultad,
         creadoPor = docenteNombre,
         fechaCreacion = Instant.now().toString(),
         metadatosIA = null,
         revisadoPor = null,
         fechaRevision = null,
         notasRevision = null,
-        modificada = false,
-        explicacionCorrecta = explicacion
+        modificada = idEdicion != null,
+        explicacionCorrecta = datos.explicacion
     )
-
     preguntaViewModel.guardarPreguntaManual(pregunta, idEdicion, onGuardada)
-}
-
-private fun generarPreguntasIA(
-    context: Context,
-    preguntaViewModel: PreguntaViewModel,
-    curso: Curso,
-    tema: Tema,
-    cantidad: Int
-) {
-    val cursoId = curso.id ?: run {
-        Toast.makeText(context, "Error: ID de curso no válido", Toast.LENGTH_SHORT).show()
-        return
-    }
-
-    val temaId = tema.id.takeIf { it.isNotEmpty() } ?: run {
-        Toast.makeText(context, "Error: ID de tema no válido", Toast.LENGTH_SHORT).show()
-        return
-    }
-
-    val temaTexto = tema.titulo + if (tema.contenido.isNotEmpty()) {
-        "\n\n${tema.contenido}"
-    } else ""
-
-    preguntaViewModel.generarPreguntasIA(
-        cursoId = cursoId,
-        temaId = temaId,
-        temaTexto = temaTexto,
-        cantidad = cantidad,
-        onSuccess = { response ->
-            Toast.makeText(
-                context,
-                "${response.total} preguntas generadas correctamente",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    )
 }
 
 /**
@@ -1983,14 +875,14 @@ private fun generarPreguntasIA(
  */
 @Composable
 private fun GenerarExplicacionTemaCard(curso: Curso, tema: Tema) {
-    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val p = LocalNexo.current
     val scope = rememberCoroutineScope()
     // 0 = sin iniciar, 1 = generando, 2 = lista, 3 = error
     var estado by remember(tema.id) { mutableStateOf(0) }
     var mensaje by remember(tema.id) { mutableStateOf("") }
 
-    com.stiven.sos.ui.theme.TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.ia) {
-        com.stiven.sos.ui.theme.GloboRobi(
+    TarjetaNexo(modifier = Modifier.fillMaxWidth(), acento = p.ia) {
+        GloboRobi(
             titulo = "ASISTENTE IA",
             mensaje = when (estado) {
                 1 -> "Estoy escribiendo la explicación de \"${tema.titulo}\"... puede tardar hasta un minuto."
@@ -1999,16 +891,16 @@ private fun GenerarExplicacionTemaCard(curso: Curso, tema: Tema) {
                 else -> "Las preguntas se basan en la explicación aprobada del tema. ¿Genero la explicación de \"${tema.titulo}\" ahora?"
             },
             expresion = when (estado) {
-                1 -> com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
-                2 -> com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA
-                3 -> com.stiven.sos.ui.theme.ExpresionRobi.TRISTE
-                else -> com.stiven.sos.ui.theme.ExpresionRobi.FELIZ
+                1 -> ExpresionRobi.PIENSA
+                2 -> ExpresionRobi.CELEBRA
+                3 -> ExpresionRobi.TRISTE
+                else -> ExpresionRobi.FELIZ
             },
             tamanoRobi = 60.dp
         )
         if (estado != 2) {
             Spacer(Modifier.height(12.dp))
-            com.stiven.sos.ui.theme.BotonNexo(
+            BotonNexo(
                 texto = if (estado == 3) "Reintentar" else "Generar explicación con IA",
                 onClick = {
                     val cursoId = curso.id ?: return@BotonNexo
@@ -2021,8 +913,8 @@ private fun GenerarExplicacionTemaCard(curso: Curso, tema: Tema) {
                                 request = GenerarExplicacionRequest(
                                     cursoId = cursoId,
                                     temaId = tema.id,
-                                    tituloTema = tema.titulo,
-                                    contenidoTema = tema.contenido.ifBlank { null }
+                                    tituloTema = seguro(tema.titulo),
+                                    contenidoTema = seguro(tema.contenido).ifBlank { null }
                                 )
                             )
                             if (respuesta.isSuccessful) {
@@ -2039,7 +931,7 @@ private fun GenerarExplicacionTemaCard(curso: Curso, tema: Tema) {
                 },
                 habilitado = estado != 1,
                 cargando = estado == 1,
-                tipo = com.stiven.sos.ui.theme.TipoBoton.IA,
+                tipo = TipoBoton.IA,
                 icono = Icons.Filled.AutoAwesome,
                 modifier = Modifier.fillMaxWidth()
             )

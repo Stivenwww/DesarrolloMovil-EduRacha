@@ -1,5 +1,7 @@
 package com.stiven.sos
 
+import com.stiven.sos.ui.theme.avisar
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -7,6 +9,8 @@ import androidx.activity.viewModels
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -72,174 +76,203 @@ fun ValidacionPreguntasScreen(
     viewModel: PreguntaViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    // "" = todos los temas del curso
+    var temaSel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(temaId) }
+    var titulosTemas by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var confirmarTodas by remember { mutableStateOf(false) }
 
-    LaunchedEffect(cursoId, temaId) {
-        if (cursoId.isNotEmpty() && temaId.isNotEmpty()) {
-            viewModel.cargarPreguntas(
-                cursoId = cursoId,
-                estado = EstadoPregunta.PENDIENTE_REVISION
-            )
-        }
+    fun recargar() { if (cursoId.isNotEmpty()) viewModel.cargarPreguntas(cursoId = cursoId, estado = EstadoPregunta.PENDIENTE_REVISION) }
+
+    LaunchedEffect(cursoId) {
+        recargar()
+        // Nombres de los temas para las tarjetas de selección
+        runCatching { com.stiven.sos.api.ApiClient.apiService.obtenerTemasPorCurso(cursoId, null) }.getOrNull()
+            ?.takeIf { it.isSuccessful }?.body()?.let { lista -> titulosTemas = lista.associate { it.id to it.titulo } }
     }
 
     LaunchedEffect(uiState.error, uiState.successMessage) {
         uiState.error?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.avisar(it, com.stiven.sos.ui.theme.TipoAviso.ERROR)
             viewModel.clearMessages()
         }
         uiState.successMessage?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.avisar(it, com.stiven.sos.ui.theme.TipoAviso.EXITO)
             viewModel.clearMessages()
         }
     }
 
-    val preguntasFiltradas = remember(uiState.preguntas, temaId) {
-        uiState.preguntas.filter { it.temaId == temaId }
+    val pendientesCurso = remember(uiState.preguntas) { uiState.preguntas.filter { it.estado == EstadoPregunta.PENDIENTE_REVISION } }
+    val porTema = remember(pendientesCurso) { pendientesCurso.groupingBy { it.temaId }.eachCount() }
+    val preguntasFiltradas = remember(pendientesCurso, temaSel) {
+        if (temaSel.isBlank()) pendientesCurso else pendientesCurso.filter { it.temaId == temaSel }
     }
+    val nombreTemaSel = if (temaSel.isBlank()) null else (titulosTemas[temaSel] ?: temaTitulo.takeIf { temaSel == temaId } ?: "Tema")
 
     Scaffold(
         snackbarHost = { com.stiven.sos.ui.theme.AvisosNexoHost(snackbarHostState) },
         topBar = {
             ValidacionTopAppBar(
                 cursoTitulo = cursoTitulo,
-                temaTitulo = temaTitulo,
+                temaTitulo = nombreTemaSel ?: "Todos los temas",
                 pendingCount = preguntasFiltradas.size,
                 onNavigateBack = onNavigateBack
             )
         },
-        containerColor = EduRachaColors.Background
+        containerColor = p.fondo
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            when {
-                uiState.isLoading && preguntasFiltradas.isEmpty() -> {
-                    val configuration = LocalConfiguration.current
-                    val screenWidth = configuration.screenWidthDp.dp
-
-                    val iconSize = (screenWidth * 0.12f).coerceIn(40.dp, 60.dp)
-
-                    val fontSize = (screenWidth * 0.04f).coerceIn(14.dp, 18.dp).value.sp
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+            // Tarjetas de tema (seleccionar qué validar)
+            item {
+                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.stiven.sos.ui.theme.TituloSeccionNexo("Elige el tema", icono = Icons.Default.Topic, color = p.ia)
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        CircularProgressIndicator(
-                            color = EduRachaColors.Primary,
-                            modifier = Modifier.size(iconSize)
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "Cargando preguntas...",
-                            color = EduRachaColors.TextSecondary,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                preguntasFiltradas.isEmpty() && !uiState.isLoading -> {
-                    val configuration = LocalConfiguration.current
-                    val screenWidth = configuration.screenWidthDp.dp
-                    val iconSize = (screenWidth * 0.2f).coerceIn(60.dp, 100.dp)
-                    val titleSize = (screenWidth * 0.06f).coerceIn(20.dp, 28.dp).value.sp
-
-                    val subtitleSize = (screenWidth * 0.035f).coerceIn(12.dp, 16.dp).value.sp
-
-
-                    Column(
-                        Modifier
-                            .fillMaxSize()
-                            .padding((screenWidth * 0.08f).coerceIn(20.dp, 40.dp)),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            "Todo validado",
-                            Modifier.size(iconSize),
-                            EduRachaColors.Success
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "¡Todo validado!",
-                            fontSize = titleSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "No hay preguntas pendientes para este tema.",
-                            fontSize = subtitleSize,
-                            color = EduRachaColors.TextSecondary
-                        )
-                    }
-                }
-
-                else -> {
-                    val configuration = LocalConfiguration.current
-                    val screenWidth = configuration.screenWidthDp.dp
-                    val cardPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
-                    val cardSpacing = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(cardPadding),
-                        verticalArrangement = Arrangement.spacedBy(cardSpacing),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        items(preguntasFiltradas, key = { it.id ?: it.texto }) { pregunta ->
-                          // En tablets las tarjetas no se estiran de borde a borde
-                          Box(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
-                            PreguntaCard(
-                                pregunta = pregunta,
-                                onAprobar = {
-                                    viewModel.actualizarEstadoPregunta(
-                                        id = pregunta.id ?: "",
-                                        estado = EstadoPregunta.APROBADA,
-                                        notas = "Aprobada por el docente",
-                                        onSuccess = {
-                                            viewModel.cargarPreguntas(
-                                                cursoId = cursoId,
-                                                estado = EstadoPregunta.PENDIENTE_REVISION
-                                            )
-                                        }
-                                    )
-                                },
-                                onRechazar = { motivo ->
-                                    viewModel.actualizarEstadoPregunta(
-                                        id = pregunta.id ?: "",
-                                        estado = EstadoPregunta.RECHAZADA,
-                                        notas = motivo,
-                                        onSuccess = {
-                                            viewModel.cargarPreguntas(
-                                                cursoId = cursoId,
-                                                estado = EstadoPregunta.PENDIENTE_REVISION
-                                            )
-                                        }
-                                    )
-                                },
-                                onEditar = { preguntaEditada ->
-                                    viewModel.actualizarPregunta(
-                                        id = preguntaEditada.id ?: "",
-                                        pregunta = preguntaEditada,
-                                        onSuccess = {
-                                            viewModel.cargarPreguntas(
-                                                cursoId = cursoId,
-                                                estado = EstadoPregunta.PENDIENTE_REVISION
-                                            )
-                                        }
-                                    )
-                                }
-                            )
-                          }
+                        item {
+                            TarjetaTemaValidacion("Todos los temas", pendientesCurso.size, temaSel.isBlank()) { temaSel = "" }
+                        }
+                        val ids = (porTema.keys + titulosTemas.keys).distinct().sortedByDescending { porTema[it] ?: 0 }
+                        items(ids) { id ->
+                            TarjetaTemaValidacion(titulosTemas[id] ?: "Tema", porTema[id] ?: 0, temaSel == id) { temaSel = id }
                         }
                     }
                 }
             }
+
+            // Aprobar todas
+            if (preguntasFiltradas.isNotEmpty()) {
+                item {
+                    com.stiven.sos.ui.theme.TarjetaNexo(Modifier.widthIn(max = 720.dp).fillMaxWidth(), acento = p.accion) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            com.stiven.sos.ui.theme.InsigniaNexo(Icons.Default.DoneAll, p.accion)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("${preguntasFiltradas.size} por revisar", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                                Text(
+                                    "Puedes revisarlas una por una o aprobarlas todas" + (nombreTemaSel?.let { " de \"$it\"" } ?: " del curso") + ".",
+                                    color = p.textoSuave, fontWeight = FontWeight.SemiBold, fontSize = 13.sp
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        com.stiven.sos.ui.theme.BotonNexo(
+                            texto = "Aprobar todas (${preguntasFiltradas.size})",
+                            onClick = { confirmarTodas = true },
+                            tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                            icono = Icons.Default.DoneAll,
+                            cargando = uiState.isLoading,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            when {
+                uiState.isLoading && preguntasFiltradas.isEmpty() -> item {
+                    Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = p.ia)
+                    }
+                }
+                preguntasFiltradas.isEmpty() -> item {
+                    com.stiven.sos.ui.theme.EstadoVacioNexo(
+                        titulo = "¡Todo validado!",
+                        mensaje = if (temaSel.isBlank()) "No hay preguntas pendientes en este curso." else "No hay preguntas pendientes en este tema.",
+                        expresion = com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA,
+                        textoAccion = if (temaSel.isNotBlank() && pendientesCurso.isNotEmpty()) "Ver todos los temas" else null,
+                        onAccion = { temaSel = "" }
+                    )
+                }
+                else -> items(preguntasFiltradas, key = { it.id ?: it.texto }) { pregunta ->
+                    Box(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
+                        PreguntaCard(
+                            pregunta = pregunta,
+                            onAprobar = {
+                                viewModel.actualizarEstadoPregunta(
+                                    id = pregunta.id ?: "",
+                                    estado = EstadoPregunta.APROBADA,
+                                    notas = "Aprobada por el docente",
+                                    onSuccess = { recargar() }
+                                )
+                            },
+                            onRechazar = { motivo ->
+                                viewModel.actualizarEstadoPregunta(
+                                    id = pregunta.id ?: "",
+                                    estado = EstadoPregunta.RECHAZADA,
+                                    notas = motivo,
+                                    onSuccess = { recargar() }
+                                )
+                            },
+                            onEditar = { preguntaEditada ->
+                                viewModel.actualizarPregunta(
+                                    id = preguntaEditada.id ?: "",
+                                    pregunta = preguntaEditada,
+                                    onSuccess = { recargar() }
+                                )
+                            }
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    if (confirmarTodas) {
+        com.stiven.sos.ui.theme.DialogoAccionNexo(
+            icono = Icons.Default.DoneAll,
+            color = p.accion,
+            titulo = "¿Aprobar ${preguntasFiltradas.size} preguntas?",
+            mensaje = "Quedarán disponibles para los quizzes " +
+                (nombreTemaSel?.let { "del tema \"$it\"" } ?: "de todo el curso") + ". Después puedes editarlas o desactivarlas en Preguntas revisadas.",
+            textoPrincipal = "Sí, aprobar todas",
+            tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+            iconoPrincipal = Icons.Default.DoneAll,
+            onPrincipal = {
+                confirmarTodas = false
+                viewModel.aprobarPendientes(cursoId, temaSel.ifBlank { null }) { recargar() }
+            },
+            textoSecundario = "Revisar una por una",
+            onSecundario = { confirmarTodas = false },
+            onDismiss = { confirmarTodas = false }
+        )
+    }
+}
+
+/** Tarjeta para elegir el tema a validar: nombre, cuántas faltan y si está seleccionado. */
+@Composable
+private fun TarjetaTemaValidacion(titulo: String, pendientes: Int, seleccionado: Boolean, onClick: () -> Unit) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val color = if (pendientes > 0) p.ia else p.accion
+    Column(
+        Modifier
+            .width(168.dp)
+            .heightIn(min = 104.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (seleccionado) color.copy(alpha = 0.14f) else p.superficie)
+            .border(if (seleccionado) 2.dp else 1.dp, if (seleccionado) color else p.borde, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (pendientes > 0) Icons.Default.PendingActions else Icons.Default.CheckCircle, null, tint = color, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.weight(1f))
+            if (seleccionado) Icon(Icons.Default.RadioButtonChecked, "Seleccionado", tint = color, modifier = Modifier.size(18.dp))
+        }
+        Text(titulo, color = p.texto, fontWeight = FontWeight.Black, fontSize = 14.sp, maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Text(
+            if (pendientes == 0) "Al día" else "$pendientes por revisar",
+            color = if (pendientes > 0) p.iaTexto else p.accionTexto, fontWeight = FontWeight.Black, fontSize = 12.sp
+        )
     }
 }
 
@@ -251,130 +284,15 @@ fun ValidacionTopAppBar(
     pendingCount: Int,
     onNavigateBack: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-
-    // Tamaños responsivos
-    val titleSize = (screenWidth * 0.045f).coerceIn(16.dp, 20.dp).value.sp
-    val subtitleSize = (screenWidth * 0.038f).coerceIn(13.dp, 17.dp).value.sp
-    val temaLabelSize = (screenWidth * 0.028f).coerceIn(10.dp, 12.dp).value.sp
-    val temaTitleSize = (screenWidth * 0.032f).coerceIn(11.dp, 14.dp).value.sp
-    val badgeNumberSize = (screenWidth * 0.035f).coerceIn(13.dp, 16.dp).value.sp
-    val badgeTextSize = (screenWidth * 0.025f).coerceIn(9.dp, 11.dp).value.sp
-    val iconSize = (screenWidth * 0.06f).coerceIn(22.dp, 28.dp)
-
-    // LA SOLUCIÓN MÁS ROBUSTA: Un Surface personalizado que actúa como TopAppBar
-    // Esto nos da control total sobre el contenido y el layout.
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(4.dp),
-        color = EduRachaColors.BarraSuperior
-    ) {
-        // Usamos un Box para poder alinear el contenido y los iconos de forma independiente.
-        // El padding superior se aplica aquí para respetar la barra de estado.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(WindowInsets.statusBars.asPaddingValues()) // ¡CLAVE! Respeta la barra de estado
-                .padding(vertical = 8.dp, horizontal = 4.dp)
-        ) {
-            // Icono de navegación (Atrás)
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = Color.White,
-                    modifier = Modifier.size(iconSize)
-                )
-            }
-
-            // Contenido principal del título (centrado)
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    // Añadimos padding horizontal para no chocar con los iconos
-                    .padding(horizontal = 56.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Título principal y curso
-                Text(
-                    text = "Validación de Preguntas",
-                    fontSize = titleSize,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = cursoTitulo,
-                    fontSize = subtitleSize,
-                    color = Color.White.copy(alpha = 0.9f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.2f), modifier = Modifier.width(120.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Info del tema
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.Outlined.Folder,
-                        contentDescription = null,
-                        modifier = Modifier.size((screenWidth * 0.045f).coerceIn(16.dp, 20.dp)),
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Tema",
-                            fontSize = temaLabelSize,
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = temaTitulo,
-                            fontSize = temaTitleSize,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
-            // Acciones (Contador)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp)
-            ) {
-                Text(
-                    text = "$pendingCount",
-                    fontSize = badgeNumberSize,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = if (pendingCount == 1) "Pendiente" else "Pendientes",
-                    fontSize = badgeTextSize,
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Medium
-                )
-            }
+    com.stiven.sos.ui.theme.EncabezadoNexo(
+        titulo = "Validación de preguntas",
+        subtitulo = if (temaTitulo.isNotBlank()) "$cursoTitulo · $temaTitulo" else cursoTitulo,
+        onVolver = onNavigateBack,
+        tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+        acciones = {
+            com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("$pendingCount", Icons.Default.PendingActions)
         }
-    }
+    )
 }
 
 
@@ -1032,4 +950,4 @@ fun InfoRow(icon: ImageVector, label: String, value: String) {
             modifier = Modifier.weight(1f, fill = false)
         )
     }
-}
+}

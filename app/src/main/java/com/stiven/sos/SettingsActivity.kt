@@ -71,6 +71,9 @@ class SettingsActivity : ComponentActivity() {
 
     private fun logout() {
         UserPreferences.clearUserData(this)
+        com.stiven.sos.utils.SessionManager.getInstance(applicationContext).logout()
+        // Sin esto, la siguiente cuenta seguía usando el token de la anterior ("No estás inscrito")
+        com.stiven.sos.api.ApiClient.cerrarSesion()
         FirebaseAuth.getInstance().signOut()
         val intent = Intent(this, WelcomeActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -107,6 +110,7 @@ fun SettingsScreen(
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showAyuda by remember { mutableStateOf(false) }
 
     var notificationsEnabled by remember { mutableStateOf(true) }
     var soundEnabled by remember { mutableStateOf(true) }
@@ -180,12 +184,12 @@ fun SettingsScreen(
 
                 SettingsSection(title = "INFORMACIÓN", iconColor = EduRachaColors.Secondary) {
                     SettingsItem(
-                        Icons.Outlined.Help, "Ayuda y soporte", "Centro de ayuda EduRacha",
+                        Icons.Outlined.Help, "Ayuda y soporte", "Cómo funciona la app y contacto",
                         EduRachaColors.Secondary
-                    ) { Toast.makeText(context, "Próximamente", Toast.LENGTH_SHORT).show() }
+                    ) { showAyuda = true }
                     SettingsDivider()
                     SettingsItem(
-                        Icons.Outlined.Info, "Acerca de EduRacha", "Versión 1.0.0",
+                        Icons.Outlined.Info, "Acerca de EduRacha", "Qué es, creadores y versión",
                         EduRachaColors.Secondary
                     ) { showAboutDialog = true }
                 }
@@ -206,7 +210,7 @@ fun SettingsScreen(
                 showEditProfileDialog = false
                 updateUserProfile(context, userUid, name, nickname, userEmail, userRole) {
                     refreshKey++
-                    Toast.makeText(context, "Perfil actualizado exitosamente", Toast.LENGTH_SHORT).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Perfil actualizado exitosamente")
                 }
             }
         )
@@ -234,7 +238,10 @@ fun SettingsScreen(
     }
 
     if (showAboutDialog) {
-        AboutDialog(onDismiss = { showAboutDialog = false })
+        PantallaAcercaDe(onVolver = { showAboutDialog = false })
+    }
+    if (showAyuda) {
+        PantallaAyudaSoporte(rol = userRole, onVolver = { showAyuda = false })
     }
 }
 
@@ -251,7 +258,7 @@ private fun updateUserProfile(
     onSuccess: () -> Unit
 ) {
     if (uid.isEmpty()) {
-        Toast.makeText(context, "Error: Usuario no identificado", Toast.LENGTH_LONG).show()
+        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: Usuario no identificado")
         return
     }
 
@@ -284,27 +291,15 @@ private fun updateUserProfile(
             withContext(Dispatchers.Main) {
                 if (response.isSuccessful) {
                     onSuccess()
-                    Toast.makeText(
-                        context,
-                        "Perfil actualizado exitosamente",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Perfil actualizado exitosamente")
                 } else {
-                    Toast.makeText(
-                        context,
-                        "Error al sincronizar: ${response.code()}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error al sincronizar: ${response.code()}")
                 }
             }
 
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${e.message}")
             }
         }
     }
@@ -319,7 +314,7 @@ private fun changePassword(
     val user = FirebaseAuth.getInstance().currentUser
 
     if (user?.email == null) {
-        Toast.makeText(context, "Usuario no autenticado", Toast.LENGTH_LONG).show()
+        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Usuario no autenticado")
         return
     }
 
@@ -327,12 +322,12 @@ private fun changePassword(
 
     user.reauthenticate(credential).addOnSuccessListener {
         user.updatePassword(newPassword).addOnSuccessListener {
-            Toast.makeText(context, "Contraseña cambiada exitosamente", Toast.LENGTH_SHORT).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Contraseña cambiada exitosamente")
         }.addOnFailureListener { e ->
-            Toast.makeText(context, "Error al cambiar contraseña: ${e.message}", Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error al cambiar contraseña: ${e.message}")
         }
     }.addOnFailureListener {
-        Toast.makeText(context, "Contraseña actual incorrecta", Toast.LENGTH_LONG).show()
+        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Contraseña actual incorrecta")
     }
 }
 

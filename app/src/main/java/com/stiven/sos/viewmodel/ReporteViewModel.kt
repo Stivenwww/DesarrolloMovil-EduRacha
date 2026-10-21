@@ -142,14 +142,14 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun parsearDatosReporteDiario(data: DatosReporteDiarioResponse, cursoId: String, fecha: String): DatosReporte {
-        val encabezados = listOf("Estudiante ID", "Nombre", "Quizzes Realizados", "Promedio Correctas", "Experiencia Ganada")
-        val filas = data.estudiantes.map { est ->
+        val encabezados = listOf("Nombre", "Quizzes Realizados", "Promedio Correctas", "Experiencia Ganada", "Estado")
+        val filas = data.estudiantes.sortedByDescending { it.experienciaGanada }.map { est ->
             mapOf(
-                "Estudiante ID" to est.estudianteId,
                 "Nombre" to est.nombre,
                 "Quizzes Realizados" to est.quizzesRealizados.toString(),
                 "Promedio Correctas" to est.promedioCorrectas,
-                "Experiencia Ganada" to est.experienciaGanada.toString()
+                "Experiencia Ganada" to est.experienciaGanada.toString(),
+                "Estado" to if (est.quizzesRealizados > 0) "Activo" else "Sin actividad"
             )
         }
 
@@ -158,7 +158,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
 
     private fun parsearDatosReporteTema(data: DatosReporteTemaResponse, cursoId: String, temaId: String): DatosReporte {
         val encabezados = listOf("Nombre", "Intentos", "Mejor Puntaje", "Promedio Tiempo (seg)", "Estado")
-        val filas = data.estudiantes.map { est ->
+        val filas = data.estudiantes.sortedByDescending { it.mejorPuntaje }.map { est ->
             mapOf(
                 "Nombre" to est.nombre,
                 "Intentos" to est.intentos.toString(),
@@ -173,7 +173,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
 
     private fun parsearDatosReporteGeneral(data: DatosReporteGeneralResponse, cursoId: String): DatosReporte {
         val encabezados = listOf("Nombre", "Total Quizzes", "Promedio General", "Experiencia Total", "Temas Completados")
-        val filas = data.estudiantes.map { est ->
+        val filas = data.estudiantes.sortedByDescending { it.experienciaTotal }.map { est ->
             mapOf(
                 "Nombre" to est.nombre,
                 "Total Quizzes" to est.totalQuizzes.toString(),
@@ -188,7 +188,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
 
     private fun parsearDatosReporteRango(data: DatosReporteRangoResponse, cursoId: String, desde: String, hasta: String): DatosReporte {
         val encabezados = listOf("Nombre", "Quizzes en Rango", "Promedio Correctas", "Experiencia", "Tiempo Promedio (seg)")
-        val filas = data.estudiantes.map { est ->
+        val filas = data.estudiantes.sortedByDescending { it.experiencia }.map { est ->
             mapOf(
                 "Nombre" to est.nombre,
                 "Quizzes en Rango" to est.quizzesEnRango.toString(),
@@ -251,7 +251,10 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                         return@launch
                     }
 
-                    val nombreArchivo = generarNombreArchivo(tipo, cursoId)
+                    // Nombre que pone el servidor (EduRacha_General_Curso.xlsx); si no viene, uno local
+                    val nombreArchivo = nombreDesdeCabecera(response.headers()["Content-Disposition"])
+                        ?.let { it.removeSuffix(".xlsx") + "_" + SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date()) + ".xlsx" }
+                        ?: generarNombreArchivo(tipo, cursoId)
 
                     val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         guardarArchivoModerno(excelBytes, nombreArchivo)
@@ -260,7 +263,7 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                     }
 
                     if (uri != null) {
-                        estadoFlow.value = ReporteEstado.Exito(nombreArchivo)
+                        estadoFlow.value = ReporteEstado.Exito(nombreArchivo, uri.toString())
                     } else {
                         estadoFlow.value = ReporteEstado.Error("Error al guardar el archivo")
                     }
@@ -283,6 +286,13 @@ class ReporteViewModel(application: Application) : AndroidViewModel(application)
                 estadoFlow.value = ReporteEstado.Error(e.message ?: "Error de conexión")
             }
         }
+    }
+
+    /** Lee filename="..." de la cabecera Content-Disposition (versión ASCII que envía el servidor). */
+    private fun nombreDesdeCabecera(cabecera: String?): String? {
+        val c = cabecera ?: return null
+        val nombre = Regex("filename=\"([^\"]+)\"").find(c)?.groupValues?.get(1)?.trim() ?: return null
+        return nombre.replace(Regex("[\\\\/:*?\"<>|]"), "_").takeIf { it.endsWith(".xlsx") }
     }
 
     private fun generarNombreArchivo(tipo: TipoReporte, cursoId: String): String {

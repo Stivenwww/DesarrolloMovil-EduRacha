@@ -259,14 +259,19 @@ fun PanelDocenteScreen(
                         modifier = Modifier.weight(1f),
                         onClick = onNavigateToCourses
                     )
+                    // Todos los pendientes del docente (preguntas, explicaciones, temas y aspirantes)
+                    val (pendientes, cargandoPend, _) = rememberPendientesDocente()
                     AdminStatCard(
                         titulo = "Pendientes",
-                        valor = if (preguntasUiState.isLoading && preguntasUiState.preguntas.isEmpty()) "…"
-                        else "$preguntasPendientes",
+                        valor = when {
+                            pendientes != null -> "${pendientes.total}"
+                            cargandoPend -> "…"
+                            else -> "$preguntasPendientes"
+                        },
                         icon = Icons.Outlined.HourglassTop,
                         acento = nx.racha,
                         modifier = Modifier.weight(1f),
-                        onClick = onNavigateToValidation
+                        onClick = { context.startActivity(android.content.Intent(context, PendientesDocenteActivity::class.java)) }
                     )
                     AdminStatCard(
                         titulo = "Estudiantes",
@@ -374,65 +379,39 @@ fun UserHeader(
     totalCursos: Int = 0,
     preguntasPendientes: Int = 0
 ) {
-    val nx = com.stiven.sos.ui.theme.LocalNexo.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.weight(1f)) {
-                Text("edu", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.texto)
-                Text("racha", fontSize = 22.sp, fontWeight = FontWeight.Black, color = nx.marcaTexto)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "DOCENTE",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
-                    color = nx.iaTexto,
-                    modifier = Modifier
-                        .padding(bottom = 4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(nx.ia.copy(alpha = 0.16f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+    // Mismo encabezado que el resto de la app (tarjeta de color, antetítulo y título), sin botón volver.
+    com.stiven.sos.ui.theme.EncabezadoNexo(
+        titulo = fullName.ifBlank { "Docente" },
+        subtitulo = "$greeting · Panel docente",
+        onVolver = null,
+        tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+        acciones = {
+            val noLeidas = com.stiven.sos.services.rememberNotificacionesNoLeidas()
+            Box {
+                com.stiven.sos.ui.theme.AccionEncabezadoNexo(
+                    Icons.Outlined.Notifications,
+                    if (noLeidas > 0) "Notificaciones, $noLeidas sin leer" else "Notificaciones",
+                    onNavigateToNotifications,
+                    com.stiven.sos.ui.theme.TonoEncabezado.IA
                 )
-            }
-            IconButton(onClick = onNavigateToNotifications) {
-                Icon(Icons.Outlined.Notifications, contentDescription = "Notificaciones", tint = nx.texto)
-            }
-            IconButton(onClick = onNavigateToSettings) {
-                Icon(Icons.Outlined.Settings, contentDescription = "Ajustes", tint = nx.texto)
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            com.stiven.sos.ui.theme.AvatarNexo(
-                nombre = fullName,
-                color = nx.ia,
-                tamano = 52.dp,
-                modifier = Modifier
-                    .border(2.dp, nx.marca, CircleShape)
-                    .clickable(onClick = onNavigateToProfile)
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(text = "$greeting,", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = nx.textoSuave)
-                Text(
-                    text = fullName,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    color = nx.texto,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                if (userEmail.isNotEmpty()) {
-                    Text(text = userEmail, fontSize = 12.sp, color = nx.textoTenue, maxLines = 1)
+                if (noLeidas > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(com.stiven.sos.ui.theme.LocalNexo.current.error),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (noLeidas > 9) "9+" else "$noLeidas", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
                 }
             }
+            com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Outlined.Settings, "Configuración", onNavigateToSettings, com.stiven.sos.ui.theme.TonoEncabezado.IA)
+            com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Outlined.Person, "Mi perfil", onNavigateToProfile, com.stiven.sos.ui.theme.TonoEncabezado.IA)
         }
-    }
+    )
 }
 
 @Composable

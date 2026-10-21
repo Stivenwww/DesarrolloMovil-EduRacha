@@ -49,49 +49,23 @@ fun MensajeFlotante(
         ) + fadeOut(),
         modifier = modifier
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = obtenerColorFondo(tipo),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, obtenerColorIcono(tipo).copy(alpha = 0.6f)),
-            shadowElevation = 8.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = obtenerIcono(tipo),
-                    contentDescription = null,
-                    tint = obtenerColorIcono(tipo),
-                    modifier = Modifier.size(24.dp)
-                )
-
-                Text(
-                    text = mensaje,
-                    fontSize = 14.sp,
-                    color = obtenerColorTexto(tipo),
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = obtenerColorIcono(tipo),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+        val aviso = remember(mensaje, tipo) {
+            com.stiven.sos.ui.theme.Aviso(
+                mensaje = mensaje,
+                tipo = when (tipo) {
+                    TipoMensaje.EXITO -> com.stiven.sos.ui.theme.TipoAviso.EXITO
+                    TipoMensaje.ERROR -> com.stiven.sos.ui.theme.TipoAviso.ERROR
+                    TipoMensaje.INFO -> com.stiven.sos.ui.theme.TipoAviso.INFO
+                    TipoMensaje.ADVERTENCIA -> com.stiven.sos.ui.theme.TipoAviso.ADVERTENCIA
+                },
+                duracionMs = 3000
+            )
         }
+        com.stiven.sos.ui.theme.TarjetaAvisoNexo(
+            aviso = aviso,
+            onCerrar = onDismiss,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
     }
 }
 

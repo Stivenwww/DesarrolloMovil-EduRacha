@@ -63,18 +63,11 @@ fun SeleccionarCursoExplicacionesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Seleccionar Curso") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Explicaciones",
+                subtitulo = "Elige un curso",
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA
             )
         }
     ) { paddingValues ->

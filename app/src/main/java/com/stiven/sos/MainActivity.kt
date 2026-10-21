@@ -154,7 +154,7 @@ fun MainEstudianteScreen(
                 primerNombre = primerNombre,
                 userEmail = userEmail,
                 userInitial = userInitial,
-                hasNotificationBadge = solicitudesPendientes > 0,
+                hasNotificationBadge = com.stiven.sos.services.rememberNotificacionesNoLeidas() > 0 || solicitudesPendientes > 0,
                 onNotificationClick = onNavigateToNotifications,
                 onSettingsClick = onNavigateToSettings,
                 onInfoClick = onNavigateToProfile
@@ -325,62 +325,32 @@ private fun HeaderInicioEstudiante(
     onSettingsClick: () -> Unit,
     onInfoClick: () -> Unit
 ) {
-    val p = com.stiven.sos.ui.theme.LocalNexo.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.weight(1f)) {
-                Text("edu", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.texto)
-                Text("racha", fontSize = 22.sp, fontWeight = FontWeight.Black, color = p.marcaTexto)
+    // Mismo encabezado que el resto de la app (tarjeta de color, antetítulo y título), sin botón volver.
+    com.stiven.sos.ui.theme.EncabezadoNexo(
+        titulo = primerNombre.ifBlank { "Estudiante" },
+        subtitulo = "${saludoSegunHora()} · EduRacha",
+        onVolver = null,
+        tono = com.stiven.sos.ui.theme.TonoEncabezado.MARCA,
+        acciones = {
+            Box {
+                com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Outlined.Notifications, "Notificaciones", onNotificationClick)
+                if (hasNotificationBadge) {
+                    val p = com.stiven.sos.ui.theme.LocalNexo.current
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 6.dp, end = 6.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(p.error)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
             }
-            BotonIconoHeader(Icons.Outlined.Notifications, "Notificaciones", onNotificationClick, hasNotificationBadge)
-            BotonIconoHeader(Icons.Outlined.Settings, "Configuración", onSettingsClick)
-            Box(
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(p.ia)
-                    .border(2.dp, p.marca, CircleShape)
-                    .clickable(role = Role.Button, onClick = onInfoClick)
-                    .semantics { contentDescription = "Perfil" },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(userInitial, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black)
-            }
+            com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Outlined.Settings, "Configuración", onSettingsClick)
+            com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Outlined.Person, "Mi perfil", onInfoClick)
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "${saludoSegunHora()},",
-            color = p.textoSuave,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            primerNombre,
-            color = p.texto,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (userEmail.isNotBlank()) {
-            Text(
-                userEmail,
-                color = p.textoTenue,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
+    )
 }
 
 @Composable

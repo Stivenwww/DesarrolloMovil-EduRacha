@@ -32,6 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.EstadoPregunta
 import com.stiven.sos.models.Pregunta
+import com.stiven.sos.models.DificultadPregunta
+import com.stiven.sos.models.FuentePregunta
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.viewmodel.CursoViewModel
@@ -62,207 +66,148 @@ class PreguntasRevisadasActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PreguntasRevisadasScreen(
     preguntasViewModel: PreguntaViewModel,
     cursoViewModel: CursoViewModel,
     onBack: () -> Unit
 ) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val preguntasUiState by preguntasViewModel.uiState.collectAsState()
     val cursoUiState by cursoViewModel.uiState.collectAsState()
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
+    // Filtros (se conservan al girar la pantalla)
+    var estadoSel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var cursoSel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var temaSel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var dificultadSel by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var busqueda by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var detalleId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
-    // Estados para filtros
-    var selectedEstado by remember { mutableStateOf<String?>(null) }
-    var selectedCurso by remember { mutableStateOf<String?>(null) }
-    var showFilterDialog by remember { mutableStateOf(false) }
-    var selectedPregunta by remember { mutableStateOf<Pregunta?>(null) }
-
-    // Filtrar preguntas
-    val preguntasFiltradas = remember(
-        preguntasUiState.preguntas,
-        selectedEstado,
-        selectedCurso
-    ) {
-        preguntasUiState.preguntas.filter { pregunta ->
-            val cumpleEstado = selectedEstado == null || pregunta.estado == selectedEstado
-            val cumpleCurso = selectedCurso == null || pregunta.cursoId == selectedCurso
-            cumpleEstado && cumpleCurso &&
-                    (pregunta.estado == EstadoPregunta.APROBADA || pregunta.estado == EstadoPregunta.RECHAZADA)
-        }
+    LaunchedEffect(preguntasUiState.successMessage, preguntasUiState.error) {
+        preguntasUiState.successMessage?.let { com.stiven.sos.ui.theme.Avisos.mostrar(context, it, com.stiven.sos.ui.theme.TipoAviso.EXITO) }
+        preguntasUiState.error?.let { com.stiven.sos.ui.theme.Avisos.mostrar(context, it, com.stiven.sos.ui.theme.TipoAviso.ERROR) }
+        if (preguntasUiState.successMessage != null || preguntasUiState.error != null) preguntasViewModel.clearMessages()
     }
 
-    // Contar estadísticas
-    val totalAprobadas = preguntasFiltradas.count { it.estado == EstadoPregunta.APROBADA }
-    val totalRechazadas = preguntasFiltradas.count { it.estado == EstadoPregunta.RECHAZADA }
-
-    val titleSize = (screenWidth * 0.045f).coerceIn(16.dp, 20.dp).value.sp
-    val subtitleSize = (screenWidth * 0.03f).coerceIn(11.dp, 14.dp).value.sp
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Preguntas Revisadas",
-                            fontSize = titleSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "$totalAprobadas aprobadas · $totalRechazadas rechazadas",
-                            fontSize = subtitleSize,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White,
-                            modifier = Modifier.size((screenWidth * 0.06f).coerceIn(20.dp, 28.dp))
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showFilterDialog = true }) {
-                        Badge(
-                            containerColor = if (selectedEstado != null || selectedCurso != null)
-                                EduRachaColors.Warning else Color.Transparent
-                        ) {
-                            Icon(
-                                Icons.Default.FilterList,
-                                contentDescription = "Filtros",
-                                tint = Color.White,
-                                modifier = Modifier.size((screenWidth * 0.06f).coerceIn(20.dp, 28.dp))
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior,
-                    titleContentColor = Color.White
-                )
-            )
+    val uid = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid }
+    val misCursos = remember(cursoUiState.cursos) { cursoUiState.cursos.filter { uid == null || it.docenteId == uid } }
+    val idsMisCursos = remember(misCursos) { misCursos.mapNotNull { it.id }.toSet() }
+    val revisadas = remember(preguntasUiState.preguntas, idsMisCursos) {
+        preguntasUiState.preguntas.filter {
+            (it.estado == EstadoPregunta.APROBADA || it.estado == EstadoPregunta.RECHAZADA) &&
+                (idsMisCursos.isEmpty() || it.cursoId in idsMisCursos)
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(EduRachaColors.Background)
-                .padding(padding)
-        ) {
-            // Chips de filtro activo
-            if (selectedEstado != null || selectedCurso != null) {
-                val chipPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
-                val chipSpacing = (screenWidth * 0.02f).coerceIn(6.dp, 10.dp)
+    }
+    val cursoActual = misCursos.firstOrNull { it.id == cursoSel }
+    val temasCurso = remember(cursoActual) { cursoActual?.getTemasLista().orEmpty() }
+    val filtradas = remember(revisadas, estadoSel, cursoSel, temaSel, dificultadSel, busqueda) {
+        revisadas.filter { q ->
+            (estadoSel == null || q.estado == estadoSel) &&
+                (cursoSel == null || q.cursoId == cursoSel) &&
+                (temaSel == null || q.temaId == temaSel) &&
+                (dificultadSel == null || q.dificultad == dificultadSel) &&
+                (busqueda.isBlank() || q.texto.contains(busqueda, true))
+        }.sortedByDescending { it.fechaRevision ?: it.fechaCreacion }
+    }
+    val hayFiltros = estadoSel != null || cursoSel != null || dificultadSel != null || busqueda.isNotBlank()
+    val aprobadas = revisadas.count { it.estado == EstadoPregunta.APROBADA }
+    val rechazadas = revisadas.count { it.estado == EstadoPregunta.RECHAZADA }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(chipPadding),
-                    horizontalArrangement = Arrangement.spacedBy(chipSpacing)
-                ) {
-                    if (selectedEstado != null) {
-                        val estado = selectedEstado!!
-                        FilterChip(
-                            selected = true,
-                            onClick = { selectedEstado = null },
-                            label = {
-                                Text(
-                                    when(estado) {
-                                        EstadoPregunta.APROBADA -> " Aprobadas"
-                                        EstadoPregunta.RECHAZADA -> " Rechazadas"
-                                        else -> estado
-                                    },
-                                    fontSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Quitar filtro",
-                                    modifier = Modifier.size((screenWidth * 0.045f).coerceIn(16.dp, 20.dp))
-                                )
-                            }
-                        )
-                    }
-
-                    if (selectedCurso != null) {
-                        val cursoId = selectedCurso!!
-                        val curso = cursoUiState.cursos.find { it.id == cursoId }
-
-                        // Usamos la misma lógica que en el diálogo para obtener el nombre
-                        val nombreMostrado = curso?.let {
-                            it.nombre.ifEmpty { it.titulo }
-                        } ?: "Curso"
-
-                        FilterChip(
-                            selected = true,
-                            onClick = { selectedCurso = null },
-                            label = {
-                                Text(
-                                    nombreMostrado, // <-- SOLUCIÓN AQUÍ
-                                    fontSize = (screenWidth * 0.032f).coerceIn(12.dp, 14.dp).value.sp
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Quitar filtro",
-                                    modifier = Modifier.size((screenWidth * 0.045f).coerceIn(16.dp, 20.dp))
-                                )
-                            }
-                        )
-                    }
-
+    com.stiven.sos.ui.theme.FondoNexo {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Preguntas revisadas",
+                subtitulo = "Banco de preguntas",
+                onVolver = onBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
+                    com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Default.Refresh, "Actualizar",
+                        { preguntasViewModel.cargarPreguntas() }, com.stiven.sos.ui.theme.TonoEncabezado.IA)
                 }
-            }
-
-            // Lista de preguntas
-            when {
-                preguntasUiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = EduRachaColors.Primary,
-                            modifier = Modifier.size((screenWidth * 0.12f).coerceIn(40.dp, 60.dp))
-                        )
-                    }
-                }
-
-                preguntasFiltradas.isEmpty() -> {
-                    EmptyState(
-                        hasFilters = selectedEstado != null || selectedCurso != null,
-                        onClearFilters = {
-                            selectedEstado = null
-                            selectedCurso = null
+            )
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Filtros visibles y a un toque (antes estaban escondidos en una ventana emergente)
+                item {
+                    Column(Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            com.stiven.sos.ui.theme.StatNexo(Icons.Default.CheckCircle, "$aprobadas", "Aprobadas", p.accion, Modifier.weight(1f),
+                                onClick = { estadoSel = if (estadoSel == EstadoPregunta.APROBADA) null else EstadoPregunta.APROBADA })
+                            com.stiven.sos.ui.theme.StatNexo(Icons.Default.Cancel, "$rechazadas", "Rechazadas", p.error, Modifier.weight(1f),
+                                onClick = { estadoSel = if (estadoSel == EstadoPregunta.RECHAZADA) null else EstadoPregunta.RECHAZADA })
                         }
-                    )
+                        com.stiven.sos.ui.theme.BuscadorNexo(busqueda, { busqueda = it }, "Buscar en el texto de la pregunta")
+                        com.stiven.sos.ui.theme.SegmentadoNexo(
+                            opciones = listOf(
+                                Triple("todas", "Todas", Icons.Default.List),
+                                Triple(EstadoPregunta.APROBADA, "Aprobadas", Icons.Default.Check),
+                                Triple(EstadoPregunta.RECHAZADA, "Rechazadas", Icons.Default.Close)
+                            ),
+                            seleccion = estadoSel ?: "todas",
+                            onCambio = { estadoSel = if (it == "todas") null else it },
+                            colores = { when (it) { EstadoPregunta.APROBADA -> p.accion; EstadoPregunta.RECHAZADA -> p.error; else -> p.ia } }
+                        )
+                        Text("Curso", color = p.textoSuave, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.stiven.sos.ui.theme.FichaNexo("Todos", cursoSel == null, p.marca, { cursoSel = null; temaSel = null })
+                            misCursos.forEach { c ->
+                                val n = revisadas.count { it.cursoId == c.id }
+                                if (n > 0) com.stiven.sos.ui.theme.FichaNexo("${c.titulo} · $n", cursoSel == c.id, p.marca, { cursoSel = c.id; temaSel = null })
+                            }
+                        }
+                        if (cursoSel != null && temasCurso.isNotEmpty()) {
+                            Text("Tema", color = p.textoSuave, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                com.stiven.sos.ui.theme.FichaNexo("Todos", temaSel == null, p.ia, { temaSel = null })
+                                temasCurso.forEach { t ->
+                                    val n = revisadas.count { it.temaId == t.id }
+                                    if (n > 0) com.stiven.sos.ui.theme.FichaNexo("${t.titulo} · $n", temaSel == t.id, p.ia, { temaSel = t.id })
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Dificultad", color = p.textoSuave, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                            listOf(DificultadPregunta.FACIL to "Fácil", DificultadPregunta.MEDIO to "Media", DificultadPregunta.DIFICIL to "Difícil").forEach { (v, t) ->
+                                com.stiven.sos.ui.theme.FichaNexo(t, dificultadSel == v, p.racha, { dificultadSel = if (dificultadSel == v) null else v })
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${filtradas.size} resultados", color = p.texto, fontWeight = FontWeight.Black, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            if (hayFiltros) {
+                                com.stiven.sos.ui.theme.TextoAccionEncabezadoNexo("Limpiar filtros") {
+                                    estadoSel = null; cursoSel = null; temaSel = null; dificultadSel = null; busqueda = ""
+                                }
+                            }
+                        }
+                    }
                 }
 
-                else -> {
-                    val listPadding = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
-                    val listSpacing = (screenWidth * 0.03f).coerceIn(10.dp, 16.dp)
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(listPadding),
-                        verticalArrangement = Arrangement.spacedBy(listSpacing)
-                    ) {
-                        items(preguntasFiltradas) { pregunta ->
+                when {
+                    preguntasUiState.isLoading && revisadas.isEmpty() -> item {
+                        Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = p.ia) }
+                    }
+                    filtradas.isEmpty() -> item {
+                        com.stiven.sos.ui.theme.EstadoVacioNexo(
+                            titulo = if (hayFiltros) "Sin resultados" else "Aún no hay preguntas revisadas",
+                            mensaje = if (hayFiltros) "Prueba con otros filtros." else "Cuando apruebes o rechaces preguntas aparecerán aquí.",
+                            expresion = com.stiven.sos.ui.theme.ExpresionRobi.PIENSA,
+                            textoAccion = if (hayFiltros) "Limpiar filtros" else null,
+                            onAccion = { estadoSel = null; cursoSel = null; temaSel = null; dificultadSel = null; busqueda = "" }
+                        )
+                    }
+                    else -> items(filtradas, key = { it.id ?: it.texto }) { pregunta ->
+                        Box(Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO).fillMaxWidth()) {
                             PreguntaCard(
                                 pregunta = pregunta,
-                                cursoNombre = cursoUiState.cursos
-                                    .find { it.id == pregunta.cursoId }?.nombre,
-                                onClick = { selectedPregunta = pregunta }
+                                cursoNombre = misCursos.find { it.id == pregunta.cursoId }?.titulo,
+                                onClick = { detalleId = pregunta.id }
                             )
                         }
                     }
@@ -271,26 +216,134 @@ fun PreguntasRevisadasScreen(
         }
     }
 
-    // Diálogo de filtros
-    if (showFilterDialog) {
-        FilterDialog(
-            cursos = cursoUiState.cursos,
-            selectedEstado = selectedEstado,
-            selectedCurso = selectedCurso,
-            onEstadoSelected = { selectedEstado = it },
-            onCursoSelected = { selectedCurso = it },
-            onDismiss = { showFilterDialog = false }
-        )
+    // Detalle en su propia pantalla completa (antes era una ventana emergente)
+    val detalle = revisadas.firstOrNull { it.id == detalleId } ?: preguntasUiState.preguntas.firstOrNull { it.id == detalleId }
+    if (detalleId != null && detalle != null) {
+        val curso = misCursos.find { it.id == detalle.cursoId }
+        com.stiven.sos.ui.theme.PantallaSuperpuestaNexo(onAtras = { detalleId = null }) {
+            DetallePreguntaRevisadaPantalla(
+                pregunta = detalle,
+                cursoNombre = curso?.titulo,
+                temaNombre = curso?.temas?.get(detalle.temaId)?.titulo ?: curso?.getTemasLista()?.firstOrNull { it.id == detalle.temaId }?.titulo,
+                cargando = preguntasUiState.isLoading,
+                onVolver = { detalleId = null },
+                onCambiarEstado = { estado, nota -> preguntasViewModel.actualizarEstadoPregunta(detalle.id ?: "", estado, nota) },
+                onEliminar = { preguntasViewModel.eliminarPregunta(detalle.id ?: "") { detalleId = null } }
+            )
+        }
     }
+}
 
-    // Diálogo de detalle
-    if (selectedPregunta != null) {
-        val pregunta = selectedPregunta!!
-        PreguntaDetailDialog(
-            pregunta = pregunta,
-            cursoNombre = cursoUiState.cursos
-                .find { it.id == pregunta.cursoId }?.nombre,
-            onDismiss = { selectedPregunta = null }
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DetallePreguntaRevisadaPantalla(
+    pregunta: Pregunta,
+    cursoNombre: String?,
+    temaNombre: String?,
+    cargando: Boolean,
+    onVolver: () -> Unit,
+    onCambiarEstado: (String, String?) -> Unit,
+    onEliminar: () -> Unit
+) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val aprobada = pregunta.estado == EstadoPregunta.APROBADA
+    val colorEstado = if (aprobada) p.accion else p.error
+    var confirmarEliminar by remember { mutableStateOf(false) }
+    val letras = listOf("A", "B", "C", "D", "E", "F")
+
+    com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Detalle de la pregunta",
+                subtitulo = listOfNotNull(cursoNombre, temaNombre).joinToString(" · ").ifBlank { "Pregunta revisada" },
+                onVolver = onVolver,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA
+            )
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.stiven.sos.ui.theme.EtiquetaEstadoNexo(if (aprobada) "Aprobada" else "Rechazada", colorEstado)
+                            com.stiven.sos.ui.theme.EtiquetaEstadoNexo(
+                                when (pregunta.dificultad) { DificultadPregunta.FACIL -> "Fácil"; DificultadPregunta.DIFICIL -> "Difícil"; else -> "Media" }, p.racha)
+                            com.stiven.sos.ui.theme.EtiquetaEstadoNexo(if (pregunta.fuente == FuentePregunta.IA) "Creada con IA" else "Creada por docente",
+                                if (pregunta.fuente == FuentePregunta.IA) p.ia else p.marca)
+                            if (pregunta.modificada) com.stiven.sos.ui.theme.EtiquetaEstadoNexo("Editada", p.textoSuave)
+                        }
+                        com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth(), acento = colorEstado) {
+                            Text(pregunta.texto, color = p.texto, fontWeight = FontWeight.Black, fontSize = 18.sp, lineHeight = 25.sp)
+                        }
+                        com.stiven.sos.ui.theme.TituloSeccionNexo("Opciones", icono = Icons.Default.List)
+                        pregunta.opciones.forEachIndexed { i, o ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                    .background(if (o.esCorrecta) p.accion.copy(alpha = 0.14f) else p.superficie)
+                                    .border(if (o.esCorrecta) 2.dp else 1.dp, if (o.esCorrecta) p.accion else p.borde, RoundedCornerShape(16.dp))
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(Modifier.size(32.dp).clip(CircleShape).background(if (o.esCorrecta) p.accion else p.superficieAlt), contentAlignment = Alignment.Center) {
+                                    if (o.esCorrecta) Icon(Icons.Default.Check, null, tint = p.sobreAccion, modifier = Modifier.size(18.dp))
+                                    else Text(letras.getOrElse(i) { "${i + 1}" }, color = p.textoSuave, fontWeight = FontWeight.Black)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text(o.texto, color = p.texto, fontWeight = if (o.esCorrecta) FontWeight.Black else FontWeight.SemiBold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                                if (o.esCorrecta) Text("Correcta", color = p.accionTexto, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                            }
+                        }
+                        pregunta.explicacionCorrecta?.takeIf { it.isNotBlank() }?.let {
+                            com.stiven.sos.ui.theme.NotaNexo(it, p.racha, Icons.Default.Lightbulb, titulo = "¿Por qué es la correcta?")
+                        }
+                        pregunta.notasRevision?.takeIf { it.isNotBlank() }?.let {
+                            com.stiven.sos.ui.theme.NotaNexo(it, colorEstado, Icons.Default.RateReview, titulo = "Nota de la revisión")
+                        }
+                        com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth()) {
+                            Text("Información", color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                            Spacer(Modifier.height(8.dp))
+                            listOfNotNull(
+                                "Curso" to (cursoNombre ?: "—"),
+                                "Tema" to (temaNombre ?: "—"),
+                                "Creada por" to pregunta.creadoPor.ifBlank { "—" },
+                                "Creada el" to pregunta.fechaCreacion.take(10).ifBlank { "—" },
+                                pregunta.revisadoPor?.let { "Revisada por" to it },
+                                pregunta.fechaRevision?.let { "Revisada el" to it.take(10) }
+                            ).forEach { (k, v) ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text(k, color = p.textoSuave, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(110.dp))
+                                    Text(v, color = p.texto, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+            Surface(color = p.superficie, shadowElevation = 8.dp) {
+                com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        com.stiven.sos.ui.theme.BotonNexo("Eliminar", { confirmarEliminar = true }, tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                            icono = Icons.Default.Delete, habilitado = !cargando, alto = 52.dp, modifier = Modifier.weight(1f))
+                        if (aprobada) {
+                            com.stiven.sos.ui.theme.BotonNexo("Rechazar", { onCambiarEstado(EstadoPregunta.RECHAZADA, "Retirada por el docente") },
+                                tipo = com.stiven.sos.ui.theme.TipoBoton.PELIGRO, icono = Icons.Default.Close, cargando = cargando, alto = 52.dp, modifier = Modifier.weight(1.2f))
+                        } else {
+                            com.stiven.sos.ui.theme.BotonNexo("Aprobar", { onCambiarEstado(EstadoPregunta.APROBADA, "Aprobada por el docente") },
+                                tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION, icono = Icons.Default.Check, cargando = cargando, alto = 52.dp, modifier = Modifier.weight(1.2f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (confirmarEliminar) {
+        com.stiven.sos.ui.theme.DialogoAccionNexo(
+            icono = Icons.Default.DeleteOutline, color = p.error,
+            titulo = "¿Eliminar la pregunta?",
+            mensaje = "Se borrará del banco y no volverá a aparecer en los quizzes. Esta acción no se puede deshacer.",
+            textoPrincipal = "Eliminar", tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.PELIGRO,
+            onPrincipal = { confirmarEliminar = false; onEliminar() },
+            textoSecundario = "Cancelar", onSecundario = { confirmarEliminar = false },
+            onDismiss = { confirmarEliminar = false }
         )
     }
 }
@@ -1247,4 +1300,4 @@ fun DetailInfoRow(
             color = EduRachaColors.TextPrimary
         )
     }
-}
+}

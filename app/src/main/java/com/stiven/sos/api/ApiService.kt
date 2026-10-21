@@ -96,6 +96,10 @@ interface ApiService {
     @GET("api/solicitudes/estudiante/{estudianteId}")
     suspend fun obtenerSolicitudesEstudiante(@Path("estudianteId") estudianteId: String): Response<List<SolicitudCurso>>
 
+    /** Todo lo que el docente tiene por revisar, por tipo y por curso. */
+    @GET("api/solicitudes/pendientes-docente")
+    suspend fun obtenerPendientesDocente(): Response<PendientesDocente>
+
     @GET("api/solicitudes/docente/{docenteId}")
     suspend fun obtenerSolicitudesDocente(@Path("docenteId") docenteId: String): Response<List<SolicitudCurso>>
 
@@ -126,16 +130,12 @@ interface ApiService {
     @POST("api/pdf/extraer")
     suspend fun extraerPdf(@Part archivo: okhttp3.MultipartBody.Part): Response<ResultadoPdf>
 
-    /** Genera preguntas con IA a partir del contenido de un PDF (quedan pendientes de revisión). */
-    @Multipart
-    @POST("api/preguntas/ia/generar-desde-pdf")
-    suspend fun generarPreguntasDesdePdf(
-        @Part archivo: okhttp3.MultipartBody.Part,
-        @Part("cursoId") cursoId: okhttp3.RequestBody,
-        @Part("temaId") temaId: okhttp3.RequestBody,
-        @Part("cantidad") cantidad: okhttp3.RequestBody,
-        @Part("dificultad") dificultad: okhttp3.RequestBody
-    ): Response<PreguntasIAResponse>
+    /**
+     * La IA escribe la explicación de un tema que todavía no existe (formulario "Agregar tema").
+     * Cuerpo: titulo, contenido?, textoDocumento? (texto del PDF), curso?. Respuesta: {"explicacion": "..."}.
+     */
+    @POST("api/ia/explicacion-borrador")
+    suspend fun generarExplicacionBorrador(@Body datos: Map<String, String>): Response<Map<String, String>>
 
     @POST("quiz/explicacion-vista")
     suspend fun marcarExplicacionVista(@Body request: Map<String, String>): Response<Map<String, String>>
@@ -223,6 +223,33 @@ interface ApiService {
         @Body estado: Map<String, String>
     ): Response<Map<String, Any>>
 
+    /** Guarda la explicación escrita o corregida por el docente. Cuerpo: {"explicacion": "...", "estado": "pendiente"|"aprobada"}. */
+    @PUT("api/cursos/{cursoId}/temas/{temaId}/explicacion")
+    suspend fun guardarExplicacion(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String,
+        @Body datos: Map<String, String>
+    ): Response<Map<String, Any>>
+
+    @DELETE("api/cursos/{cursoId}/temas/{temaId}/explicacion")
+    suspend fun eliminarExplicacion(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String
+    ): Response<Map<String, Any>>
+
+    /** La IA escribe la explicación del tema con el texto del PDF (queda pendiente de aprobación). */
+    @Multipart
+    @POST("api/cursos/{cursoId}/temas/{temaId}/explicacion-desde-pdf")
+    suspend fun generarExplicacionDesdePdf(
+        @Path("cursoId") cursoId: String,
+        @Path("temaId") temaId: String,
+        @Part archivo: okhttp3.MultipartBody.Part
+    ): Response<Map<String, Any>>
+
+    /** Aprueba todas las preguntas pendientes del curso (o solo de un tema si se envía temaId). */
+    @POST("api/preguntas/aprobar-pendientes")
+    suspend fun aprobarPendientes(@Body datos: Map<String, String>): Response<Map<String, String>>
+
     @GET("api/cursos/ranking/{cursoId}")
     suspend fun obtenerRankingPorExperiencia(@Path("cursoId") cursoId: String): Response<List<RankingEstudianteAPI>>
 
@@ -273,6 +300,10 @@ interface ApiService {
         @Path("cursoId") cursoId: String,
         @Path("temaId") temaId: String
     ): Response<ResponseBody>
+
+    /** Estadísticas del curso para el docente (pestaña Estadísticas del ranking). */
+    @GET("reportes/cursos/{cursoId}/estadisticas")
+    suspend fun obtenerEstadisticasCurso(@Path("cursoId") cursoId: String): Response<EstadisticasCurso>
 
     @GET("reportes/cursos/{cursoId}/general")
     @Streaming

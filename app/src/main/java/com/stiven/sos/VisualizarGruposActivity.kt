@@ -156,58 +156,19 @@ fun VisualizarGruposHeader(
     totalCursos: Int,
     totalTemas: Int
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.85f)
-                    )
-                )
-            )
-    ) {
+    Column(Modifier.fillMaxWidth()) {
+        com.stiven.sos.ui.theme.EncabezadoNexo(
+            titulo = "Contenido de cursos",
+            subtitulo = "Temas organizados por curso",
+            onVolver = onNavigateBack,
+            tono = com.stiven.sos.ui.theme.TonoEncabezado.MARCA
+        )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f))
-            ) {
-                Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Contenido de Cursos", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Temas organizados por curso", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 20.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                StatVisualizarCard(totalCursos, "Cursos", Icons.Outlined.MenuBook, EduRachaColors.Primary, Modifier.weight(1f))
-                StatVisualizarCard(totalTemas, "Temas", Icons.Outlined.Bookmark, EduRachaColors.Success, Modifier.weight(1f))
-            }
+            StatVisualizarCard(totalCursos, "Cursos", Icons.Outlined.MenuBook, EduRachaColors.Primary, Modifier.weight(1f))
+            StatVisualizarCard(totalTemas, "Temas", Icons.Outlined.Bookmark, EduRachaColors.Success, Modifier.weight(1f))
         }
     }
 }

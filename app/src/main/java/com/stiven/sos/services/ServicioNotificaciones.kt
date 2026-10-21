@@ -199,3 +199,33 @@ data class NotificacionModel(
     val xpGanado: Int? = null,
     val racha: Int? = null
 )
+/**
+ * Escucha las notificaciones de la cuenta que inició sesión (UID de Firebase Auth, no el guardado en el celular)
+ * y devuelve cuántas hay sin leer. Si llega una nueva mientras la app está abierta, la muestra como aviso Nexo.
+ */
+@androidx.compose.runtime.Composable
+fun rememberNotificacionesNoLeidas(mostrarAvisos: Boolean = true): Int {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return 0
+    val noLeidas = androidx.compose.runtime.remember(uid) { androidx.compose.runtime.mutableStateOf(0) }
+    val inicio = androidx.compose.runtime.remember(uid) { System.currentTimeMillis() }
+    val vistas = androidx.compose.runtime.remember(uid) { mutableSetOf<String>() }
+    androidx.compose.runtime.LaunchedEffect(uid) {
+        ServicioNotificaciones.escucharNotificaciones(uid).collect { lista ->
+            noLeidas.value = lista.count { !it.leido }
+            if (mostrarAvisos) {
+                lista.filter { !it.leido && it.fecha > inicio && vistas.add(it.id) }
+                    .take(2)
+                    .forEach { n ->
+                        com.stiven.sos.ui.theme.Avisos.mostrar(context, n.mensaje, com.stiven.sos.ui.theme.TipoAviso.INFO, n.titulo)
+                    }
+            }
+        }
+    }
+    return noLeidas.value
+}
+
+/** UID de la cuenta activa; el guardado en preferencias solo se usa si Firebase aún no lo tiene. */
+fun uidSesion(context: Context): String =
+    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        ?: context.getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE).getString("user_uid", "").orEmpty()

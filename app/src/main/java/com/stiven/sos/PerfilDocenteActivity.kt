@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.stiven.sos.models.EstadoPregunta
 import com.stiven.sos.ui.theme.*
 import com.stiven.sos.viewmodel.CursoViewModel
@@ -290,77 +291,25 @@ fun PerfilDocenteHeader(
     userEmail: String,
     onBackClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 4.dp),
-        color = Color.Transparent
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            EduRachaColors.BarraSuperior.copy(0.92f),
-                            EduRachaColors.BarraSuperior
-                        )
-                    )
-                )
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Column(Modifier.fillMaxWidth()) {
+        com.stiven.sos.ui.theme.EncabezadoNexo(
+            titulo = "Mi perfil",
+            subtitulo = "Docente",
+            onVolver = onBackClick,
+            tono = com.stiven.sos.ui.theme.TonoEncabezado.IA
+        )
+        com.stiven.sos.ui.theme.TarjetaNexo(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            acento = nx.ia
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Botón de volver
-                IconButton(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f))
-                ) {
-                    Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Avatar y datos del docente
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .shadow(8.dp, CircleShape)
-                            .border(4.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                            .background(Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = userName.firstOrNull()?.uppercase() ?: "U",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Primary
-                        )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                com.stiven.sos.ui.theme.AvatarNexo(nombre = userName.ifBlank { "Docente" }, color = nx.ia, tamano = 64.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(userName.ifBlank { "Docente" }, color = nx.texto, fontSize = 20.sp, fontWeight = FontWeight.Black, maxLines = 2)
+                    if (userEmail.isNotBlank()) {
+                        Text(userEmail, color = nx.textoSuave, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        userName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (userEmail.isNotBlank()) Text(
-                        userEmail,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f),
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }

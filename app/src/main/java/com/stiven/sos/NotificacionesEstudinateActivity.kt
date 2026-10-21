@@ -39,8 +39,8 @@ class NotificacionesEstudianteActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val prefs = getSharedPreferences("EduRachaUserPrefs", MODE_PRIVATE)
-        val userId = prefs.getString("user_uid", "") ?: ""
+        // UID de la sesión activa: con el guardado en el celular se escuchaba la bandeja de otra cuenta
+        val userId = com.stiven.sos.services.uidSesion(this)
 
         setContent {
             EduRachaTheme {
@@ -97,17 +97,9 @@ fun NotificacionesEstudianteScreen(
                                 scope.launch {
                                     try {
                                         ServicioNotificaciones.marcarTodasComoLeidas(userId)
-                                        Toast.makeText(
-                                            context,
-                                            "Todas las notificaciones marcadas como leídas",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Todas las notificaciones marcadas como leídas")
                                     } catch (e: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "Error: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${e.message}")
                                     }
                                 }
                             }
@@ -171,17 +163,9 @@ fun NotificacionesEstudianteScreen(
                                 scope.launch {
                                     try {
                                         ServicioNotificaciones.eliminarNotificacion(userId, notificacion.id)
-                                        Toast.makeText(
-                                            context,
-                                            "Notificación eliminada",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Notificación eliminada")
                                     } catch (e: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "Error al eliminar",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error al eliminar")
                                     }
                                 }
                             }

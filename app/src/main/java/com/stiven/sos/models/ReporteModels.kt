@@ -5,7 +5,8 @@ import com.google.gson.annotations.SerializedName
 sealed class ReporteEstado {
     object Idle : ReporteEstado()
     object Descargando : ReporteEstado()
-    data class Exito(val nombreArchivo: String) : ReporteEstado()
+    /** [uri]: dónde quedó el archivo (content://…) para abrirlo o compartirlo. */
+    data class Exito(val nombreArchivo: String, val uri: String? = null) : ReporteEstado()
     data class Error(val mensaje: String) : ReporteEstado()
 }
 

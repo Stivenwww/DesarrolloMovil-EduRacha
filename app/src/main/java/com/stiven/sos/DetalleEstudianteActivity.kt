@@ -132,111 +132,31 @@ fun DetalleHeader(
     ranking: Int,
     onNavigateBack: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EduRachaColors.Primary,
-                        EduRachaColors.Primary.copy(alpha = 0.85f)
-                    )
-                )
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp)
-        ) {
-            // Botón volver
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = Color.White
-                )
+    val nx = com.stiven.sos.ui.theme.LocalNexo.current
+    Column(Modifier.fillMaxWidth()) {
+        com.stiven.sos.ui.theme.EncabezadoNexo(
+            titulo = nombre.ifBlank { "Estudiante" },
+            subtitulo = "Detalle del estudiante",
+            onVolver = onNavigateBack,
+            tono = com.stiven.sos.ui.theme.TonoEncabezado.MARCA,
+            acciones = {
+                if (ranking > 0) com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("#$ranking", Icons.Default.EmojiEvents)
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Avatar y datos del estudiante
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(EduRachaColors.Surface),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val iniciales = nombre.split(" ")
-                            .take(2)
-                            .mapNotNull { it.firstOrNull() }
-                            .joinToString("")
-
-                        Text(
-                            text = iniciales,
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EduRachaColors.Primary
-                        )
+        )
+        com.stiven.sos.ui.theme.TarjetaNexo(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            acento = nx.marca
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                com.stiven.sos.ui.theme.AvatarNexo(nombre = nombre.ifBlank { "Estudiante" }, color = nx.marca, tamano = 64.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(nombre.ifBlank { "Estudiante" }, color = nx.texto, fontSize = 20.sp, fontWeight = FontWeight.Black, maxLines = 2)
+                    if (email.isNotBlank()) {
+                        Text(email, color = nx.textoSuave, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
-
-                    // Badge de ranking
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .offset(x = 8.dp, y = 8.dp),
-                        shape = CircleShape,
-                        shadowElevation = 4.dp
-                    ) {
-                        Text(
-                            text = "#$ranking",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                    if (ranking > 0) {
+                        Text("Puesto #$ranking en el ranking del curso", color = nx.marcaTexto, fontSize = 13.sp, fontWeight = FontWeight.Black)
                     }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = nombre,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = email,
-                        fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
                 }
             }
         }

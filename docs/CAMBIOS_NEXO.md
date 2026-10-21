@@ -187,3 +187,126 @@ En `C:\Users\STIVEN\.gradle\eduracha_verificacion` quedaron copias de las librer
 ### Pendiente o limitaciones
 - **OCR de PDF escaneados:** necesita Tesseract instalado en el servidor. Hoy se informa al docente y no se finge el procesamiento.
 - **Pruebas manuales en el emulador:** quedan por hacer con usuarios reales (estudiante y docente). Sin acceso a sus cuentas no se pudo probar el flujo completo de punta a punta.
+
+## Fase 5: ronda de correcciones del rol docente
+
+### Crear preguntas (rehecha con el diseño Nexo)
+- Flujo en 3 pasos: curso y tema (en hojas inferiores, con el estado de la explicación del tema), cómo crearlas (Escribirlas / Con IA) y el formulario.
+- **Ya no se cierra al guardar.** Las preguntas creadas aparecen abajo ("Creadas ahora") para verlas, editarlas o eliminarlas, con un botón para ir a aprobarlas.
+- El estado se conserva al girar la pantalla.
+- **Se quitó el PDF de esta pantalla.** El PDF ahora va al crear los temas del curso.
+- **Tope con IA: 30 preguntas.** Por arquitectura se generan en **lotes de 10** con una pausa de 4 s entre lotes. Se muestra el avance ("Lote 2 de 3 · 14 de 30") y se puede detener; cada lote se guarda apenas termina.
+- Backend:
+  - Si la IA responde "límite superado" (429/502/503), espera lo que pide el proveedor y reintenta hasta 4 veces.
+  - Como máximo 2 llamadas simultáneas a la IA por servidor (`ai/LimitesIa.kt`).
+  - No se repiten preguntas que el tema ya tiene.
+
+### Crear temas: PDF → explicación con IA
+- Al agregar un tema (pantalla completa) se puede adjuntar un PDF. El servidor lee su texto y la IA escribe la explicación **solo con ese contenido**.
+- La explicación se ve en el mismo formulario y se puede editar antes de guardar.
+- Si la IA falla, se puede escribir a mano en el mismo campo.
+- El identificador del tema se crea solo a partir del título.
+- Nueva ruta: `POST /api/ia/explicacion-borrador`.
+
+### Explicaciones (validar)
+- La IA escribe explicaciones **detalladas** (600-900 palabras) por secciones: Introducción, Conceptos clave, Cómo funciona, Ejemplos, Errores comunes y Resumen. Se ciñen al tema y al curso.
+- CRUD completo, con filtros por estado. Cada tema se abre en una pantalla de lectura cómoda (ya no en un diálogo amontonado). Botones disponibles:
+  - Editar.
+  - Guardar.
+  - Guardar y aprobar.
+  - Aprobar.
+  - Rechazar.
+  - Regenerar con IA.
+  - Desde un PDF.
+  - Eliminar.
+- Si el tema no tiene explicación o la IA falla, se puede escribir a mano.
+- Rutas nuevas:
+  - `PUT /api/cursos/{id}/temas/{temaId}/explicacion`
+  - `DELETE /api/cursos/{id}/temas/{temaId}/explicacion`
+  - `POST /api/cursos/{id}/temas/{temaId}/explicacion-desde-pdf`
+- `generar-explicacion` y `validar-explicacion` ahora exigen rol docente o admin.
+
+### Ranking docente: estadísticas
+- Nueva vista **Estadísticas** junto al ranking, con datos calculados por el servidor a partir de cada estudiante (`GET /reportes/cursos/{id}/estadisticas`):
+  - indicadores;
+  - actividad de 14 días;
+  - distribución de puntajes;
+  - promedio por tema;
+  - estudiantes que necesitan apoyo y el motivo;
+  - preguntas más difíciles;
+  - tabla ordenable por estudiante.
+
+### Reportes
+- Los Excel tienen diseño propio de EduRacha (`services/LibroExcelEduRacha.kt`):
+  - franja de marca, curso y fecha;
+  - indicadores;
+  - tabla con encabezado de color, filas alternas, estados de color, filtros y fila fija;
+  - gráfico de barras;
+  - pie de página;
+  - página horizontal para imprimir.
+- La vista previa en la app muestra lo mismo que el Excel. Después de descargarlo se puede **abrir** o **compartir**.
+- El archivo se guarda en Descargas con un nombre claro (`EduRacha_General_<curso>_<fecha>.xlsx`).
+
+### Avisos y encabezados
+- Avisos Nexo (éxito, error, advertencia e información) con icono, título, botón cerrar y barra de tiempo. Reemplazan todos los Toast y snackbars.
+- Encabezado único `EncabezadoNexo`: misma forma y tipografía en todas las pantallas, incluidas las de inicio de docente y estudiante. Solo cambia el color (`TonoEncabezado`).
+
+### Verificación
+- Backend: compila con kotlinc y pasan **40 pruebas JUnit**. Nuevas pruebas:
+  - lotes de 30 y reintentos;
+  - estadísticas;
+  - Excel con marca y gráfico, que se abrió y se revisó visualmente.
+- App: todo el código compila con kotlinc y las librerías del proyecto.
+
+## Fase 6: errores críticos y experiencia del docente
+
+### "No estás inscrito" al entrar al quiz (crítico)
+- **Causa:** la app guardaba el token de sesión en caché 50 minutos sin fijarse de qué cuenta era. Al cerrar sesión como docente y entrar como estudiante (o al revés), la app seguía enviando el token de la cuenta anterior, y el servidor respondía que esa cuenta no estaba inscrita.
+- **Corrección en la app:**
+  - el token queda atado al UID de la sesión y se descarta si cambia la cuenta;
+  - si el servidor responde 401, se pide un token nuevo y se reintenta una vez;
+  - al cerrar sesión se limpia todo (token, `SessionManager` y preferencias).
+- **Corrección en el backend:**
+  - acepta inscripciones antiguas guardadas con otra clave (busca el UID en los campos `id`, `userId`, `uid` y `estudianteId`);
+  - el mensaje de error ahora explica qué hacer y avisa si se está usando la cuenta del docente.
+
+### Notificaciones
+- Las bandejas leen la cuenta activa (UID de Firebase), no un UID guardado que podía ser de otra cuenta.
+- Campana con contador de no leídas en el panel del docente y en el del estudiante. Si llega un aviso con la app abierta, se muestra en pantalla.
+- Avisos nuevos desde el backend (`services/Notificador.kt`):
+  - **docente:** nueva solicitud de inscripción, preguntas de IA listas para revisar y estudiante que aprobó un tema o el curso;
+  - **estudiante:** solicitud rechazada (con el motivo) y nuevo contenido disponible cuando se aprueba la explicación de un tema.
+
+### Pantallas rediseñadas (sin ventanas emergentes)
+- **Gestión de grupos → curso:**
+  - aspirantes e inscritos en la misma pantalla;
+  - "Aceptar" es inmediato y hay "Aceptar a todos";
+  - "Rechazar" abre el motivo dentro de la misma tarjeta;
+  - solo aparecen los cursos del docente.
+- **Validar preguntas:**
+  - tarjetas para elegir el tema, con lo que falta por revisar;
+  - botón **Aprobar todas** con confirmación, para todo el curso o solo un tema (`POST /api/preguntas/aprobar-pendientes`, una sola escritura);
+  - las tarjetas de curso se rediseñaron.
+- **Mis cursos → detalle del curso:** pantalla completa con datos, vigencia, temas con el estado de su explicación y accesos directos a estudiantes, validar, explicaciones y estadísticas. Editar también es pantalla completa.
+- **Preguntas revisadas:**
+  - filtros siempre visibles: estado, curso, tema, dificultad y búsqueda;
+  - el detalle se abre en pantalla completa, con aprobar o rechazar y eliminar.
+- **Pendientes del docente** (nueva, `GET /api/solicitudes/pendientes-docente`): muestra por tipo y por curso cuántas preguntas, explicaciones, temas sin explicación y aspirantes faltan, con acceso directo a cada pantalla. La tarjeta "Pendientes" del panel muestra el total.
+- **Estadísticas:** cada gráfico se puede tocar para verlo en grande, con sus datos en lista.
+- **Ranking docente:**
+  - tarjetas nuevas con puesto (medalla para el top 3), avatar y XP, racha y vidas, resaltando la métrica elegida;
+  - el perfil del estudiante es pantalla completa y suma promedio, quizzes, temas aprobados, actividad y si necesita apoyo.
+- Los botones secundarios ya no tienen borde gris.
+
+### Configuración
+- **Ayuda y soporte:**
+  - guía por rol (estudiante o docente) con preguntas frecuentes;
+  - botón para escribir a soporte (brayner.trochez.o@uniautonoma.edu.co); el correo incluye versión, rol y dispositivo.
+- **Acerca de EduRacha:**
+  - qué es y cómo funciona;
+  - creadores: Laura Valentina Solarte Muñoz y Brayner Stiven Trochez Ordóñez;
+  - programa e institución, y tecnología.
+
+### Verificación
+- Backend: compila y pasan **43 pruebas JUnit**. Nuevas pruebas: centro de pendientes y formato de las notificaciones.
+- App: todo el código compila con kotlinc y las librerías del proyecto. Falta probarla en el emulador.

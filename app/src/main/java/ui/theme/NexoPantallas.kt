@@ -62,50 +62,132 @@ fun BotonIconoNexo(
     }
 }
 
-/** Barra superior: volver + título/subtítulo + acciones opcionales a la derecha. */
+/** Color del encabezado. La forma y la tipografía son siempre las mismas; solo cambia el color. */
+enum class TonoEncabezado { MARCA, IA, ACCION, RACHA }
+
+/** Colores (inicio y fin del degradado, y texto) de un tono de encabezado en la paleta activa. */
+@Composable
+fun coloresEncabezado(tono: TonoEncabezado): Triple<Color, Color, Color> {
+    val p = LocalNexo.current
+    return if (p.esOscuro) when (tono) {
+        TonoEncabezado.MARCA -> Triple(p.marcaSombra, p.marca, p.fondo)
+        TonoEncabezado.IA -> Triple(p.iaSombra, p.ia, Color.White)
+        TonoEncabezado.ACCION -> Triple(p.accionSombra, p.accion, p.fondo)
+        TonoEncabezado.RACHA -> Triple(p.rachaSombra, p.racha, p.fondo)
+    } else when (tono) {
+        TonoEncabezado.MARCA -> Triple(p.marcaTexto, p.marcaSombra, Color.White)
+        TonoEncabezado.IA -> Triple(p.iaSombra, p.ia, Color.White)
+        TonoEncabezado.ACCION -> Triple(p.accionTexto, p.accionSombra, Color.White)
+        TonoEncabezado.RACHA -> Triple(p.rachaTexto, p.rachaSombra, Color.White)
+    }
+}
+
+/**
+ * Encabezado único de todas las pantallas: tarjeta de color con esquinas redondeadas,
+ * botón volver, antetítulo en mayúsculas, título y acciones opcionales a la derecha.
+ * Misma forma y tipografía en toda la app; el color cambia según [tono].
+ */
 @Composable
 fun EncabezadoNexo(
     titulo: String,
     onVolver: (() -> Unit)?,
     modifier: Modifier = Modifier,
     subtitulo: String? = null,
+    tono: TonoEncabezado = TonoEncabezado.MARCA,
     acciones: @Composable RowScope.() -> Unit = {}
 ) {
-    val p = LocalNexo.current
-    Row(
+    val (inicio, fin, sobre) = coloresEncabezado(tono)
+    Box(
         modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(inicio, fin)))
     ) {
-        if (onVolver != null) {
-            BotonIconoNexo(Icons.Filled.ArrowBack, "Volver", onVolver)
-        }
-        Column(Modifier.weight(1f)) {
-            if (subtitulo != null) {
+        // Decoración suave (burbujas), igual en todas las pantallas
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 26.dp, y = (-30).dp)
+                .size(110.dp)
+                .clip(CircleShape)
+                .background(sobre.copy(alpha = 0.08f))
+        )
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = (-70).dp, y = 34.dp)
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(sobre.copy(alpha = 0.06f))
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (onVolver != null) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(sobre.copy(alpha = 0.16f))
+                        .clickable(role = Role.Button, onClick = onVolver)
+                        .semantics { contentDescription = "Volver" },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.ArrowBack, null, tint = sobre, modifier = Modifier.size(22.dp))
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                if (subtitulo != null) {
+                    Text(
+                        subtitulo.uppercase(),
+                        color = sobre.copy(alpha = 0.85f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
                 Text(
-                    subtitulo.uppercase(),
-                    color = p.marcaTexto,
-                    fontSize = 11.sp,
+                    titulo,
+                    color = sobre,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
-                    letterSpacing = 1.2.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    lineHeight = 26.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() }
                 )
             }
-            Text(
-                titulo,
-                color = p.texto,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() }
-            )
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides sobre) {
+                acciones()
+            }
         }
-        acciones()
+    }
+}
+
+/** Botón de acción para la derecha del encabezado (mismo estilo que el botón volver). */
+@Composable
+fun AccionEncabezadoNexo(icono: ImageVector, descripcion: String, onClick: () -> Unit, tono: TonoEncabezado = TonoEncabezado.MARCA) {
+    val sobre = coloresEncabezado(tono).third
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(sobre.copy(alpha = 0.16f))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = descripcion },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icono, null, tint = sobre, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -659,55 +741,39 @@ fun EntradaEscalonada(indice: Int, content: @Composable () -> Unit) {
 private fun Modifier.graphicsLayerCompat(t: Float): Modifier =
     this.then(Modifier.graphicsLayer { alpha = t; translationY = (1f - t) * 40f })
 
-/**
- * Avisos inferiores con el estilo Nexo (reemplaza el snackbar gris de Material).
- * Quedan por encima de la barra de navegación, con ancho máximo en tablets, y no tapan los botones.
- */
+// AvisosNexoHost se movió a AvisosNexo.kt (misma tarjeta para todos los avisos).
+
+/** Contador o etiqueta para la derecha del encabezado (por ejemplo "12 pendientes"). Toma el color del encabezado. */
 @Composable
-fun AvisosNexoHost(
-    hostState: androidx.compose.material3.SnackbarHostState,
-    modifier: Modifier = Modifier
-) {
-    val p = LocalNexo.current
-    androidx.compose.material3.SnackbarHost(
-        hostState = hostState,
-        modifier = modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
-    ) { datos ->
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = p.superficie,
-            border = BorderStroke(1.5.dp, p.marca.copy(alpha = 0.55f)),
-            shadowElevation = 6.dp,
-            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(p.marca)
-                )
-                Text(
-                    datos.visuals.message,
-                    color = p.texto,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-                datos.visuals.actionLabel?.let { etiqueta ->
-                    Text(
-                        etiqueta,
-                        color = p.marcaTexto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        modifier = Modifier.clickable { datos.performAction() }.padding(4.dp)
-                    )
-                }
-            }
-        }
+fun EtiquetaEncabezadoNexo(texto: String, icono: ImageVector? = null) {
+    val sobre = androidx.compose.material3.LocalContentColor.current
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(sobre.copy(alpha = 0.16f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        if (icono != null) Icon(icono, null, tint = sobre, modifier = Modifier.size(16.dp))
+        Text(texto, color = sobre, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1)
     }
+}
+
+/** Botón de texto para la derecha del encabezado (por ejemplo "Leer todo"). */
+@Composable
+fun TextoAccionEncabezadoNexo(texto: String, onClick: () -> Unit) {
+    val sobre = androidx.compose.material3.LocalContentColor.current
+    Text(
+        texto.uppercase(),
+        color = sobre,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 0.6.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(sobre.copy(alpha = 0.16f))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    )
 }

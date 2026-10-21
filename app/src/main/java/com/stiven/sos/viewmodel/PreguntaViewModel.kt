@@ -263,38 +263,138 @@ class PreguntaViewModel : ViewModel() {
         }
     }
 
+    // ===================== Generación con IA por lotes =====================
+
+    /** Avance de una generación con IA en curso (null = no hay ninguna). */
+    data class ProgresoIA(
+        val total: Int,
+        val hechas: Int,
+        val lote: Int,
+        val lotes: Int,
+        val esperando: Boolean = false,
+        val mensaje: String = ""
+    )
+
+    /** Preguntas creadas o generadas en esta visita a "Crear preguntas" (sobreviven a girar la pantalla). */
+    val preguntasSesion = androidx.compose.runtime.mutableStateListOf<com.stiven.sos.PreguntaSesion>()
+
+    private val _progresoIA = MutableStateFlow<ProgresoIA?>(null)
+    val progresoIA: StateFlow<ProgresoIA?> = _progresoIA.asStateFlow()
+    private var trabajoIA: kotlinx.coroutines.Job? = null
+
+    companion object {
+        /** Tope por solicitud del docente (el servidor acepta hasta 30). */
+        const val MAX_PREGUNTAS_IA = 30
+        /** Preguntas por llamada: lotes pequeños responden rápido y no saturan la API de la IA. */
+        const val LOTE_IA = 10
+        /** Pausa entre lotes para respetar el límite de solicitudes por minuto del proveedor. */
+        const val PAUSA_ENTRE_LOTES_MS = 4_000L
+        /** Si la IA responde "demasiadas solicitudes", se espera esto y se reintenta una vez el mismo lote. */
+        const val ESPERA_LIMITE_MS = 25_000L
+
+        fun lotesPara(total: Int): List<Int> {
+            val t = total.coerceIn(1, MAX_PREGUNTAS_IA)
+            return List((t + LOTE_IA - 1) / LOTE_IA) { i -> minOf(LOTE_IA, t - i * LOTE_IA) }
+        }
+
+        /** Segundos aproximados que tarda una generación (para avisar al docente antes de empezar). */
+        fun segundosEstimados(total: Int): Int {
+            val lotes = lotesPara(total)
+            return lotes.sumOf { 8 + it * 2 } + (lotes.size - 1) * (PAUSA_ENTRE_LOTES_MS / 1000).toInt()
+        }
+    }
+
     /**
-     * Genera preguntas con IA usando el contenido real de un PDF (lo lee el servidor).
-     * Si el PDF no se puede leer, el error del servidor llega tal cual (escaneado, protegido, dañado...).
+     * Genera [total] preguntas (máximo 30) en lotes de 10 con una pausa entre lotes.
+     * Cada lote se guarda en el servidor apenas llega, así que si uno falla no se pierden los anteriores.
+     * [onLote] recibe las preguntas de cada lote para mostrarlas sin salir de la pantalla.
      */
-    fun generarPreguntasDesdePdf(
-        archivo: okhttp3.MultipartBody.Part,
+    fun generarPreguntasPorLotes(
         cursoId: String,
         temaId: String,
-        cantidad: Int,
-        dificultad: String?,
-        onListo: (PreguntasIAResponse) -> Unit
+        temaTexto: String,
+        total: Int,
+        onLote: (List<Pregunta>) -> Unit,
+        onFin: (generadas: Int, error: String?) -> Unit
     ) {
+        if (trabajoIA?.isActive == true) return
+        val lotes = lotesPara(total)
+        val pedidas = lotes.sum()
+        trabajoIA = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(error = null, successMessage = null)
+            var hechas = 0
+            var error: String? = null
+            try {
+                for ((i, cantidad) in lotes.withIndex()) {
+                    if (i > 0) {
+                        _progresoIA.value = ProgresoIA(pedidas, hechas, i + 1, lotes.size, esperando = true,
+                            mensaje = "Pausa corta para no saturar la IA…")
+                        kotlinx.coroutines.delay(PAUSA_ENTRE_LOTES_MS)
+                    }
+                    _progresoIA.value = ProgresoIA(pedidas, hechas, i + 1, lotes.size,
+                        mensaje = "Generando lote ${i + 1} de ${lotes.size} ($cantidad preguntas)…")
+                    var resultado = repository.generarPreguntasIA(cursoId, temaId, temaTexto, cantidad)
+                    if (resultado is ApiResult.Error && esLimite(resultado.message)) {
+                        _progresoIA.value = ProgresoIA(pedidas, hechas, i + 1, lotes.size, esperando = true,
+                            mensaje = "La IA pidió una pausa. Reintentando en ${ESPERA_LIMITE_MS / 1000} s…")
+                        kotlinx.coroutines.delay(ESPERA_LIMITE_MS)
+                        resultado = repository.generarPreguntasIA(cursoId, temaId, temaTexto, cantidad)
+                    }
+                    when (resultado) {
+                        is ApiResult.Success -> {
+                            val nuevas = resultado.data.preguntas.orEmpty()
+                            hechas += nuevas.size
+                            onLote(nuevas)
+                            _progresoIA.value = ProgresoIA(pedidas, hechas, i + 1, lotes.size, mensaje = "Lote ${i + 1} listo")
+                        }
+                        is ApiResult.Error -> { error = resultado.message; break }
+                        is ApiResult.Loading -> {}
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                error = if (hechas > 0) "Generación detenida. Se guardaron $hechas preguntas." else "Generación detenida."
+            } catch (e: Exception) {
+                error = e.message ?: "Error inesperado al generar preguntas"
+            } finally {
+                _progresoIA.value = null
+                val mensajeFinal = when {
+                    error == null -> "Se generaron $hechas preguntas. Quedan pendientes de revisión."
+                    hechas > 0 -> "Se generaron $hechas de $pedidas preguntas. $error"
+                    else -> null
+                }
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    successMessage = mensajeFinal,
+                    error = if (hechas == 0) error else null
+                )
+                onFin(hechas, error)
+            }
+        }
+    }
+
+    fun detenerGeneracion() { trabajoIA?.cancel() }
+
+    private fun esLimite(mensaje: String?): Boolean {
+        val m = mensaje?.lowercase() ?: return false
+        return "demasiadas solicitudes" in m || "429" in m || "rate limit" in m || "límite" in m
+    }
+
+    /** Aprueba de una vez todas las pendientes del curso (o de un tema). */
+    fun aprobarPendientes(cursoId: String, temaId: String?, onListo: () -> Unit = {}) {
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
             try {
-                val t = com.stiven.sos.utils.ArchivosPdf::texto
-                val resp = com.stiven.sos.api.ApiClient.apiService.generarPreguntasDesdePdf(
-                    archivo, t(cursoId), t(temaId), t(cantidad.toString()), t(dificultad ?: "mixta")
-                )
-                val cuerpo = resp.body()
-                if (resp.isSuccessful && cuerpo != null) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, successMessage = cuerpo.message)
-                    onListo(cuerpo)
+                val datos = buildMap { put("cursoId", cursoId); if (!temaId.isNullOrBlank()) put("temaId", temaId) }
+                val r = com.stiven.sos.api.ApiClient.apiService.aprobarPendientes(datos)
+                if (r.isSuccessful) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, successMessage = r.body()?.get("message") ?: "Preguntas aprobadas")
+                    onListo()
                 } else {
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = com.stiven.sos.api.mensajeDeError(resp))
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = com.stiven.sos.api.mensajeDeError(r))
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "No se pudo conectar con el servidor. Revisa que el backend esté encendido."
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, error = "No se pudo conectar con el servidor.")
             }
         }
     }
@@ -324,4 +424,4 @@ class PreguntaViewModel : ViewModel() {
     fun clearSelectedPregunta() {
         _uiState.value = _uiState.value.copy(preguntaSeleccionada = null)
     }
-}
+}

@@ -10,6 +10,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -79,6 +81,8 @@ fun PantallaDetalleRanking(
     var pestanaSeleccionada by remember { mutableIntStateOf(0) }
     var estudianteSeleccionado by remember { mutableStateOf<RankingEstudiante?>(null) }
     var mostrarEstadisticas by remember { mutableStateOf(true) }
+    // 0 = ranking, 1 = estadísticas del curso
+    var vista by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(pestanaSeleccionada) {
         val tipo = when (pestanaSeleccionada) {
@@ -90,14 +94,6 @@ fun PantallaDetalleRanking(
         viewModel.cargarRankingCurso(cursoId, tipo)
     }
 
-    // Diálogo de perfil de estudiante
-    if (estudianteSeleccionado != null) {
-        DialogoPerfilEstudiante(
-            estudiante = estudianteSeleccionado!!,
-            tipoRanking = estadoUI.tipoRanking,
-            onDismiss = { estudianteSeleccionado = null }
-        )
-    }
 
     EduRachaV2Container {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -107,11 +103,15 @@ fun PantallaDetalleRanking(
                 pestanaSeleccionada = pestanaSeleccionada,
                 alSeleccionarPestana = { pestanaSeleccionada = it },
                 mostrarEstadisticas = mostrarEstadisticas,
-                onToggleEstadisticas = { mostrarEstadisticas = !mostrarEstadisticas }
+                onToggleEstadisticas = { mostrarEstadisticas = !mostrarEstadisticas },
+                vista = vista,
+                alCambiarVista = { vista = it }
             )
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
+                    vista == 1 -> EstadisticasCursoDocente(cursoId = cursoId)
+
                     estadoUI.isLoading -> {
                         EduRachaV2LoadingState(
                             message = "Cargando ranking...",
@@ -161,6 +161,14 @@ fun PantallaDetalleRanking(
             }
         }
     }
+    // Perfil del estudiante en pantalla completa, encima del ranking
+    if (estudianteSeleccionado != null) {
+        DialogoPerfilEstudiante(
+            estudiante = estudianteSeleccionado!!.let { it.copy(cursoId = it.cursoId ?: cursoId) },
+            tipoRanking = estadoUI.tipoRanking,
+            onDismiss = { estudianteSeleccionado = null }
+        )
+    }
 }
 
 @Composable
@@ -170,126 +178,50 @@ fun EncabezadoRankingMejorado(
     pestanaSeleccionada: Int,
     alSeleccionarPestana: (Int) -> Unit,
     mostrarEstadisticas: Boolean,
-    onToggleEstadisticas: () -> Unit
+    onToggleEstadisticas: () -> Unit,
+    vista: Int = 0,
+    alCambiarVista: (Int) -> Unit = {}
 ) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
     Column {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            EduRachaV2Colors.Secondary,
-                            EduRachaV2Colors.SecondaryDark
-                        )
+        com.stiven.sos.ui.theme.EncabezadoNexo(
+            titulo = cursoTitulo,
+            subtitulo = "Ranking y estadísticas",
+            onVolver = alVolverAtras,
+            tono = com.stiven.sos.ui.theme.TonoEncabezado.RACHA,
+            acciones = {
+                if (vista == 0) {
+                    com.stiven.sos.ui.theme.AccionEncabezadoNexo(
+                        if (mostrarEstadisticas) Icons.Outlined.BarChart else Icons.Outlined.ShowChart,
+                        if (mostrarEstadisticas) "Ocultar resumen" else "Mostrar resumen",
+                        onToggleEstadisticas,
+                        com.stiven.sos.ui.theme.TonoEncabezado.RACHA
                     )
-                )
-        ) {
-            AnimatedBubblesDecoration(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp),
-                color = Color.White
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 32.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = alVolverAtras,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                    ) {
-                        Icon(
-                            Icons.Outlined.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onToggleEstadisticas,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                    ) {
-                        Icon(
-                            if (mostrarEstadisticas) Icons.Outlined.BarChart else Icons.Outlined.ShowChart,
-                            contentDescription = "Toggle Stats",
-                            tint = Color.White
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    IconoTrofeoAnimado()
-
-                    Column {
-                        Text(
-                            text = "Ranking del Curso",
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = cursoTitulo,
-                            fontSize = 15.sp,
-                            color = Color.White.copy(alpha = 0.9f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
             }
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = EduRachaColors.Surface,
-            shadowElevation = 4.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                PestanaRanking(
-                    icono = Icons.Outlined.Star,
-                    etiqueta = "Experiencia",
-                    seleccionada = pestanaSeleccionada == 0,
-                    alHacerClic = { alSeleccionarPestana(0) },
-                    color = EduRachaV2Colors.Accent
+        )
+        com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.stiven.sos.ui.theme.SegmentadoNexo(
+                    opciones = listOf(
+                        Triple(0, "Ranking", Icons.Outlined.EmojiEvents),
+                        Triple(1, "Estadísticas", Icons.Outlined.Insights)
+                    ),
+                    seleccion = vista,
+                    onCambio = alCambiarVista,
+                    colores = { if (it == 0) p.racha else p.marca }
                 )
-                PestanaRanking(
-                    icono = Icons.Outlined.Whatshot,
-                    etiqueta = "Racha",
-                    seleccionada = pestanaSeleccionada == 1,
-                    alHacerClic = { alSeleccionarPestana(1) },
-                    color = EduRachaV2Colors.Warning
-                )
-                PestanaRanking(
-                    icono = Icons.Outlined.Favorite,
-                    etiqueta = "Vidas",
-                    seleccionada = pestanaSeleccionada == 2,
-                    alHacerClic = { alSeleccionarPestana(2) },
-                    color = EduRachaV2Colors.Pink
-                )
+                if (vista == 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf(
+                            Triple(0, "Experiencia", p.racha),
+                            Triple(1, "Racha", p.racha),
+                            Triple(2, "Vidas", p.error)
+                        ).forEach { (i, texto, color) ->
+                            com.stiven.sos.ui.theme.FichaNexo(texto, pestanaSeleccionada == i, color, { alSeleccionarPestana(i) }, Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     }
@@ -1116,306 +1048,144 @@ fun TarjetaEstudianteInteractiva(
     tipoRanking: TipoRanking,
     onClick: () -> Unit
 ) {
-    val escala by animateFloatAsState(
-        targetValue = if (esUsuarioActual) 1.02f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "escalaTarjetaEstudiante"
-    )
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(escala)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = if (esUsuarioActual) EduRachaV2Colors.Primary.copy(alpha = 0.08f) else Color.White,
-        shadowElevation = if (esUsuarioActual) 6.dp else 3.dp
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val medalla = when (posicion) { 1 -> Color(0xFFFFC14D); 2 -> Color(0xFFB8C4D6); 3 -> Color(0xFFE0915A); else -> null }
+    com.stiven.sos.ui.theme.TarjetaNexo(
+        Modifier.fillMaxWidth().clickable(onClick = onClick),
+        acento = medalla ?: if (esUsuarioActual) p.marca else null,
+        padding = 14.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (posicion <= 3) {
-                            when (posicion) {
-                                1 -> Color(0xFFFFD700).copy(alpha = 0.15f)
-                                2 -> Color(0xFFC0C0C0).copy(alpha = 0.15f)
-                                3 -> Color(0xFFCD7F32).copy(alpha = 0.15f)
-                                else -> EduRachaV2Colors.Primary.copy(alpha = 0.1f)
-                            }
-                        } else {
-                            EduRachaV2Colors.Background
-                        }
-                    ),
+                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background((medalla ?: p.superficieAlt).copy(alpha = if (medalla != null) 0.9f else 1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = posicion.toString(),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (posicion <= 3) {
-                        when (posicion) {
-                            1 -> Color(0xFFFFD700)
-                            2 -> Color(0xFFC0C0C0)
-                            3 -> Color(0xFFCD7F32)
-                            else -> EduRachaV2Colors.Primary
-                        }
-                    } else {
-                        EduRachaV2Colors.TextSecondary
-                    }
-                )
+                Text("$posicion", color = if (medalla != null) Color(0xFF1B2433) else p.textoSuave, fontWeight = FontWeight.Black, fontSize = 15.sp)
             }
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                EduRachaV2Colors.Secondary,
-                                EduRachaV2Colors.SecondaryDark
-                            )
-                        )
-                    )
-                    .border(2.dp, Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = estudiante.nombre.firstOrNull()?.uppercase() ?: "?",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+            Spacer(Modifier.width(10.dp))
+            com.stiven.sos.ui.theme.AvatarNexo(estudiante.nombre, p.ia, tamano = 44.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(estudiante.nombre, color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Toca para ver su progreso", color = p.textoTenue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = estudiante.nombre,
-                    fontSize = 15.sp,
-                    fontWeight = if (esUsuarioActual) FontWeight.Bold else FontWeight.SemiBold,
-                    color = EduRachaV2Colors.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                val valor = when (tipoRanking) {
-                    TipoRanking.EXPERIENCIA -> "${estudiante.experiencia} XP"
-                    TipoRanking.RACHA -> "${estudiante.diasConsecutivos} días"
-                    TipoRanking.VIDAS -> "${estudiante.vidas} vidas"
-                }
-
-                Text(
-                    text = valor,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = EduRachaV2Colors.TextSecondary
-                )
-            }
-
-            Icon(
-                Icons.Outlined.ChevronRight,
-                contentDescription = "Ver perfil",
-                tint = EduRachaV2Colors.TextSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-
-            if (esUsuarioActual) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = EduRachaV2Colors.Primary
-                ) {
-                    Text(
-                        text = "TÚ",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = p.textoSuave)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricaRanking(Icons.Outlined.Bolt, "${estudiante.experiencia}", "XP", p.racha, tipoRanking == TipoRanking.EXPERIENCIA, Modifier.weight(1f))
+            MetricaRanking(Icons.Outlined.LocalFireDepartment, "${estudiante.diasConsecutivos}", "Racha", p.racha, tipoRanking == TipoRanking.RACHA, Modifier.weight(1f))
+            MetricaRanking(Icons.Outlined.Favorite, "${estudiante.vidas}", "Vidas", p.error, tipoRanking == TipoRanking.VIDAS, Modifier.weight(1f))
         }
     }
 }
 
+@Composable
+private fun MetricaRanking(icono: androidx.compose.ui.graphics.vector.ImageVector, valor: String, etiqueta: String, color: Color, destacada: Boolean, modifier: Modifier) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    Row(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (destacada) color.copy(alpha = 0.16f) else p.superficieAlt)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(icono, null, tint = color, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(valor, color = p.texto, fontWeight = FontWeight.Black, fontSize = 15.sp)
+        Spacer(Modifier.width(4.dp))
+        Text(etiqueta, color = p.textoSuave, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+    }
+}
+
+/**
+ * Perfil del estudiante en pantalla completa (antes una ventana emergente con botón cerrar gris).
+ * Suma los datos del ranking con los de las estadísticas del curso (promedio, quizzes, temas, actividad).
+ */
 @Composable
 fun DialogoPerfilEstudiante(
     estudiante: RankingEstudiante,
     tipoRanking: TipoRanking,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(28.dp),
-            color = EduRachaColors.Surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                // Header del perfil
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    EduRachaV2Colors.Secondary,
-                                    EduRachaV2Colors.SecondaryDark
-                                )
-                            )
-                        )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.3f))
-                                .border(3.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = estudiante.nombre.firstOrNull()?.uppercase() ?: "?",
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    val estVm: EstadisticasCursoViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val estUi by estVm.ui.collectAsState()
+    LaunchedEffect(estudiante.cursoId) { estudiante.cursoId?.let { estVm.cargar(it) } }
+    val detalle = estUi.datos?.estudiantes?.firstOrNull { it.estudianteId == estudiante.id }
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Nombre del estudiante
-                Text(
-                    text = estudiante.nombre,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaV2Colors.TextPrimary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+    com.stiven.sos.ui.theme.PantallaSuperpuestaNexo(onAtras = onDismiss) {
+        com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
+            Column(Modifier.fillMaxSize()) {
+                com.stiven.sos.ui.theme.EncabezadoNexo(
+                    titulo = estudiante.nombre,
+                    subtitulo = "Perfil del estudiante",
+                    onVolver = onDismiss,
+                    tono = com.stiven.sos.ui.theme.TonoEncabezado.RACHA
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "ID: ${estudiante.id.take(8)}...",
-                    fontSize = 12.sp,
-                    color = EduRachaV2Colors.TextSecondary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Estadísticas del estudiante
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ItemPerfilEstudiante(
-                        icono = Icons.Outlined.Star,
-                        label = "Experiencia Total",
-                        valor = "${estudiante.experiencia} XP",
-                        color = EduRachaV2Colors.Accent
-                    )
-
-                    ItemPerfilEstudiante(
-                        icono = Icons.Outlined.Whatshot,
-                        label = "Racha Actual",
-                        valor = "${estudiante.diasConsecutivos} días",
-                        color = EduRachaV2Colors.Warning
-                    )
-
-                    ItemPerfilEstudiante(
-                        icono = Icons.Outlined.Favorite,
-                        label = "Vidas",
-                        valor = "${estudiante.vidas} vidas",
-                        color = EduRachaV2Colors.Pink
-                    )
-
-                    // Estadística destacada según el tipo de ranking
-                    val (destacadoLabel, destacadoValor, destacadoColor) = when (tipoRanking) {
-                        TipoRanking.EXPERIENCIA -> Triple(
-                            "Posición en Experiencia",
-                            "TOP en XP",
-                            EduRachaV2Colors.Accent
-                        )
-                        TipoRanking.RACHA -> Triple(
-                            "Posición en Racha",
-                            "TOP en Racha",
-                            EduRachaV2Colors.Warning
-                        )
-                        TipoRanking.VIDAS -> Triple(
-                            "Posición en Vidas",
-                            "TOP en Energía",
-                            EduRachaV2Colors.Pink
-                        )
-                    }
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = destacadoColor.copy(alpha = 0.15f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Outlined.EmojiEvents,
-                                contentDescription = null,
-                                tint = destacadoColor,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = destacadoLabel,
-                                    fontSize = 12.sp,
-                                    color = EduRachaV2Colors.TextSecondary
-                                )
-                                Text(
-                                    text = destacadoValor,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = destacadoColor
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(16.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                com.stiven.sos.ui.theme.AvatarNexo(estudiante.nombre, p.ia, tamano = 72.dp)
+                                Spacer(Modifier.width(14.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(estudiante.nombre, color = p.texto, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                                    if (detalle?.enRiesgo == true) {
+                                        com.stiven.sos.ui.theme.EtiquetaEstadoNexo("Necesita apoyo", p.error)
+                                    } else if (detalle != null) {
+                                        com.stiven.sos.ui.theme.EtiquetaEstadoNexo("Va bien", p.accion)
+                                    }
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Bolt, "${estudiante.experiencia}", "XP", p.racha, Modifier.weight(1f))
+                                com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.LocalFireDepartment, "${estudiante.diasConsecutivos}", "Días de racha", p.racha, Modifier.weight(1f))
+                                com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Favorite, "${estudiante.vidas}", "Vidas", p.error, Modifier.weight(1f))
+                            }
+                            when {
+                                detalle != null -> {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Quiz, "${detalle.quizzes}", "Quizzes", p.ia, Modifier.weight(1f))
+                                        com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.TrackChanges, "${detalle.promedio}%", "Aciertos", p.marca, Modifier.weight(1f))
+                                        com.stiven.sos.ui.theme.StatNexo(Icons.Outlined.Verified, "${detalle.temasAprobados}", "Temas aprob.", p.accion, Modifier.weight(1f))
+                                    }
+                                    com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth()) {
+                                        Text("Promedio de aciertos", color = p.texto, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                                        Spacer(Modifier.height(8.dp))
+                                        com.stiven.sos.ui.theme.BarraNexo(detalle.promedio / 100f, color = if (detalle.promedio >= 80) p.accion else p.marca, alto = 12.dp)
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(if (detalle.promedio >= 80) "Aprueba con holgura (meta: 80%)." else "Le faltan ${80 - detalle.promedio} puntos para la meta de 80%.",
+                                            color = p.textoSuave, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    }
+                                    com.stiven.sos.ui.theme.NotaNexo(
+                                        when {
+                                            detalle.ultimaActividad == null -> "Todavía no ha presentado quizzes."
+                                            detalle.diasSinActividad == 0 -> "Estuvo activo hoy (${detalle.ultimaActividad})."
+                                            else -> "Último quiz hace ${detalle.diasSinActividad} días (${detalle.ultimaActividad})."
+                                        },
+                                        p.marca, Icons.Outlined.Event, titulo = "Actividad"
+                                    )
+                                    detalle.motivoRiesgo?.let {
+                                        com.stiven.sos.ui.theme.NotaNexo(it, p.error, Icons.Outlined.ReportProblem, titulo = "Por qué necesita apoyo")
+                                    }
+                                }
+                                estUi.cargando -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = p.racha)
+                                }
+                                else -> com.stiven.sos.ui.theme.NotaNexo(
+                                    estUi.error ?: "No hay más datos de este estudiante todavía.", p.textoSuave, Icons.Outlined.Info
                                 )
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Botón cerrar
-                EduRachaV2Button(
-                    text = "Cerrar",
-                    onClick = onDismiss,
-                    gradient = EduRachaV2Gradients.Blue
-                )
+                Surface(color = p.superficie, shadowElevation = 8.dp) {
+                    com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        com.stiven.sos.ui.theme.BotonNexo("Cerrar", onDismiss, tipo = com.stiven.sos.ui.theme.TipoBoton.MARCA, alto = 52.dp, modifier = Modifier.fillMaxWidth())
+                    }
+                }
             }
         }
     }
@@ -1462,4 +1232,4 @@ fun ItemPerfilEstudiante(
             )
         }
     }
-}
+}

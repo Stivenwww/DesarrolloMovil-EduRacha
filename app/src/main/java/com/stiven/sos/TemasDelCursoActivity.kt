@@ -451,11 +451,7 @@ fun TemasDelCursoScreenFinal(
                     QuizFinalCardFigma(
                         onClick = {
                             if (quizFinalAprobado) {
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Ya aprobaste el Quiz Final",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
+                                com.stiven.sos.ui.theme.Avisos.mostrar(context, "Ya aprobaste el Quiz Final")
                             } else {
                                 onQuizFinalClick()
                             }
@@ -595,4 +591,4 @@ fun DialogoXPCompacto(
         textoBoton = "Continuar",
         onDismiss = onDismiss
     )
-}
+}

@@ -176,78 +176,13 @@ fun HeaderRankingScrollable(
     cantidadCursos: Int,
     onNavigateBack: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                EduRachaV2Gradients.Blue,
-                shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-            )
-    ) {
-        // Burbujas decorativas animadas
-        AnimatedBubblesDecoration(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp),
-            color = Color.White
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 32.dp)
-        ) {
-            // Botón de retroceso animado
-            val interactionSource = remember { MutableInteractionSource() }
-
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f)),
-                interactionSource = interactionSource
-            ) {
-                Icon(
-                    Icons.Outlined.ArrowBack,
-                    "Volver",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            // Ícono principal animado
-            AnimatedTrophyIcon()
-
-            Spacer(Modifier.height(20.dp))
-
-            // Título principal
-            Text(
-                "Rankings de Cursos",
-                color = Color.White,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Subtítulo
-            Text(
-                "Explora el desempeño académico",
-                color = Color.White.copy(alpha = 0.95f),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // Contador animado de cursos
-            ContadorCursosAnimado(cantidad = cantidadCursos)
-        }
-    }
+    com.stiven.sos.ui.theme.EncabezadoNexo(
+        titulo = "Ranking y estadísticas",
+        subtitulo = "Elige un curso",
+        onVolver = onNavigateBack,
+        tono = com.stiven.sos.ui.theme.TonoEncabezado.RACHA,
+        acciones = { com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("$cantidadCursos cursos") }
+    )
 }
 
 @Composable
@@ -681,4 +616,4 @@ fun EmptyRankingView(onNavigateBack: () -> Unit) {
             )
         }
     }
-}
+}

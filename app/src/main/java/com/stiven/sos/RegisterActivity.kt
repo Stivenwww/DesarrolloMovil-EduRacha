@@ -299,11 +299,7 @@ fun RegisterScreen(
                                                 rol = rolReal
                                             )
 
-                                            Toast.makeText(
-                                                context,
-                                                "¡Registro exitoso! Bienvenido ${fullName.trim()}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                            com.stiven.sos.ui.theme.Avisos.mostrar(context, "¡Registro exitoso! Bienvenido ${fullName.trim()}")
 
                                             isLoading = false
                                             onNavigateToMain()

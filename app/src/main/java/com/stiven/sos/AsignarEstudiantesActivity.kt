@@ -32,10 +32,12 @@ import com.stiven.sos.ui.theme.EduRachaColors
 import com.stiven.sos.ui.theme.EduRachaTheme
 import com.stiven.sos.utils.SessionManager
 import com.stiven.sos.viewmodel.SolicitudDocenteViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 
 class AsignarEstudiantesActivity : ComponentActivity() {
 
-    private val solicitudViewModel: SolicitudDocenteViewModel by viewModels()
+    private val grupoViewModel: GrupoCursoViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,8 +46,8 @@ class AsignarEstudiantesActivity : ComponentActivity() {
         val cursoId = intent.getStringExtra("CURSO_ID") ?: ""
 
         //  Obtener docenteId de SessionManager en lugar del Intent
-        val sessionManager = SessionManager.getInstance(applicationContext)
-        val docenteId = sessionManager.getUserId() ?: ""
+        // UID de la sesión activa (el guardado podía ser de otra cuenta)
+        val docenteId = com.stiven.sos.services.uidSesion(this)
 
         Log.d("AsignarEstudiantes", """
              Activity iniciada:
@@ -55,21 +57,18 @@ class AsignarEstudiantesActivity : ComponentActivity() {
         """.trimIndent())
 
         if (docenteId.isBlank()) {
-            Toast.makeText(this, "Error: No hay sesión activa", Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrarAlVolver(this, "No hay sesión activa. Vuelve a iniciar sesión.", com.stiven.sos.ui.theme.TipoAviso.ERROR)
             finish()
             return
         }
 
-        //  Cargar todas las solicitudes del docente
-        solicitudViewModel.cargarSolicitudesDocente(docenteId)
+        grupoViewModel.iniciar(docenteId, cursoId)
 
         setContent {
             EduRachaTheme {
-                GestionSolicitudesScreen(
+                GrupoCursoScreen(
                     cursoTitulo = cursoTitulo,
-                    cursoId = cursoId,
-                    docenteId = docenteId,
-                    solicitudViewModel = solicitudViewModel,
+                    vm = grupoViewModel,
                     onNavigateBack = { finish() }
                 )
             }
@@ -77,870 +76,342 @@ class AsignarEstudiantesActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ============================================================================
+// Grupo del curso (docente): aspirantes e inscritos en la misma pantalla, sin ventanas emergentes.
+// Aceptar es inmediato; rechazar abre un panel dentro de la misma tarjeta para elegir el motivo.
+// ============================================================================
+
+data class GrupoCursoUi(
+    val cargando: Boolean = true,
+    val aspirantes: List<SolicitudCurso> = emptyList(),
+    val inscritos: List<com.stiven.sos.models.UsuarioAsignado> = emptyList(),
+    val procesando: Set<String> = emptySet(),
+    val error: String? = null,
+    val mensaje: String? = null
+)
+
+class GrupoCursoViewModel : androidx.lifecycle.ViewModel() {
+    private val api = com.stiven.sos.api.ApiClient.apiService
+    private val _ui = kotlinx.coroutines.flow.MutableStateFlow(GrupoCursoUi())
+    val ui: kotlinx.coroutines.flow.StateFlow<GrupoCursoUi> = _ui
+    private var docenteId = ""
+    private var cursoId = ""
+
+    fun iniciar(docente: String, curso: String) {
+        if (docente == docenteId && curso == cursoId && !_ui.value.cargando) return
+        docenteId = docente; cursoId = curso
+        cargar()
+    }
+
+    fun cargar() {
+        viewModelScope.launch {
+            _ui.value = _ui.value.copy(cargando = true, error = null)
+            try {
+                val r1 = api.obtenerSolicitudesDocente(docenteId)
+                val aspirantes = if (r1.isSuccessful) r1.body().orEmpty()
+                    .filter { it.cursoId == cursoId && it.estado == EstadoSolicitud.PENDIENTE }
+                    .sortedBy { it.fechaSolicitud.toLongOrNull() ?: 0L } else emptyList()
+                val r2 = api.obtenerEstudiantesPorCurso(cursoId)
+                val inscritos = if (r2.isSuccessful) r2.body().orEmpty().sortedBy { it.nombre.lowercase() } else emptyList()
+                _ui.value = _ui.value.copy(
+                    cargando = false, aspirantes = aspirantes, inscritos = inscritos,
+                    error = if (!r1.isSuccessful) com.stiven.sos.api.mensajeDeError(r1) else null
+                )
+            } catch (e: Exception) {
+                _ui.value = _ui.value.copy(cargando = false, error = "No se pudo conectar con el servidor.")
+            }
+        }
+    }
+
+    fun responder(s: SolicitudCurso, aceptar: Boolean, mensaje: String?) {
+        val id = s.id ?: return
+        if (id in _ui.value.procesando) return
+        run {
+            viewModelScope.launch {
+                _ui.value = _ui.value.copy(procesando = _ui.value.procesando + id)
+                try {
+                    val r = api.responderSolicitud(id, com.stiven.sos.models.RespuestaSolicitudRequest(aceptar, mensaje?.ifBlank { null }))
+                    if (r.isSuccessful) {
+                        _ui.value = _ui.value.copy(
+                            aspirantes = _ui.value.aspirantes.filter { it.id != id },
+                            mensaje = if (aceptar) "${s.estudianteNombre} ya es parte del curso." else "Solicitud de ${s.estudianteNombre} rechazada."
+                        )
+                        if (aceptar) recargarInscritos()
+                    } else {
+                        _ui.value = _ui.value.copy(error = com.stiven.sos.api.mensajeDeError(r))
+                    }
+                } catch (e: Exception) {
+                    _ui.value = _ui.value.copy(error = "No se pudo conectar con el servidor.")
+                } finally {
+                    _ui.value = _ui.value.copy(procesando = _ui.value.procesando - id)
+                }
+            }
+        }
+    }
+
+    fun aceptarTodas() {
+        _ui.value.aspirantes.forEach { responder(it, true, null) }
+    }
+
+    private suspend fun recargarInscritos() {
+        runCatching { api.obtenerEstudiantesPorCurso(cursoId) }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.let {
+            _ui.value = _ui.value.copy(inscritos = it.sortedBy { e -> e.nombre.lowercase() })
+        }
+    }
+
+    fun limpiarMensajes() { _ui.value = _ui.value.copy(mensaje = null, error = null) }
+}
+
+private val MOTIVOS_RECHAZO = listOf(
+    "El curso ya no tiene cupos",
+    "No perteneces a este grupo",
+    "Usa el código de tu grupo",
+    "Escríbeme para revisarlo"
+)
+
+private fun fechaLegible(valor: String): String {
+    val ms = valor.toLongOrNull() ?: return valor
+    return java.text.SimpleDateFormat("d MMM yyyy · HH:mm", java.util.Locale("es", "CO")).format(java.util.Date(ms))
+}
+
 @Composable
-fun GestionSolicitudesScreen(
+fun GrupoCursoScreen(
     cursoTitulo: String,
-    cursoId: String,
-    docenteId: String,
-    solicitudViewModel: SolicitudDocenteViewModel,
+    vm: GrupoCursoViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
     val context = androidx.compose.ui.platform.LocalContext.current
-    val solicitudUiState by solicitudViewModel.uiState.collectAsState()
+    val ui by vm.ui.collectAsState()
+    var pestana by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    var busqueda by remember { mutableStateOf("") }
+    var confirmarTodas by remember { mutableStateOf(false) }
 
-    var solicitudSeleccionada by remember { mutableStateOf<SolicitudCurso?>(null) }
-    var showRechazarDialog by remember { mutableStateOf(false) }
-    var showAceptarDialog by remember { mutableStateOf(false) }
-    var mensajeRespuesta by remember { mutableStateOf("") }
-    var mensajePredeterminadoSeleccionado by remember { mutableStateOf<String?>(null) }
-    var modoPersonalizado by remember { mutableStateOf(false) }
-
-    //  Filtrar solicitudes del curso actual que estén PENDIENTES
-    val solicitudesCurso = remember(solicitudUiState.solicitudes, cursoId) {
-        val filtradas = solicitudUiState.solicitudes.filter {
-            it.cursoId == cursoId && it.estado == EstadoSolicitud.PENDIENTE
-        }
-        Log.d("GestionSolicitudes", """
-             Filtrando solicitudes:
-            - Total recibidas: ${solicitudUiState.solicitudes.size}
-            - Del curso $cursoId: ${filtradas.size}
-        """.trimIndent())
-        filtradas
+    LaunchedEffect(ui.mensaje, ui.error) {
+        ui.mensaje?.let { com.stiven.sos.ui.theme.Avisos.mostrar(context, it, com.stiven.sos.ui.theme.TipoAviso.EXITO) }
+        ui.error?.let { com.stiven.sos.ui.theme.Avisos.mostrar(context, it, com.stiven.sos.ui.theme.TipoAviso.ERROR) }
+        if (ui.mensaje != null || ui.error != null) vm.limpiarMensajes()
     }
 
-    LaunchedEffect(solicitudUiState.mensajeExito) {
-        solicitudUiState.mensajeExito?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            solicitudViewModel.clearMessages()
-            //  Recargar solicitudes después de aceptar/rechazar
-            solicitudViewModel.cargarSolicitudesDocente(docenteId)
-        }
-    }
-
-    LaunchedEffect(solicitudUiState.error) {
-        solicitudUiState.error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            solicitudViewModel.clearMessages()
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Aspirantes al Curso",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            cursoTitulo,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 13.sp
-                        )
+    com.stiven.sos.ui.theme.FondoNexo {
+        Column(Modifier.fillMaxSize()) {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = cursoTitulo,
+                subtitulo = "Grupo del curso",
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
+                    com.stiven.sos.ui.theme.AccionEncabezadoNexo(Icons.Default.Refresh, "Actualizar", { vm.cargar() }, com.stiven.sos.ui.theme.TonoEncabezado.IA)
+                }
+            )
+            com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        com.stiven.sos.ui.theme.StatNexo(Icons.Default.PersonAdd, "${ui.aspirantes.size}", "Aspirantes", p.racha, Modifier.weight(1f))
+                        com.stiven.sos.ui.theme.StatNexo(Icons.Default.Groups, "${ui.inscritos.size}", "Inscritos", p.accion, Modifier.weight(1f))
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    if (solicitudesCurso.isNotEmpty()) {
-                        Surface(
-                            color = Color.White.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(20.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.PendingActions,
-                                    null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "${solicitudesCurso.size}",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
+                    com.stiven.sos.ui.theme.SegmentadoNexo(
+                        opciones = listOf(
+                            Triple(0, "Aspirantes", Icons.Default.PersonAdd),
+                            Triple(1, "Inscritos", Icons.Default.Groups)
+                        ),
+                        seleccion = pestana,
+                        onCambio = { pestana = it },
+                        colores = { if (it == 0) p.racha else p.accion }
+                    )
+                }
+            }
+
+            Box(Modifier.fillMaxSize()) {
+                when {
+                    ui.cargando && ui.aspirantes.isEmpty() && ui.inscritos.isEmpty() ->
+                        CircularProgressIndicator(color = p.ia, modifier = Modifier.align(Alignment.Center))
+
+                    pestana == 0 && ui.aspirantes.isEmpty() -> com.stiven.sos.ui.theme.EstadoVacioNexo(
+                        titulo = "Sin aspirantes",
+                        mensaje = "Cuando un estudiante pida unirse con el código del curso, aparecerá aquí.",
+                        expresion = com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+
+                    pestana == 0 -> LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (ui.aspirantes.size > 1) {
+                            item {
+                                com.stiven.sos.ui.theme.BotonNexo(
+                                    texto = "Aceptar a los ${ui.aspirantes.size}",
+                                    onClick = { confirmarTodas = true },
+                                    tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                                    icono = Icons.Default.DoneAll,
+                                    habilitado = ui.procesando.isEmpty(),
+                                    modifier = Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO).fillMaxWidth()
                                 )
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior
-                )
-            )
-        },
-        containerColor = EduRachaColors.Background
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            when {
-                solicitudUiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = EduRachaColors.Primary
-                    )
-                }
-
-                solicitudesCurso.isEmpty() -> {
-                    EmptyAspirantesView()
-                }
-
-                else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(
-                            items = solicitudesCurso,
-                            key = { it.id ?: it.estudianteId }
-                        ) { solicitud ->
-                            SolicitudAspiranteCard(
-                                solicitud = solicitud,
-                                onAceptarClick = {
-                                    solicitudSeleccionada = solicitud
-                                    mensajeRespuesta = ""
-                                    mensajePredeterminadoSeleccionado = null
-                                    modoPersonalizado = false
-                                    showAceptarDialog = true
-                                },
-                                onRechazarClick = {
-                                    solicitudSeleccionada = solicitud
-                                    mensajeRespuesta = ""
-                                    mensajePredeterminadoSeleccionado = null
-                                    modoPersonalizado = false
-                                    showRechazarDialog = true
-                                }
+                        items(ui.aspirantes, key = { it.id ?: it.estudianteId }) { s ->
+                            TarjetaAspirante(
+                                s = s,
+                                procesando = s.id in ui.procesando,
+                                onAceptar = { vm.responder(s, true, null) },
+                                onRechazar = { motivo -> vm.responder(s, false, motivo) },
+                                modifier = Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO).fillMaxWidth()
                             )
                         }
                     }
-                }
-            }
-        }
-    }
 
-    // Diálogos de aceptar y rechazar
-    if (showAceptarDialog && solicitudSeleccionada != null) {
-        DialogoAceptarSolicitud(
-            solicitud = solicitudSeleccionada!!,
-            mensajePredeterminadoSeleccionado = mensajePredeterminadoSeleccionado,
-            onMensajeSeleccionado = { mensajePredeterminadoSeleccionado = it },
-            modoPersonalizado = modoPersonalizado,
-            onModoPersonalizadoChange = { modoPersonalizado = it },
-            mensajeRespuesta = mensajeRespuesta,
-            onMensajeChange = { mensajeRespuesta = it },
-            onConfirm = {
-                val mensajeFinal = if (modoPersonalizado) {
-                    mensajeRespuesta.ifBlank { null }
-                } else {
-                    mensajePredeterminadoSeleccionado
-                }
-                solicitudSeleccionada?.id?.let { id ->
-                    solicitudViewModel.aceptarSolicitud(id, mensajeFinal)
-                }
-                showAceptarDialog = false
-            },
-            onDismiss = {
-                showAceptarDialog = false
-                solicitudSeleccionada = null
-                mensajeRespuesta = ""
-                mensajePredeterminadoSeleccionado = null
-                modoPersonalizado = false
-            }
-        )
-    }
-
-    if (showRechazarDialog && solicitudSeleccionada != null) {
-        DialogoRechazarSolicitud(
-            solicitud = solicitudSeleccionada!!,
-            mensajePredeterminadoSeleccionado = mensajePredeterminadoSeleccionado,
-            onMensajeSeleccionado = { mensajePredeterminadoSeleccionado = it },
-            modoPersonalizado = modoPersonalizado,
-            onModoPersonalizadoChange = { modoPersonalizado = it },
-            mensajeRespuesta = mensajeRespuesta,
-            onMensajeChange = { mensajeRespuesta = it },
-            onConfirm = {
-                val mensajeFinal = if (modoPersonalizado) {
-                    mensajeRespuesta.ifBlank { null }
-                } else {
-                    mensajePredeterminadoSeleccionado
-                }
-                solicitudSeleccionada?.id?.let { id ->
-                    solicitudViewModel.rechazarSolicitud(id, mensajeFinal)
-                }
-                showRechazarDialog = false
-            },
-            onDismiss = {
-                showRechazarDialog = false
-                solicitudSeleccionada = null
-                mensajeRespuesta = ""
-                mensajePredeterminadoSeleccionado = null
-                modoPersonalizado = false
-            }
-        )
-    }
-}
-
-
-
-@Composable
-fun DialogoAceptarSolicitud(
-    solicitud: SolicitudCurso,
-    mensajePredeterminadoSeleccionado: String?,
-    onMensajeSeleccionado: (String?) -> Unit,
-    modoPersonalizado: Boolean,
-    onModoPersonalizadoChange: (Boolean) -> Unit,
-    mensajeRespuesta: String,
-    onMensajeChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.CheckCircle,
-                null,
-                tint = EduRachaColors.Success,
-                modifier = Modifier.size(52.dp)
-            )
-        },
-        title = {
-            Text(
-                "Aceptar Solicitud",
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                fontSize = 20.sp
-            )
-        },
-        text = {
-            DialogoAceptarContent(
-                solicitud = solicitud,
-                mensajePredeterminadoSeleccionado = mensajePredeterminadoSeleccionado,
-                onMensajeSeleccionado = onMensajeSeleccionado,
-                modoPersonalizado = modoPersonalizado,
-                onModoPersonalizadoChange = onModoPersonalizadoChange,
-                mensajeRespuesta = mensajeRespuesta,
-                onMensajeChange = onMensajeChange
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Success
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Aceptar Estudiante", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Text("Cancelar")
-            }
-        }
-    )
-}
-
-@Composable
-fun DialogoRechazarSolicitud(
-    solicitud: SolicitudCurso,
-    mensajePredeterminadoSeleccionado: String?,
-    onMensajeSeleccionado: (String?) -> Unit,
-    modoPersonalizado: Boolean,
-    onModoPersonalizadoChange: (Boolean) -> Unit,
-    mensajeRespuesta: String,
-    onMensajeChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.Cancel,
-                null,
-                tint = EduRachaColors.Error,
-                modifier = Modifier.size(52.dp)
-            )
-        },
-        title = {
-            Text(
-                "Rechazar Solicitud",
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                fontSize = 20.sp
-            )
-        },
-        text = {
-            DialogoRechazarContent(
-                solicitud = solicitud,
-                mensajePredeterminadoSeleccionado = mensajePredeterminadoSeleccionado,
-                onMensajeSeleccionado = onMensajeSeleccionado,
-                modoPersonalizado = modoPersonalizado,
-                onModoPersonalizadoChange = onModoPersonalizadoChange,
-                mensajeRespuesta = mensajeRespuesta,
-                onMensajeChange = onMensajeChange
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EduRachaColors.Error
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Icon(Icons.Default.Close, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Rechazar Solicitud", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Text("Cancelar")
-            }
-        }
-    )
-}
-
-@Composable
-fun DialogoAceptarContent(
-    solicitud: SolicitudCurso,
-    mensajePredeterminadoSeleccionado: String?,
-    onMensajeSeleccionado: (String?) -> Unit,
-    modoPersonalizado: Boolean,
-    onModoPersonalizadoChange: (Boolean) -> Unit,
-    mensajeRespuesta: String,
-    onMensajeChange: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "Vas a aceptar a ${solicitud.estudianteNombre} en el curso",
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-            fontSize = 15.sp,
-            color = EduRachaColors.TextPrimary
-        )
-
-        val mensajeEst = solicitud.mensajeEstudiante
-        if (!mensajeEst.isNullOrBlank()) {
-            Spacer(Modifier.height(16.dp))
-            MensajeEstudianteCard(mensajeEst)
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        Text(
-            text = "Mensaje de bienvenida",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
-
-        if (!modoPersonalizado) {
-            OpcionesMensajePredeterminado(
-                mensajesPredeterminados = listOf(
-                    "Bienvenido al curso. Estoy seguro de que te irá muy bien.",
-                    "Me alegra tenerte en el curso. Espero que disfrutes el aprendizaje.",
-                    "Has sido aceptado. Estoy disponible si tienes alguna duda.",
-                    "Bienvenido. Prepárate para una gran experiencia de aprendizaje."
-                ),
-                mensajeSeleccionado = mensajePredeterminadoSeleccionado,
-                onMensajeSeleccionado = onMensajeSeleccionado,
-                colorFondo = EduRachaColors.Success,
-                onModoPersonalizado = { onModoPersonalizadoChange(true) }
-            )
-        } else {
-            CampoMensajePersonalizado(
-                mensajeRespuesta = mensajeRespuesta,
-                onMensajeChange = onMensajeChange,
-                placeholder = "Ej: Bienvenido al curso...",
-                colorBorde = EduRachaColors.Success,
-                onVolverPredeterminados = { onModoPersonalizadoChange(false) }
-            )
-        }
-    }
-}
-
-@Composable
-fun DialogoRechazarContent(
-    solicitud: SolicitudCurso,
-    mensajePredeterminadoSeleccionado: String?,
-    onMensajeSeleccionado: (String?) -> Unit,
-    modoPersonalizado: Boolean,
-    onModoPersonalizadoChange: (Boolean) -> Unit,
-    mensajeRespuesta: String,
-    onMensajeChange: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "Vas a rechazar la solicitud de ${solicitud.estudianteNombre}",
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-            fontSize = 15.sp,
-            color = EduRachaColors.TextPrimary
-        )
-
-        val mensajeEst = solicitud.mensajeEstudiante
-        if (!mensajeEst.isNullOrBlank()) {
-            Spacer(Modifier.height(16.dp))
-            MensajeEstudianteCard(mensajeEst)
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        Text(
-            text = "Motivo del rechazo (opcional)",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
-
-        if (!modoPersonalizado) {
-            OpcionesMensajePredeterminado(
-                mensajesPredeterminados = listOf(
-                    "Lo siento, el curso ha alcanzado su capacidad máxima.",
-                    "En este momento no hay cupos disponibles.",
-                    "No cumples con los requisitos previos del curso.",
-                    "La solicitud no cumple con los criterios de admisión."
-                ),
-                mensajeSeleccionado = mensajePredeterminadoSeleccionado,
-                onMensajeSeleccionado = onMensajeSeleccionado,
-                colorFondo = EduRachaColors.Error,
-                onModoPersonalizado = { onModoPersonalizadoChange(true) }
-            )
-        } else {
-            CampoMensajePersonalizado(
-                mensajeRespuesta = mensajeRespuesta,
-                onMensajeChange = onMensajeChange,
-                placeholder = "Ej: El curso está lleno...",
-                colorBorde = EduRachaColors.Error,
-                onVolverPredeterminados = { onModoPersonalizadoChange(false) }
-            )
-        }
-    }
-}
-
-@Composable
-fun MensajeEstudianteCard(mensaje: String) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = EduRachaColors.Primary.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, EduRachaColors.Primary.copy(alpha = 0.2f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    Icons.Default.Message,
-                    null,
-                    tint = EduRachaColors.Primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Mensaje del estudiante",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.Primary
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = mensaje,
-                fontSize = 13.sp,
-                color = EduRachaColors.TextPrimary,
-                lineHeight = 19.sp
-            )
-        }
-    }
-}
-
-@Composable
-fun OpcionesMensajePredeterminado(
-    mensajesPredeterminados: List<String>,
-    mensajeSeleccionado: String?,
-    onMensajeSeleccionado: (String?) -> Unit,
-    colorFondo: Color,
-    onModoPersonalizado: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        mensajesPredeterminados.forEach { mensaje ->
-            MensajePredeterminadoChip(
-                mensaje = mensaje,
-                seleccionado = mensajeSeleccionado == mensaje,
-                onClick = {
-                    onMensajeSeleccionado(if (mensajeSeleccionado == mensaje) null else mensaje)
-                },
-                colorFondo = colorFondo
-            )
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        TextButton(
-            onClick = onModoPersonalizado,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Escribir mensaje personalizado")
-        }
-    }
-}
-
-@Composable
-fun CampoMensajePersonalizado(
-    mensajeRespuesta: String,
-    onMensajeChange: (String) -> Unit,
-    placeholder: String,
-    colorBorde: Color,
-    onVolverPredeterminados: () -> Unit
-) {
-    Column {
-        OutlinedTextField(
-            value = mensajeRespuesta,
-            onValueChange = onMensajeChange,
-            label = { Text("Escribe tu mensaje") },
-            placeholder = { Text(placeholder) },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 4,
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colorBorde,
-                focusedLabelColor = colorBorde
-            )
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        TextButton(onClick = onVolverPredeterminados) {
-            Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Volver a mensajes predeterminados")
-        }
-    }
-}
-
-@Composable
-fun MensajePredeterminadoChip(
-    mensaje: String,
-    seleccionado: Boolean,
-    onClick: () -> Unit,
-    colorFondo: Color
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (seleccionado) colorFondo.copy(alpha = 0.15f) else Color.Transparent,
-        border = BorderStroke(
-            width = if (seleccionado) 2.dp else 1.dp,
-            color = if (seleccionado) colorFondo else EduRachaColors.TextSecondary.copy(alpha = 0.3f)
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(
-                selected = seleccionado,
-                onClick = onClick,
-                colors = RadioButtonDefaults.colors(
-                    selectedColor = colorFondo,
-                    unselectedColor = EduRachaColors.TextSecondary
-                )
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = mensaje,
-                fontSize = 13.sp,
-                color = if (seleccionado) EduRachaColors.TextPrimary else EduRachaColors.TextSecondary,
-                fontWeight = if (seleccionado) FontWeight.Medium else FontWeight.Normal,
-                lineHeight = 18.sp,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun SolicitudAspiranteCard(
-    solicitud: SolicitudCurso,
-    onAceptarClick: () -> Unit,
-    onRechazarClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = EduRachaColors.Surface)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    EduRachaColors.Primary,
-                                    EduRachaColors.Primary.copy(alpha = 0.75f)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = solicitud.estudianteNombre
-                            .split(" ")
-                            .take(2)
-                            .mapNotNull { it.firstOrNull() }
-                            .joinToString("")
-                            .uppercase(),
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = solicitud.estudianteNombre,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.TextPrimary,
-                        lineHeight = 22.sp
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Email,
-                            null,
-                            tint = EduRachaColors.TextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = solicitud.estudianteEmail,
-                            fontSize = 13.sp,
-                            color = EduRachaColors.TextSecondary
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = EduRachaColors.SurfaceVariant.copy(alpha = 0.5f)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CalendarToday,
-                        null,
-                        tint = EduRachaColors.Primary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = "Solicitó el ${solicitud.fechaSolicitud}",
-                        fontSize = 12.sp,
-                        color = EduRachaColors.TextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            val mensajeEst = solicitud.mensajeEstudiante
-            if (!mensajeEst.isNullOrBlank()) {
-                Spacer(Modifier.height(14.dp))
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = EduRachaColors.Primary.copy(alpha = 0.06f),
-                    border = BorderStroke(1.dp, EduRachaColors.Primary.copy(alpha = 0.15f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    else -> {
+                        val lista = ui.inscritos.filter {
+                            busqueda.isBlank() || it.nombre.contains(busqueda, true) || it.correo.contains(busqueda, true)
+                        }
+                        LazyColumn(
+                            Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 32.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                Icons.Default.Message,
-                                null,
-                                tint = EduRachaColors.Primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Mensaje del estudiante",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EduRachaColors.Primary
-                            )
+                            item {
+                                Box(Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO)) {
+                                    com.stiven.sos.ui.theme.BuscadorNexo(busqueda, { busqueda = it }, "Buscar por nombre o correo")
+                                }
+                            }
+                            if (lista.isEmpty()) item {
+                                com.stiven.sos.ui.theme.EstadoVacioNexo(
+                                    titulo = if (ui.inscritos.isEmpty()) "Aún no hay inscritos" else "Sin resultados",
+                                    mensaje = if (ui.inscritos.isEmpty()) "Acepta aspirantes para formar el grupo." else "Prueba con otro nombre.",
+                                    expresion = com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                                )
+                            }
+                            items(lista, key = { it.uid.ifBlank { it.correo } }) { e ->
+                                com.stiven.sos.ui.theme.FilaNexo(
+                                    icono = Icons.Default.Person,
+                                    color = if (e.estado.equals("activo", true)) p.accion else p.textoSuave,
+                                    titulo = e.nombre.ifBlank { "Estudiante" },
+                                    subtitulo = e.correo.ifBlank { null },
+                                    modifier = Modifier.widthIn(max = com.stiven.sos.ui.theme.ANCHO_CONTENIDO_NEXO),
+                                    extremo = {
+                                        com.stiven.sos.ui.theme.EtiquetaEstadoNexo(
+                                            e.estado.ifBlank { "activo" },
+                                            if (e.estado.isBlank() || e.estado.equals("activo", true)) p.accion else p.textoSuave
+                                        )
+                                    }
+                                )
+                            }
                         }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = mensajeEst,
-                            fontSize = 13.sp,
-                            color = EduRachaColors.TextPrimary,
-                            lineHeight = 19.sp
-                        )
                     }
-                }
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onRechazarClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = EduRachaColors.Error
-                    ),
-                    border = BorderStroke(1.5.dp, EduRachaColors.Error),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        null,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Rechazar", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-
-                Button(
-                    onClick = onAceptarClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EduRachaColors.Success
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 2.dp,
-                        pressedElevation = 4.dp
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        null,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Aceptar", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
     }
+
+    if (confirmarTodas) {
+        com.stiven.sos.ui.theme.DialogoAccionNexo(
+            icono = Icons.Default.DoneAll,
+            color = p.accion,
+            titulo = "¿Aceptar a todos?",
+            mensaje = "${ui.aspirantes.size} estudiantes entrarán al curso y recibirán un aviso de bienvenida.",
+            textoPrincipal = "Aceptar a todos",
+            tipoPrincipal = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+            onPrincipal = { confirmarTodas = false; vm.aceptarTodas() },
+            textoSecundario = "Cancelar",
+            onSecundario = { confirmarTodas = false },
+            onDismiss = { confirmarTodas = false }
+        )
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun EmptyAspirantesView() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(EduRachaColors.SurfaceVariant.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.PersonOff,
-                contentDescription = null,
-                modifier = Modifier.size(60.dp),
-                tint = EduRachaColors.TextSecondary.copy(alpha = 0.5f)
-            )
+private fun TarjetaAspirante(
+    s: SolicitudCurso,
+    procesando: Boolean,
+    onAceptar: () -> Unit,
+    onRechazar: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
+    var rechazando by remember(s.id) { mutableStateOf(false) }
+    var motivo by remember(s.id) { mutableStateOf<String?>(null) }
+    var personalizado by remember(s.id) { mutableStateOf("") }
+
+    com.stiven.sos.ui.theme.TarjetaNexo(modifier, acento = if (rechazando) p.error else p.racha, padding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            com.stiven.sos.ui.theme.AvatarNexo(s.estudianteNombre.ifBlank { "?" }, p.ia, tamano = 48.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(s.estudianteNombre.ifBlank { "Estudiante" }, color = p.texto, fontWeight = FontWeight.Black, fontSize = 16.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                if (s.estudianteEmail.isNotBlank()) {
+                    Text(s.estudianteEmail, color = p.textoSuave, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Text("Solicitó el ${fechaLegible(s.fechaSolicitud)}", color = p.textoTenue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            }
         }
-        Spacer(Modifier.height(24.dp))
-        Text(
-            text = "No hay solicitudes pendientes",
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            color = EduRachaColors.TextPrimary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Cuando los estudiantes soliciten unirse a este curso, aparecerán aquí para que puedas revisar y aprobar sus solicitudes",
-            fontSize = 14.sp,
-            color = EduRachaColors.TextSecondary,
-            textAlign = TextAlign.Center,
-            lineHeight = 20.sp,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        s.mensajeEstudiante?.takeIf { it.isNotBlank() }?.let {
+            Spacer(Modifier.height(10.dp))
+            com.stiven.sos.ui.theme.NotaNexo("\"$it\"", p.marca, Icons.Default.FormatQuote, titulo = "Mensaje del estudiante")
+        }
+        Spacer(Modifier.height(12.dp))
+        if (!rechazando) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Rechazar",
+                    onClick = { rechazando = true },
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                    habilitado = !procesando,
+                    alto = 48.dp,
+                    modifier = Modifier.weight(1f)
+                )
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Aceptar",
+                    onClick = onAceptar,
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                    icono = Icons.Default.Check,
+                    cargando = procesando,
+                    alto = 48.dp,
+                    modifier = Modifier.weight(1.3f)
+                )
+            }
+        } else {
+            // Rechazo dentro de la misma tarjeta (sin ventana emergente)
+            Text("¿Por qué no lo aceptas? (opcional)", color = p.texto, fontWeight = FontWeight.Black, fontSize = 14.sp)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MOTIVOS_RECHAZO.forEach { m ->
+                    com.stiven.sos.ui.theme.FichaNexo(m, motivo == m, p.error, { motivo = if (motivo == m) null else m })
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            com.stiven.sos.ui.theme.CampoNexo(
+                valor = personalizado,
+                onCambio = { personalizado = it; if (it.isNotBlank()) motivo = null },
+                etiqueta = "Otro motivo",
+                lineasMinimas = 2,
+                colorFoco = p.error
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Cancelar",
+                    onClick = { rechazando = false; motivo = null; personalizado = "" },
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                    habilitado = !procesando,
+                    alto = 48.dp,
+                    modifier = Modifier.weight(1f)
+                )
+                com.stiven.sos.ui.theme.BotonNexo(
+                    texto = "Rechazar",
+                    onClick = { onRechazar(personalizado.ifBlank { motivo }) },
+                    tipo = com.stiven.sos.ui.theme.TipoBoton.PELIGRO,
+                    cargando = procesando,
+                    alto = 48.dp,
+                    modifier = Modifier.weight(1.3f)
+                )
+            }
+        }
     }
 }

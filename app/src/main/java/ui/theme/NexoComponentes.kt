@@ -2,6 +2,8 @@
 // Componentes visuales del diseño "Nexo". Solo presentación: no acceden a datos.
 package com.stiven.sos.ui.theme
 
+import androidx.compose.ui.graphics.compositeOver
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -528,7 +530,8 @@ fun BotonNexo(
         TipoBoton.MARCA -> Triple(p.marca, p.marcaSombra, p.sobreMarca)
         TipoBoton.IA -> Triple(p.ia, p.iaSombra, Color.White)
         TipoBoton.PELIGRO -> Triple(p.error, p.errorSombra, Color.White)
-        TipoBoton.SECUNDARIO -> Triple(p.superficie, p.borde, p.marcaTexto)
+        // Secundario sin borde gris: fondo suave del color de marca
+        TipoBoton.SECUNDARIO -> Triple(p.marca.copy(alpha = if (p.esOscuro) 0.18f else 0.12f).compositeOver(p.superficie), p.marca.copy(alpha = 0.30f).compositeOver(p.superficie), p.marcaTexto)
     }
     val caraFinal = if (habilitado) cara else p.borde
     val sombraFinal = if (habilitado) sombra else p.borde
@@ -548,7 +551,7 @@ fun BotonNexo(
                 .offset(y = hundido)
                 .clip(forma)
                 .background(caraFinal)
-                .then(if (tipo == TipoBoton.SECUNDARIO) Modifier.border(2.dp, p.borde, forma) else Modifier),
+                ,
             contentAlignment = Alignment.Center
         ) {
             if (cargando) {

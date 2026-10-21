@@ -142,7 +142,7 @@ fun CursosDisponiblesScreen(
 
     LaunchedEffect(solicitudUiState.error) {
         solicitudUiState.error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, it)
             solicitudViewModel.clearMessages()
         }
     }

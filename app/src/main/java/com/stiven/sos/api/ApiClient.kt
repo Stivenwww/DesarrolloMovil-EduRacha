@@ -32,6 +32,9 @@ object ApiClient {
 
     private val authInterceptor = AuthInterceptor()
 
+    /** Llamar al cerrar sesión para que la próxima cuenta no use el token de la anterior. */
+    fun cerrarSesion() = authInterceptor.limpiar()
+
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)

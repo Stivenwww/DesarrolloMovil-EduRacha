@@ -55,7 +55,7 @@ class ReportesActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (!isGranted) {
-            Toast.makeText(this, "Permiso necesario para guardar reportes", Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(this, "Permiso necesario para guardar reportes")
         }
     }
 
@@ -175,7 +175,7 @@ fun ReportesScreenComplete(
         listOf(estadoDiario, estadoTema, estadoGeneral, estadoRango).forEach { estado ->
             when (estado) {
                 is ReporteEstado.Exito -> {
-                    Toast.makeText(context, "Reporte guardado: ${estado.nombreArchivo}", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Excel guardado en Descargas: ${estado.nombreArchivo}", com.stiven.sos.ui.theme.TipoAviso.EXITO, "Reporte descargado")
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()
@@ -184,7 +184,7 @@ fun ReportesScreenComplete(
                     }
                 }
                 is ReporteEstado.Error -> {
-                    Toast.makeText(context, "Error: ${estado.mensaje}", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, estado.mensaje, com.stiven.sos.ui.theme.TipoAviso.ERROR, "No se pudo descargar")
                     when (estado) {
                         estadoDiario -> reporteViewModel.resetearEstadoDiario()
                         estadoTema -> reporteViewModel.resetearEstadoTema()

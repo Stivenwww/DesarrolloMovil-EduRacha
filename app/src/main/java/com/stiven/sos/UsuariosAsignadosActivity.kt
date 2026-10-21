@@ -84,7 +84,7 @@ fun UsuariosAsignadosScreen(
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
-            Toast.makeText(context, "Error: $it", Toast.LENGTH_LONG).show()
+            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: $it")
             viewModel.clearError()
         }
     }
@@ -102,64 +102,16 @@ fun UsuariosAsignadosScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Estudiantes Asignados",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        )
-                        Text(
-                            cursoTitulo,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Estudiantes asignados",
+                subtitulo = cursoTitulo,
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
                     if (uiState.usuarios.isNotEmpty()) {
-                        Surface(
-                            color = Color.White.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.People,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = "${uiState.usuarios.size}",
-                                    color = Color.White,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                        com.stiven.sos.ui.theme.EtiquetaEncabezadoNexo("${uiState.usuarios.size}", Icons.Default.People)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior
-                )
+                }
             )
         },
         containerColor = EduRachaColors.Background

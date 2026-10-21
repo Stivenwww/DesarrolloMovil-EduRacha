@@ -42,12 +42,20 @@ class GestionGruposActivity : ComponentActivity() {
     private val cursoViewModel: CursoViewModel by viewModels()
     private val solicitudViewModel: SolicitudViewModel by viewModels()
 
+    private var docenteSesion = ""
+
+    // Al volver de un grupo se actualizan los aspirantes pendientes
+    override fun onRestart() {
+        super.onRestart()
+        if (docenteSesion.isNotEmpty()) solicitudViewModel.cargarSolicitudesDocente(docenteSesion)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Cargar datos
-        val prefs = getSharedPreferences("EduRachaUserPrefs", Context.MODE_PRIVATE)
-        val docenteId = prefs.getString("user_uid", "") ?: ""
+        val docenteId = com.stiven.sos.services.uidSesion(this)
+        docenteSesion = docenteId
 
         cursoViewModel.obtenerCursos()
         if (docenteId.isNotEmpty()) {
@@ -59,11 +67,8 @@ class GestionGruposActivity : ComponentActivity() {
                 GestionGruposScreen(
                     cursoViewModel = cursoViewModel,
                     solicitudViewModel = solicitudViewModel,
-                    onNavigateBack = {
-                        val intent = Intent(this, PanelDocenteActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        startActivity(intent)
-                    },
+                    docenteId = docenteId,
+                    onNavigateBack = { finish() },
                     onCursoClick = { curso ->
                         val intent = Intent(this, AsignarEstudiantesActivity::class.java)
                         intent.putExtra("CURSO_TITULO", curso.titulo)
@@ -84,6 +89,7 @@ class GestionGruposActivity : ComponentActivity() {
 fun GestionGruposScreen(
     cursoViewModel: CursoViewModel,
     solicitudViewModel: SolicitudViewModel,
+    docenteId: String = "",
     onNavigateBack: () -> Unit,
     onCursoClick: (Curso) -> Unit,
     onCrearCurso: () -> Unit
@@ -91,7 +97,10 @@ fun GestionGruposScreen(
     val cursoUiState by cursoViewModel.uiState.collectAsState()
     val solicitudUiState by solicitudViewModel.uiState.collectAsState()
 
-    val cursos = cursoUiState.cursos
+    // Solo los cursos del docente que inició sesión
+    val cursos = remember(cursoUiState.cursos, docenteId) {
+        cursoUiState.cursos.filter { docenteId.isBlank() || it.docenteId == docenteId }
+    }
     val isLoading = cursoUiState.isLoading
     val errorMessage = cursoUiState.error
 

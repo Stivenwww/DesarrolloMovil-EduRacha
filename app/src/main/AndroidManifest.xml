@@ -95,6 +95,10 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".PendientesDocenteActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".PreguntasRevisadasActivity"
             android:exported="false" />
 

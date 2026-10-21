@@ -11,6 +11,15 @@ class AuthInterceptor : Interceptor {
     private val TAG = "AuthInterceptor"
     @Volatile private var tokenCache: String? = null
     @Volatile private var tokenExpiraEn: Long = 0L
+    /** Dueño del token en caché. Si cambia la cuenta (docente -> estudiante) el token viejo NO se reutiliza. */
+    @Volatile private var tokenUid: String? = null
+
+    /** Olvida el token guardado (se llama al cerrar sesión y cuando cambia la cuenta). */
+    fun limpiar() {
+        tokenCache = null
+        tokenExpiraEn = 0L
+        tokenUid = null
+    }
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
@@ -24,6 +33,9 @@ class AuthInterceptor : Interceptor {
 
         // Obtener token de Firebase con caché (evita getIdToken(true) en cada request)
         val ahora = System.currentTimeMillis()
+        val uidActual = FirebaseAuth.getInstance().currentUser?.uid
+        // Causa del error "No estás inscrito": se enviaba el token de la cuenta anterior tras cambiar de usuario
+        if (uidActual == null || uidActual != tokenUid) limpiar()
         val cacheValido = tokenCache != null && ahora < tokenExpiraEn
         val firebaseToken = if (cacheValido) {
             tokenCache
@@ -44,6 +56,7 @@ class AuthInterceptor : Interceptor {
                 } else {
                     Log.d(TAG, "Token Firebase obtenido correctamente")
                     tokenCache = tokenResult.token
+                    tokenUid = currentUser.uid
                     tokenExpiraEn = System.currentTimeMillis() + 50 * 60 * 1000L
                     tokenResult.token
                 }
@@ -66,9 +79,20 @@ class AuthInterceptor : Interceptor {
         val newRequest = originalRequest.newBuilder()
             .addHeader("Authorization", "Bearer $firebaseToken")
             .build()
-
-        Log.d(TAG, "Request autenticada: ${newRequest.method} ${newRequest.url}")
-
-        return chain.proceed(newRequest)
+        val respuesta = chain.proceed(newRequest)
+        // Si el servidor rechaza el token (expirado o revocado), se pide uno nuevo y se reintenta una vez
+        if (respuesta.code == 401) {
+            val nuevo = try {
+                runBlocking { FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()?.token }
+            } catch (e: Exception) { null }
+            if (!nuevo.isNullOrEmpty() && nuevo != firebaseToken) {
+                respuesta.close()
+                tokenCache = nuevo
+                tokenUid = FirebaseAuth.getInstance().currentUser?.uid
+                tokenExpiraEn = System.currentTimeMillis() + 50 * 60 * 1000L
+                return chain.proceed(originalRequest.newBuilder().addHeader("Authorization", "Bearer $nuevo").build())
+            }
+        }
+        return respuesta
     }
 }

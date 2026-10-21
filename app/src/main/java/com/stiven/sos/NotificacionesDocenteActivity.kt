@@ -40,8 +40,8 @@ class NotificacionesDocenteActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val prefs = getSharedPreferences("EduRachaUserPrefs", MODE_PRIVATE)
-        val userId = prefs.getString("user_uid", "") ?: ""
+        // UID de la sesión activa: con el guardado en el celular se escuchaba la bandeja de otra cuenta
+        val userId = com.stiven.sos.services.uidSesion(this)
 
         setContent {
             EduRachaTheme {
@@ -52,35 +52,19 @@ class NotificacionesDocenteActivity : ComponentActivity() {
                         // Manejar click en notificación
                         when (notificacion.tipo) {
                             "solicitud" -> {
-                                Toast.makeText(
-                                    this,
-                                    "Solicitud de: ${notificacion.estudianteId ?: "Estudiante"}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                com.stiven.sos.ui.theme.Avisos.mostrar(this, "Solicitud de: ${notificacion.estudianteId ?: "Estudiante"}")
 
                             }
                             "reporte" -> {
-                                Toast.makeText(
-                                    this,
-                                    "Reporte disponible para descarga",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                com.stiven.sos.ui.theme.Avisos.mostrar(this, "Reporte disponible para descarga")
 
                             }
                             "curso_creado" -> {
-                                Toast.makeText(
-                                    this,
-                                    "Ver detalles del curso: ${notificacion.cursoId}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                com.stiven.sos.ui.theme.Avisos.mostrar(this, "Ver detalles del curso: ${notificacion.cursoId}")
 
                             }
                             else -> {
-                                Toast.makeText(
-                                    this,
-                                    "Notificación: ${notificacion.titulo}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                com.stiven.sos.ui.theme.Avisos.mostrar(this, "Notificación: ${notificacion.titulo}")
                             }
                         }
                     }
@@ -124,52 +108,25 @@ fun NotificacionesDocenteScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Notificaciones de Docente",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White
-                    )
-                    }
-                },
-
-                actions = {
+            com.stiven.sos.ui.theme.EncabezadoNexo(
+                titulo = "Notificaciones",
+                subtitulo = if (notificacionesNoLeidasCount > 0) "$notificacionesNoLeidasCount sin leer" else "Estás al día",
+                onVolver = onNavigateBack,
+                tono = com.stiven.sos.ui.theme.TonoEncabezado.IA,
+                acciones = {
                     if (notificacionesNoLeidasCount > 0) {
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    try {
-                                        ServicioNotificaciones.marcarTodasComoLeidas(userId)
-                                        Toast.makeText(
-                                            context,
-                                            "Todas marcadas como leídas",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "Error: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
+                        com.stiven.sos.ui.theme.TextoAccionEncabezadoNexo("Leer todo") {
+                            scope.launch {
+                                try {
+                                    ServicioNotificaciones.marcarTodasComoLeidas(userId)
+                                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Todas marcadas como leídas")
+                                } catch (e: Exception) {
+                                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${e.message}")
                                 }
                             }
-                        ) {
-                            Text("Leer todo", color = Color.White)
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EduRachaColors.BarraSuperior
-                )
+                }
             )
         },
         containerColor = EduRachaColors.Background
@@ -226,17 +183,9 @@ fun NotificacionesDocenteScreen(
                                 scope.launch {
                                     try {
                                         ServicioNotificaciones.eliminarNotificacion(userId, notificacion.id)
-                                        Toast.makeText(
-                                            context,
-                                            "Notificación eliminada",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Notificación eliminada")
                                     } catch (e: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "Error al eliminar",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error al eliminar")
                                     }
                                 }
                             }

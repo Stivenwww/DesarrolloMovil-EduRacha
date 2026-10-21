@@ -64,7 +64,7 @@ class CrearCursoActivity : ComponentActivity() {
                 CrearCursoConTemasScreen(
                     onNavigateBack = { finish() },
                     onCursoCreado = {
-                        Toast.makeText(this, "Curso creado exitosamente", Toast.LENGTH_LONG).show()
+                        com.stiven.sos.ui.theme.Avisos.mostrarAlVolver(this, "Curso creado exitosamente", com.stiven.sos.ui.theme.TipoAviso.EXITO)
                         finish()
                     }
                 )
@@ -89,8 +89,14 @@ data class TemaTemp(
     val explicacionEstado: String = "pendiente",
     val fechaCreacion: String = obtenerFechaActual(),
     val explicacionUltimaActualizacion: String = obtenerFechaActual(),
-    val programacion: ProgramacionTema? = null
+    val programacion: ProgramacionTema? = null,
+    /** Texto extraído del PDF del tema (solo para que la IA escriba la explicación; no se guarda en el curso). */
+    val textoPdf: String = "",
+    val paginasPdf: Int = 0
 )
+
+/** El tema pide explicación con IA y todavía no la tiene (se generará al crear el curso). */
+fun necesitaExplicacionIA(t: TemaTemp) = t.explicacionFuente == "ia" && t.explicacion.isBlank()
 
 // ============================================
 // FUNCIONES AUXILIARES
@@ -548,14 +554,14 @@ fun CrearCursoConTemasScreen(
                                 onEditar = { temaParaEditar = tema },
                                 onEliminar = {
                                     temas = temas.filter { it.id != tema.id }
-                                    Toast.makeText(context, "Tema eliminado", Toast.LENGTH_SHORT).show()
+                                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Tema eliminado")
                                 }
                             )
                         }
                     }
                 }
 
-                val temasConIA = temas.filter { it.explicacionFuente == "ia" }
+                val temasConIA = temas.filter { necesitaExplicacionIA(it) }
 
                 if (temasConIA.isNotEmpty()) {
                     Card(
@@ -662,11 +668,7 @@ fun CrearCursoConTemasScreen(
                 Button(
                     onClick = {
                         if (docenteId.isNullOrBlank()) {
-                            Toast.makeText(
-                                context,
-                                " Error: No se pudo obtener tu ID. Cierra sesión y vuelve a iniciar.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            com.stiven.sos.ui.theme.Avisos.mostrar(context, " Error: No se pudo obtener tu ID. Cierra sesión y vuelve a iniciar.")
                             return@Button
                         }
 
@@ -676,12 +678,12 @@ fun CrearCursoConTemasScreen(
                         duracionError = duracionDias.isBlank() || duracionDias.toIntOrNull() == null
 
                         if (tituloError || codigoError || descripcionError || duracionError) {
-                            Toast.makeText(context, "Completa todos los campos obligatorios", Toast.LENGTH_LONG).show()
+                            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Completa todos los campos obligatorios")
                             return@Button
                         }
 
                         if (temas.isEmpty()) {
-                            Toast.makeText(context, "Agrega al menos un tema", Toast.LENGTH_LONG).show()
+                            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Agrega al menos un tema")
                             return@Button
                         }
 
@@ -690,13 +692,13 @@ fun CrearCursoConTemasScreen(
                         }
 
                         if (temasManualesSinExplicacion.isNotEmpty()) {
-                            Toast.makeText(context, "Los temas manuales necesitan explicación", Toast.LENGTH_LONG).show()
+                            com.stiven.sos.ui.theme.Avisos.mostrar(context, "Los temas manuales necesitan explicación")
                             return@Button
                         }
 
                         val programacion = generarProgramacionAutomatica(temas, fechaInicio, fechaFin)
 
-                        val temasIA = temas.filter { it.explicacionFuente == "ia" }
+                        val temasIA = temas.filter { necesitaExplicacionIA(it) }
                         if (temasIA.isNotEmpty()) {
                             showAdvertenciaIADialog = true
                         } else {
@@ -744,22 +746,18 @@ fun CrearCursoConTemasScreen(
 
     if (showAdvertenciaIADialog) {
         AdvertenciaIADialog(
-            temasConIA = temas.filter { it.explicacionFuente == "ia" },
+            temasConIA = temas.filter { necesitaExplicacionIA(it) },
             onDismiss = { showAdvertenciaIADialog = false },
             onConfirm = {
                 showAdvertenciaIADialog = false
 
                 if (docenteId.isNullOrBlank()) {
-                    Toast.makeText(
-                        context,
-                        " Error: ID de docente no encontrado. Cierra sesión y vuelve a iniciar.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, " Error: ID de docente no encontrado. Cierra sesión y vuelve a iniciar.")
                     return@AdvertenciaIADialog
                 }
 
                 showProgresoGeneracionDialog = true
-                progresoTotal = temas.filter { it.explicacionFuente == "ia" }.size
+                progresoTotal = temas.filter { necesitaExplicacionIA(it) }.size
                 progresoCurrent = 0
                 temaActual = ""
 
@@ -806,6 +804,7 @@ fun CrearCursoConTemasScreen(
             temaExistente = temaParaEditar,
             temasExistentes = temas,
             fechaActual = fechaActual,
+            nombreCurso = titulo,
             onDismiss = {
                 showAgregarTemaDialog = false
                 temaParaEditar = null
@@ -813,10 +812,10 @@ fun CrearCursoConTemasScreen(
             onConfirm = { nuevoTema ->
                 if (temaParaEditar != null) {
                     temas = temas.map { if (it.id == temaParaEditar!!.id) nuevoTema else it }
-                    Toast.makeText(context, "Tema actualizado", Toast.LENGTH_SHORT).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Tema actualizado")
                 } else {
                     temas = temas + nuevoTema
-                    Toast.makeText(context, "Tema agregado", Toast.LENGTH_SHORT).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Tema agregado")
                 }
                 showAgregarTemaDialog = false
                 temaParaEditar = null
@@ -1113,487 +1112,328 @@ fun ProgresoGeneracionDialog(
     }
 }
 
+/** ID legible a partir del título ("Introducción a Kotlin" -> "introduccion_a_kotlin"), único entre [usados]. */
+fun idDesdeTitulo(titulo: String, usados: Collection<String>): String {
+    val base = java.text.Normalizer.normalize(titulo.lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}"), "")
+        .replace(Regex("[^a-z0-9]+"), "_")
+        .trim('_')
+        .take(40)
+        .ifBlank { "tema" }
+    var id = base
+    var n = 2
+    while (id in usados) id = "${base}_${n++}"
+    return id
+}
+
+/**
+ * Agregar o editar un tema (pantalla completa, diseño Nexo).
+ * El PDF va aquí: el servidor lee su texto y la IA escribe la explicación del tema con ese contenido.
+ * Si la IA falla, la explicación se puede escribir a mano en el mismo campo.
+ */
 @Composable
 fun AgregarTemaDialog(
     temaExistente: TemaTemp? = null,
     temasExistentes: List<TemaTemp> = emptyList(),
     fechaActual: String,
+    nombreCurso: String = "",
     onDismiss: () -> Unit,
     onConfirm: (TemaTemp) -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
+    val p = com.stiven.sos.ui.theme.LocalNexo.current
 
-    var temaId by remember { mutableStateOf(temaExistente?.id ?: "") }
     var titulo by remember { mutableStateOf(temaExistente?.titulo ?: "") }
+    var temaId by remember { mutableStateOf(temaExistente?.id ?: "") }
+    var idManual by remember { mutableStateOf(temaExistente != null) }
     var contenido by remember { mutableStateOf(temaExistente?.contenido ?: "") }
     var archivoUrl by remember { mutableStateOf(temaExistente?.archivoUrl ?: "") }
     var archivoNombre by remember { mutableStateOf(temaExistente?.archivoNombre ?: "") }
+    var textoPdf by remember { mutableStateOf(temaExistente?.textoPdf ?: "") }
+    var paginasPdf by remember { mutableStateOf(temaExistente?.paginasPdf ?: 0) }
+    var leyendoPdf by remember { mutableStateOf(false) }
+    var errorPdf by remember { mutableStateOf<String?>(null) }
 
+    // "ia" o "manual"
+    var modoExplicacion by remember { mutableStateOf(temaExistente?.explicacionFuente?.ifBlank { null } ?: "ia") }
     var explicacion by remember { mutableStateOf(temaExistente?.explicacion ?: "") }
-    var tipoExplicacion by remember { mutableStateOf(temaExistente?.explicacionFuente?.ifEmpty { "manual" } ?: "manual") }
+    var generando by remember { mutableStateOf(false) }
+    var errorIA by remember { mutableStateOf<String?>(null) }
+    var intentoGuardar by remember { mutableStateOf(false) }
 
-    var idError by remember { mutableStateOf(false) }
-    var tituloError by remember { mutableStateOf(false) }
-    var contenidoError by remember { mutableStateOf(false) }
-    var explicacionError by remember { mutableStateOf(false) }
-    var isUploading by remember { mutableStateOf(false) }
+    val usados = temasExistentes.filter { it.id != temaExistente?.id }.map { it.id }
+    val idFinal = if (idManual) temaId.trim() else idDesdeTitulo(titulo, usados)
+    val idRepetido = temaExistente == null && idFinal in usados
+    val tituloError = intentoGuardar && titulo.isBlank()
+    val contenidoError = intentoGuardar && contenido.isBlank() && textoPdf.isBlank()
+    val explicacionError = intentoGuardar && modoExplicacion == "manual" && explicacion.trim().length < 50
 
-    val pdfLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri: Uri? ->
-            uri?.let { pdfUri ->
-                isUploading = true
-                coroutineScope.launch {
-                    val result = leerPdfEnServidor(context, pdfUri)
-                    withContext(Dispatchers.Main) {
-                        isUploading = false
-                        result.onSuccess { pdf ->
-                            archivoNombre = pdf.nombre.ifBlank { obtenerNombreArchivo(context, pdfUri) }
-                            archivoUrl = "pdf://$archivoNombre"
-                            // El texto real del PDF pasa al contenido del tema: la IA lo usa para la explicación
-                            val extracto = pdf.texto.take(20_000)
-                            contenido = if (contenido.isBlank()) extracto else contenido.trimEnd() + "\n\n" + extracto
-                            contenidoError = false
-                            val aviso = if (pdf.truncado || pdf.texto.length > 20_000) " Se usó la primera parte del documento." else ""
-                            Toast.makeText(
-                                context,
-                                "PDF leído: ${pdf.paginas} páginas. El texto se agregó al contenido del tema.$aviso",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }.onFailure { e ->
-                            Toast.makeText(context, e.message ?: "No se pudo leer el PDF", Toast.LENGTH_LONG).show()
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        val pdfUri = uri ?: return@rememberLauncherForActivityResult
+        leyendoPdf = true
+        errorPdf = null
+        scope.launch {
+            val result = leerPdfEnServidor(context, pdfUri)
+            leyendoPdf = false
+            result.onSuccess { pdf ->
+                archivoNombre = pdf.nombre.ifBlank { obtenerNombreArchivo(context, pdfUri) }
+                archivoUrl = "pdf://$archivoNombre"
+                textoPdf = pdf.texto
+                paginasPdf = pdf.paginas
+                modoExplicacion = "ia"
+                val aviso = if (pdf.truncado) " Por su extensión se usará la primera parte." else ""
+                com.stiven.sos.ui.theme.Avisos.mostrar(
+                    context, "PDF leído: ${pdf.paginas} páginas. Ya puedes generar la explicación.$aviso",
+                    com.stiven.sos.ui.theme.TipoAviso.EXITO
+                )
+            }.onFailure { e ->
+                errorPdf = e.message ?: "No se pudo leer el PDF"
+            }
+        }
+    }
+
+    fun generarExplicacion() {
+        if (titulo.isBlank()) {
+            intentoGuardar = true
+            errorIA = "Escribe primero el título del tema."
+            return
+        }
+        generando = true
+        errorIA = null
+        scope.launch {
+            try {
+                val datos = buildMap {
+                    put("titulo", titulo.trim())
+                    if (contenido.isNotBlank()) put("contenido", contenido.trim())
+                    if (textoPdf.isNotBlank()) put("textoDocumento", textoPdf)
+                    if (nombreCurso.isNotBlank()) put("curso", nombreCurso.trim())
+                }
+                val resp = com.stiven.sos.api.ApiClient.apiService.generarExplicacionBorrador(datos)
+                val texto = resp.body()?.get("explicacion")
+                if (resp.isSuccessful && !texto.isNullOrBlank()) {
+                    explicacion = texto
+                } else {
+                    errorIA = com.stiven.sos.api.mensajeDeError(resp)
+                }
+            } catch (e: Exception) {
+                errorIA = "No se pudo conectar con el servidor. Puedes escribir la explicación tú mismo."
+            } finally {
+                generando = false
+            }
+        }
+    }
+
+    com.stiven.sos.ui.theme.PantallaSuperpuestaNexo(onAtras = { if (!generando && !leyendoPdf) onDismiss() }) {
+        com.stiven.sos.ui.theme.FondoNexo(conCuadricula = false) {
+            Column(Modifier.fillMaxSize()) {
+                com.stiven.sos.ui.theme.EncabezadoNexo(
+                    titulo = if (temaExistente == null) "Nuevo tema" else "Editar tema",
+                    subtitulo = nombreCurso.ifBlank { "Crear curso" },
+                    onVolver = { if (!generando && !leyendoPdf) onDismiss() },
+                    tono = com.stiven.sos.ui.theme.TonoEncabezado.MARCA
+                )
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .imePadding()
+                ) {
+                    com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                            // 1. Datos del tema
+                            com.stiven.sos.ui.theme.PasoNexo(1, "Datos del tema", completo = titulo.isNotBlank() && !contenidoError)
+                            com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth()) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    com.stiven.sos.ui.theme.CampoNexo(
+                                        valor = titulo,
+                                        onCambio = { titulo = it },
+                                        etiqueta = "Título del tema",
+                                        icono = Icons.Default.Title,
+                                        unaLinea = true,
+                                        error = tituloError,
+                                        apoyo = if (tituloError) "El título es obligatorio" else null
+                                    )
+                                    com.stiven.sos.ui.theme.CampoNexo(
+                                        valor = if (idManual) temaId else idFinal,
+                                        onCambio = {
+                                            idManual = true
+                                            temaId = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
+                                        },
+                                        etiqueta = "Identificador",
+                                        icono = Icons.Default.Key,
+                                        unaLinea = true,
+                                        habilitado = temaExistente == null,
+                                        error = idRepetido || (intentoGuardar && idFinal.isBlank()),
+                                        apoyo = when {
+                                            temaExistente != null -> "No se puede cambiar"
+                                            idRepetido -> "Ya existe otro tema con este identificador"
+                                            else -> "Se crea solo a partir del título; puedes cambiarlo"
+                                        }
+                                    )
+                                    com.stiven.sos.ui.theme.CampoNexo(
+                                        valor = contenido,
+                                        onCambio = { contenido = it },
+                                        etiqueta = "¿Qué se aprende en este tema?",
+                                        lineasMinimas = 3,
+                                        lineasMaximas = 8,
+                                        error = contenidoError,
+                                        apoyo = if (contenidoError) "Describe el tema o adjunta un PDF" else "Resumen corto para los estudiantes y para la IA"
+                                    )
+                                }
+                            }
+
+                            // 2. PDF
+                            com.stiven.sos.ui.theme.PasoNexo(2, "Material en PDF (opcional)", completo = textoPdf.isNotBlank(),
+                                detalle = "La IA escribirá la explicación con el contenido real del documento")
+                            if (textoPdf.isNotBlank() || archivoUrl.isNotBlank()) {
+                                com.stiven.sos.ui.theme.FilaNexo(
+                                    icono = Icons.Default.PictureAsPdf,
+                                    color = p.error,
+                                    titulo = archivoNombre.ifBlank { "Documento PDF" },
+                                    subtitulo = if (textoPdf.isNotBlank()) "$paginasPdf páginas · ${textoPdf.length} caracteres leídos" else "Adjunto (vuelve a elegirlo para usarlo con la IA)",
+                                    extremo = {
+                                        IconButton(onClick = { archivoUrl = ""; archivoNombre = ""; textoPdf = ""; paginasPdf = 0 }) {
+                                            Icon(Icons.Default.Close, "Quitar PDF", tint = p.textoSuave)
+                                        }
+                                    }
+                                )
+                            } else {
+                                com.stiven.sos.ui.theme.BotonNexo(
+                                    texto = if (leyendoPdf) "Leyendo PDF…" else "Elegir PDF",
+                                    onClick = { pdfLauncher.launch("application/pdf") },
+                                    tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                                    icono = Icons.Default.UploadFile,
+                                    cargando = leyendoPdf,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            errorPdf?.let {
+                                com.stiven.sos.ui.theme.NotaNexo(it, p.error, Icons.Default.ErrorOutline, titulo = "No se pudo leer el PDF")
+                            }
+
+                            // 3. Explicación
+                            com.stiven.sos.ui.theme.PasoNexo(3, "Explicación del tema", color = p.ia, completo = explicacion.isNotBlank(),
+                                detalle = "Los estudiantes la leen antes del quiz. Queda pendiente hasta que la apruebes.")
+                            com.stiven.sos.ui.theme.SegmentadoNexo(
+                                opciones = listOf(
+                                    Triple("ia", "Con IA", Icons.Default.AutoAwesome),
+                                    Triple("manual", "Escribirla", Icons.Default.Edit)
+                                ),
+                                seleccion = modoExplicacion,
+                                onCambio = { modoExplicacion = it },
+                                colores = { if (it == "ia") p.ia else p.marca }
+                            )
+
+                            if (modoExplicacion == "ia") {
+                                com.stiven.sos.ui.theme.TarjetaNexo(Modifier.fillMaxWidth(), acento = p.ia) {
+                                    com.stiven.sos.ui.theme.GloboRobi(
+                                        titulo = "ASISTENTE IA",
+                                        mensaje = when {
+                                            generando -> "Estoy escribiendo la explicación… puede tardar hasta un minuto."
+                                            explicacion.isNotBlank() -> "Listo. Revísala abajo: puedes corregir lo que quieras antes de guardar."
+                                            textoPdf.isNotBlank() -> "Escribiré una explicación detallada usando solo lo que dice tu PDF."
+                                            else -> "Escribiré una explicación detallada con el título y la descripción del tema. Si no la generas ahora, la escribo al crear el curso."
+                                        },
+                                        expresion = when {
+                                            generando -> com.stiven.sos.ui.theme.ExpresionRobi.PIENSA
+                                            explicacion.isNotBlank() -> com.stiven.sos.ui.theme.ExpresionRobi.CELEBRA
+                                            else -> com.stiven.sos.ui.theme.ExpresionRobi.FELIZ
+                                        },
+                                        tamanoRobi = 60.dp
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    com.stiven.sos.ui.theme.BotonNexo(
+                                        texto = if (explicacion.isBlank()) "Generar explicación ahora" else "Volver a generar",
+                                        onClick = { generarExplicacion() },
+                                        tipo = com.stiven.sos.ui.theme.TipoBoton.IA,
+                                        icono = Icons.Default.AutoAwesome,
+                                        cargando = generando,
+                                        habilitado = !leyendoPdf,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                errorIA?.let {
+                                    com.stiven.sos.ui.theme.NotaNexo(it, p.error, Icons.Default.ErrorOutline, titulo = "La IA no pudo escribirla")
+                                    com.stiven.sos.ui.theme.BotonNexo(
+                                        texto = "Escribirla yo",
+                                        onClick = { modoExplicacion = "manual"; errorIA = null },
+                                        tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                                        icono = Icons.Default.Edit,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+
+                            if (modoExplicacion == "manual" || explicacion.isNotBlank()) {
+                                com.stiven.sos.ui.theme.CampoNexo(
+                                    valor = explicacion,
+                                    onCambio = { explicacion = it },
+                                    etiqueta = if (modoExplicacion == "ia") "Explicación generada (editable)" else "Escribe la explicación",
+                                    lineasMinimas = 8,
+                                    lineasMaximas = 18,
+                                    error = explicacionError,
+                                    colorFoco = if (modoExplicacion == "ia") p.ia else p.marca,
+                                    apoyo = if (explicacionError) "Escribe al menos 50 caracteres" else "${explicacion.length} caracteres"
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                }
+
+                // Barra de acciones fija abajo
+                Surface(color = p.superficie, shadowElevation = 8.dp) {
+                    com.stiven.sos.ui.theme.ContenidoCentradoNexo(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            com.stiven.sos.ui.theme.BotonNexo(
+                                texto = "Cancelar",
+                                onClick = onDismiss,
+                                tipo = com.stiven.sos.ui.theme.TipoBoton.SECUNDARIO,
+                                habilitado = !generando && !leyendoPdf,
+                                modifier = Modifier.weight(1f)
+                            )
+                            com.stiven.sos.ui.theme.BotonNexo(
+                                texto = if (temaExistente == null) "Agregar" else "Guardar",
+                                onClick = {
+                                    intentoGuardar = true
+                                    val faltaContenido = contenido.isBlank() && textoPdf.isBlank()
+                                    val faltaExplicacion = modoExplicacion == "manual" && explicacion.trim().length < 50
+                                    if (titulo.isBlank() || faltaContenido || faltaExplicacion || idRepetido || idFinal.isBlank()) {
+                                        com.stiven.sos.ui.theme.Avisos.mostrar(
+                                            context, "Revisa los campos marcados en rojo.", com.stiven.sos.ui.theme.TipoAviso.ADVERTENCIA
+                                        )
+                                        return@BotonNexo
+                                    }
+                                    onConfirm(
+                                        TemaTemp(
+                                            id = idFinal,
+                                            titulo = titulo.trim(),
+                                            contenido = contenido.trim().ifBlank { "Material del documento \"$archivoNombre\"" },
+                                            archivoUrl = archivoUrl.trim(),
+                                            archivoNombre = archivoNombre.trim(),
+                                            tipo = if (archivoUrl.isNotEmpty()) "pdf" else "texto",
+                                            explicacion = explicacion.trim(),
+                                            explicacionFuente = modoExplicacion,
+                                            explicacionEstado = "pendiente",
+                                            textoPdf = textoPdf,
+                                            paginasPdf = paginasPdf,
+                                            programacion = temaExistente?.programacion
+                                        )
+                                    )
+                                },
+                                tipo = com.stiven.sos.ui.theme.TipoBoton.ACCION,
+                                icono = if (temaExistente == null) Icons.Default.Add else Icons.Default.Save,
+                                habilitado = !generando && !leyendoPdf,
+                                modifier = Modifier.weight(1.4f)
+                            )
                         }
                     }
                 }
             }
         }
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column {
-                Text(
-                    text = if (temaExistente == null) "Agregar Nuevo Tema" else "Editar Tema",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = EduRachaColors.Primary
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Fecha: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())}",
-                    fontSize = 12.sp,
-                    color = EduRachaColors.TextSecondary
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = temaId,
-                    onValueChange = {
-                        temaId = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
-                        idError = false
-                    },
-                    label = { Text("ID único del Tema (Requerido)") },
-                    leadingIcon = { Icon(Icons.Default.Key, null) },
-                    isError = idError,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    readOnly = temaExistente != null,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (idError) EduRachaColors.Error else EduRachaColors.Primary,
-                        focusedLabelColor = if (idError) EduRachaColors.Error else EduRachaColors.Primary
-                    ),
-                    supportingText = {
-                        if (idError) {
-                            Text("ID requerido y único", color = EduRachaColors.Error, fontSize = 12.sp)
-                        } else if (temaExistente != null) {
-                            Text("ID no editable", fontSize = 11.sp)
-                        } else {
-                            Text("Ej: tema1, intro, fundamentos", fontSize = 11.sp)
-                        }
-                    },
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = titulo,
-                    onValueChange = { titulo = it; tituloError = false },
-                    label = { Text("Título del Tema (Requerido)") },
-                    leadingIcon = { Icon(Icons.Default.Title, null) },
-                    isError = tituloError,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (tituloError) EduRachaColors.Error else EduRachaColors.Primary,
-                        focusedLabelColor = if (tituloError) EduRachaColors.Error else EduRachaColors.Primary
-                    ),
-                    supportingText = {
-                        if (tituloError) {
-                            Text("El título es obligatorio", color = EduRachaColors.Error, fontSize = 12.sp)
-                        }
-                    },
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = contenido,
-                    onValueChange = { contenido = it; contenidoError = false },
-                    label = { Text("Contenido del tema (Requerido)") },
-                    isError = contenidoError,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp, max = 180.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (contenidoError) EduRachaColors.Error else EduRachaColors.Secondary,
-                        focusedLabelColor = if (contenidoError) EduRachaColors.Error else EduRachaColors.Secondary
-                    ),
-                    supportingText = {
-                        if (contenidoError) {
-                            Text("El contenido es obligatorio", color = EduRachaColors.Error, fontSize = 12.sp)
-                        } else {
-                            Text("${contenido.length}/500 caracteres", fontSize = 11.sp)
-                        }
-                    },
-                    maxLines = 6
-                )
-
-                Divider(color = EduRachaColors.Background, thickness = 2.dp)
-
-                Text(
-                    "Archivo PDF (Opcional)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EduRachaColors.TextPrimary
-                )
-
-                if (archivoUrl.isEmpty()) {
-                    Button(
-                        onClick = { pdfLauncher.launch("application/pdf") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EduRachaColors.Accent,
-                            disabledContainerColor = EduRachaColors.Background
-                        ),
-                        enabled = !isUploading,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        if (isUploading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text("Leyendo PDF...", color = Color.White)
-                        } else {
-                            Icon(Icons.Default.UploadFile, null, modifier = Modifier.size(22.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Seleccionar PDF", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                } else {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { archivoUrl = ""; archivoNombre = "" },
-                        shape = RoundedCornerShape(12.dp),
-                        color = EduRachaColors.Success.copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            EduRachaColors.Success.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.PictureAsPdf,
-                                null,
-                                tint = EduRachaColors.Success,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "PDF Adjunto",
-                                    fontSize = 11.sp,
-                                    color = EduRachaColors.TextSecondary
-                                )
-                                Text(
-                                    archivoNombre.ifEmpty { "Archivo PDF" },
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EduRachaColors.Success,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(onClick = { archivoUrl = ""; archivoNombre = "" }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    "Eliminar",
-                                    tint = EduRachaColors.Error,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Divider(color = EduRachaColors.Background, thickness = 2.dp)
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        null,
-                        tint = EduRachaColors.Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Explicación del Tema (OBLIGATORIA)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EduRachaColors.Primary
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = { tipoExplicacion = "manual" },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (tipoExplicacion == "manual")
-                                EduRachaColors.Primary else EduRachaColors.Background
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Manual", fontSize = 13.sp)
-                    }
-
-                    Button(
-                        onClick = { tipoExplicacion = "ia" },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (tipoExplicacion == "ia")
-                                EduRachaColors.Accent else EduRachaColors.Background
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Psychology,
-                            null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("IA", fontSize = 13.sp)
-                    }
-                }
-
-                if (tipoExplicacion == "manual") {
-                    OutlinedTextField(
-                        value = explicacion,
-                        onValueChange = { explicacion = it; explicacionError = false },
-                        label = { Text("Escribe la explicación") },
-                        isError = explicacionError,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 150.dp, max = 200.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (explicacionError) EduRachaColors.Error else EduRachaColors.Primary,
-                            focusedLabelColor = if (explicacionError) EduRachaColors.Error else EduRachaColors.Primary
-                        ),
-                        supportingText = {
-                            if (explicacionError) {
-                                Text("La explicación es obligatoria", color = EduRachaColors.Error, fontSize = 12.sp)
-                            } else {
-                                Text("${explicacion.length}/1000 caracteres", fontSize = 11.sp)
-                            }
-                        },
-                        maxLines = 8
-                    )
-                }
-
-                if (tipoExplicacion == "ia") {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = EduRachaColors.Accent.copy(alpha = 0.1f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            EduRachaColors.Accent.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Psychology,
-                                    null,
-                                    tint = EduRachaColors.Accent,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "Generación Automática con IA",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = EduRachaColors.TextPrimary
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        "La explicación se generará automáticamente después de crear el curso (puede tardar hasta 2 minutos)",
-                                        fontSize = 12.sp,
-                                        color = EduRachaColors.TextSecondary,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.height(12.dp))
-                            Divider(color = EduRachaColors.Accent.copy(alpha = 0.2f))
-                            Spacer(Modifier.height(12.dp))
-
-                            ProcesoStep(
-                                numero = "1",
-                                texto = "El tema se creará con estado 'pendiente'",
-                                color = EduRachaColors.Accent
-                            )
-                            ProcesoStep(
-                                numero = "2",
-                                texto = "La IA generará la explicación automáticamente",
-                                color = EduRachaColors.Accent
-                            )
-                            ProcesoStep(
-                                numero = "3",
-                                texto = "Deberás revisar y aprobar antes de generar preguntas",
-                                color = EduRachaColors.Primary
-                            )
-                        }
-                    }
-                }
-
-                if (explicacion.isBlank() && tipoExplicacion == "manual") {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = EduRachaColors.Primary.copy(alpha = 0.1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Icon(
-                                Icons.Default.Warning,
-                                null,
-                                tint = EduRachaColors.Primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "La explicación es obligatoria para crear el tema. Los estudiantes la verán antes de iniciar el quiz.",
-                                fontSize = 12.sp,
-                                color = EduRachaColors.TextSecondary,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    tituloError = titulo.isBlank()
-                    contenidoError = contenido.isBlank()
-
-                    explicacionError = if (tipoExplicacion == "manual") {
-                        explicacion.isBlank()
-                    } else {
-                        false
-                    }
-
-                    if (temaExistente == null) {
-                        idError = temaId.isBlank() || temasExistentes.any { it.id == temaId }
-                    }
-
-                    if (!tituloError && !contenidoError && !idError && !explicacionError) {
-                        val nuevoTema = TemaTemp(
-                            id = temaId.trim(),
-                            titulo = titulo.trim(),
-                            contenido = contenido.trim(),
-                            archivoUrl = archivoUrl.trim(),
-                            archivoNombre = archivoNombre.trim(),
-                            tipo = if (archivoUrl.isNotEmpty()) "pdf" else "texto",
-                            explicacion = if (tipoExplicacion == "manual") explicacion.trim() else "",
-                            explicacionFuente = tipoExplicacion,
-                            explicacionEstado = "pendiente"
-                        )
-                        onConfirm(nuevoTema)
-                    } else {
-                        if (idError) {
-                            Toast.makeText(context, "El ID debe ser único", Toast.LENGTH_SHORT).show()
-                        } else if (explicacionError) {
-                            Toast.makeText(context, "Debes escribir la explicación", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "Completa todos los campos", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                enabled = !isUploading,
-                colors = ButtonDefaults.buttonColors(containerColor = EduRachaColors.Success),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    if (temaExistente == null) Icons.Default.Add else Icons.Default.Save,
-                    null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (temaExistente == null) "Agregar Tema" else "Guardar Cambios",
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Cancelar")
-            }
-        },
-        containerColor = EduRachaColors.Surface,
-        shape = RoundedCornerShape(24.dp),
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier
-            .fillMaxWidth(0.95f)
-            .fillMaxHeight(0.9f)
-    )
+    }
 }
 
 // ============================================
@@ -2117,13 +1957,13 @@ private fun crearCursoDirectamente(
             archivoUrl = temaTemp.archivoUrl.ifEmpty { null },
             tipo = if (temaTemp.archivoUrl.isNotEmpty()) "pdf" else "texto",
             fechaCreacion = fechaActual,
-            explicacion = if (temaTemp.explicacionFuente == "manual") temaTemp.explicacion else null,
+            explicacion = temaTemp.explicacion.trim().ifBlank { null },
             explicacionFuente = when {
                 temaTemp.explicacionFuente == "manual" -> "docente"
                 temaTemp.explicacionFuente == "ia" -> "ia"
                 else -> null
             },
-            explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
+            explicacionUltimaActualizacion = if (temaTemp.explicacion.isNotBlank()) fechaActual else null,
             explicacionEstado = "pendiente",
             programacion = temaTemp.programacion
         )
@@ -2150,16 +1990,16 @@ private fun crearCursoDirectamente(
             withContext(Dispatchers.Main) {
                 onLoadingChange(false)
                 if (response.isSuccessful) {
-                    Toast.makeText(context, "Curso creado exitosamente", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Curso creado exitosamente")
                     onCursoCreado()
                 } else {
-                    Toast.makeText(context, "Error: ${response.code()}", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${response.code()}")
                 }
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 onLoadingChange(false)
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${e.message}")
             }
         }
     }
@@ -2192,13 +2032,13 @@ private fun crearCursoConIA(
             archivoUrl = temaTemp.archivoUrl.ifEmpty { null },
             tipo = if (temaTemp.archivoUrl.isNotEmpty()) "pdf" else "texto",
             fechaCreacion = fechaActual,
-            explicacion = if (temaTemp.explicacionFuente == "manual") temaTemp.explicacion else null,
+            explicacion = temaTemp.explicacion.trim().ifBlank { null },
             explicacionFuente = when {
                 temaTemp.explicacionFuente == "manual" -> "docente"
                 temaTemp.explicacionFuente == "ia" -> "ia"
                 else -> null
             },
-            explicacionUltimaActualizacion = if (temaTemp.explicacionFuente == "manual") fechaActual else null,
+            explicacionUltimaActualizacion = if (temaTemp.explicacion.isNotBlank()) fechaActual else null,
             explicacionEstado = "pendiente",
             programacion = temaTemp.programacion
         )
@@ -2224,7 +2064,7 @@ private fun crearCursoConIA(
 
             if (response.isSuccessful && response.body() != null) {
                 val cursoId = response.body()!!.id
-                val temasConIA = temas.filter { it.explicacionFuente == "ia" }
+                val temasConIA = temas.filter { necesitaExplicacionIA(it) }
 
                 if (!cursoId.isNullOrBlank() && temasConIA.isNotEmpty()) {
                     generarExplicacionesConReintentos(
@@ -2238,19 +2078,19 @@ private fun crearCursoConIA(
 
                 withContext(Dispatchers.Main) {
                     onLoadingChange(false)
-                    Toast.makeText(context, "Curso creado con explicaciones generadas", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Curso creado con explicaciones generadas")
                     onFinished()
                 }
             } else {
                 withContext(Dispatchers.Main) {
                     onLoadingChange(false)
-                    Toast.makeText(context, "Error: ${response.code()}", Toast.LENGTH_LONG).show()
+                    com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${response.code()}")
                 }
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 onLoadingChange(false)
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                com.stiven.sos.ui.theme.Avisos.mostrar(context, "Error: ${e.message}")
             }
         }
     }
@@ -2287,7 +2127,8 @@ private suspend fun generarExplicacionesConReintentos(
                         cursoId = cursoId,
                         temaId = temaId,
                         tituloTema = tema.titulo,
-                        contenidoTema = tema.contenido
+                        // Si el tema trae PDF, la IA escribe la explicación con el texto del documento
+                        contenidoTema = tema.textoPdf.ifBlank { tema.contenido }
                     )
 
                     val explicacionResponse = com.stiven.sos.api.ApiClient.apiService.generarExplicacionIA(
@@ -2333,4 +2174,4 @@ private suspend fun generarExplicacionesConReintentos(
     }
 
     Log.d("CREAR_CURSO", " Exitosas: $exitosas | Timeouts: $timeouts | Fallidas: $fallidas")
-}
+}
