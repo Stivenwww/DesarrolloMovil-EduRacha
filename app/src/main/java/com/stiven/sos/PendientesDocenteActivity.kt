@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.stiven.sos.models.PendientesCursoDocente
 import com.stiven.sos.models.PendientesDocente
 import com.stiven.sos.ui.theme.*
@@ -49,7 +48,9 @@ fun rememberPendientesDocente(): Triple<PendientesDocente?, Boolean, String?> {
     var cargando by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableIntStateOf(0) }
-    val ciclo = LocalLifecycleOwner.current.lifecycle
+    // Debe ser el de compose.ui: el de lifecycle.compose no está disponible con la versión de Compose del
+    // proyecto y cerraba la app al entrar al panel docente ("CompositionLocal LocalLifecycleOwner not present").
+    val ciclo = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(ciclo) {
         val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) version++ }
         ciclo.addObserver(obs)
