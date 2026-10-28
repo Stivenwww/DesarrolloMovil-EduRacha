@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EduRacha · Aprende un poco cada día</title>
+<meta name="description" content="EduRacha es una app Android que convierte cada curso en un mapa de islas: explicaciones cortas, quizzes de 10 preguntas, racha, vidas, XP y ranking, con contenido aprobado por el docente.">
+<meta name="theme-color" content="#070B1F">
+<meta property="og:title" content="EduRacha · Aprende un poco cada día">
+<meta property="og:description" content="Quizzes cortos, racha diaria y contenido aprobado por tu docente. Una app Android de aprendizaje gamificado.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpolygon points='17,2 30,9.5 30,24.5 17,32 4,24.5 4,9.5' fill='%230E1533' stroke='%233AF2FF' stroke-width='2'/%3E%3Cpath d='M12 19c2-5 6-7 10-7-1 3-2 6-5 8 2 0 3-1 4-2-1 4-4 6-8 6 0-2 0-3-1-5z' fill='%23FFC14D'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Concepto: archipiélago nocturno de la identidad Nexo; cada sección es una "isla" sobre el océano oscuro. */
+:root{
+  --oceano:#070B1F; --oceano-2:#0B1230; --isla:#0E1533; --borde:#1E2A5A; --ruta:#2B3A78;
+  --texto:#EEF2FF; --texto-2:#C9D2F2; --apagado:#8E9BC7;
+  --cian:#3AF2FF; --violeta:#A06BFF; --verde:#5CF29A; --ambar:#FFC14D; --rosa:#FF5FA2;
+  --display:'Unbounded','Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'Nunito',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --r-lg:24px; --r-xl:36px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--oceano);color:var(--texto);font-family:var(--body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+img,svg{max-width:100%}
+a{color:var(--cian)}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+section{padding-block:clamp(64px,9vw,104px)}
+.band{background:var(--oceano-2);border-block:1px solid var(--borde)}
+.eyebrow{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:13px}
+.h2{font-family:var(--display);font-weight:700;font-size:clamp(28px,3.6vw,46px);line-height:1.1;letter-spacing:-.02em}
+.lead{font-size:clamp(17px,1.6vw,19px);color:var(--texto-2);max-width:38em}
+.head{display:flex;flex-direction:column;gap:14px;max-width:760px;margin-bottom:40px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:13px 24px;border-radius:16px;font:800 17px var(--body);text-decoration:none;cursor:pointer;border:2px solid transparent;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.btn-primary{background:var(--cian);color:var(--oceano)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(58,242,255,.28)}
+.btn-ghost{background:transparent;color:var(--texto);border-color:var(--violeta)}
+.btn-ghost:hover{background:rgba(160,107,255,.14)}
+:focus-visible{outline:3px solid var(--ambar);outline-offset:3px;border-radius:8px}
+@media (prefers-reduced-motion: reduce){.btn{transition:none}.btn-primary:hover{transform:none}}
+
+/* NAV */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--oceano)}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:rgba(7,11,31,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--borde)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:68px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--texto);text-decoration:none;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.links{display:flex;align-items:center;gap:26px;font-weight:700;font-size:15px}
+.links a:not(.btn){color:var(--texto-2);text-decoration:none}
+.links a:not(.btn):hover{color:var(--cian)}
+.links .btn{min-height:42px;padding:9px 18px;font-size:15px;border-radius:999px}
+.menu-btn{display:none;min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--borde);background:var(--isla);color:var(--texto);cursor:pointer}
+@media (max-width: 860px){
+  .menu-btn{display:inline-flex;align-items:center;justify-content:center}
+  .links{display:none;position:absolute;left:0;right:0;top:100%;flex-direction:column;align-items:stretch;gap:0;background:var(--oceano-2);border-bottom:1px solid var(--borde);padding:8px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+  .links.open{display:flex}
+  .links a:not(.btn){padding:14px 4px;border-bottom:1px solid var(--borde)}
+  .links .btn{margin-top:12px}
+}
+
+/* HERO */
+.hero{padding-block:clamp(48px,7vw,88px) clamp(56px,8vw,96px)}
+.hero-grid{display:flex;flex-wrap:wrap;align-items:center;gap:56px}
+.hero-copy{flex:1 1 500px;min-width:0;display:flex;flex-direction:column;gap:24px}
+.pill{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--borde);background:var(--isla);color:var(--apagado);padding:6px 14px;border-radius:999px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--verde)}
+.h1{font-family:var(--display);font-weight:800;font-size:clamp(36px,5.6vw,68px);line-height:1.04;letter-spacing:-.035em}
+.h1 em{font-style:normal;color:var(--cian)}
+.ctas{display:flex;flex-wrap:wrap;gap:14px}
+.facts{display:flex;flex-wrap:wrap;gap:28px;padding-top:6px}
+.fact{display:flex;flex-direction:column;gap:2px}
+.fact b{font-family:var(--display);font-weight:700;font-size:26px;line-height:1.2}
+.fact span{color:var(--apagado);font-size:14px}
+.hero-art{flex:1 1 360px;min-width:0;display:flex;justify-content:center;position:relative;padding-bottom:20px}
+.phone{width:330px;max-width:100%;border-radius:44px;border:10px solid #1A2350;background:var(--oceano-2);padding:20px 18px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 40px 90px rgba(0,0,0,.55)}
+.phone-top{display:flex;justify-content:space-between;align-items:center}
+.phone-top b{font-family:var(--display);font-weight:700;font-size:15px}
+.phone-top span{font-size:12px;color:var(--apagado)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--isla);border:1px solid var(--borde);border-radius:14px;padding:8px;display:flex;flex-direction:column;align-items:center}
+.stat b{font-weight:800}.stat span{font-size:11px;color:var(--apagado)}
+.phone-cta{background:var(--cian);color:var(--oceano);border-radius:16px;padding:12px;text-align:center;font-weight:800}
+.robi{position:absolute;left:max(0px,calc(50% - 255px));bottom:-8px;width:150px;height:170px;animation:flotar 4.5s ease-in-out infinite}
+.ojo{animation:parpadeo 5s infinite;transform-origin:center;transform-box:fill-box}
+.orbe{animation:pulso 2.4s ease-in-out infinite}
+@keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes parpadeo{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes pulso{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion: reduce){.robi,.ojo,.orbe{animation:none}}
+@media (max-width: 520px){.robi{width:110px;height:125px;left:0;bottom:-16px}}
+
+/* PROBLEMA */
+.problem{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px;align-items:start}
+.problem .h3{font-family:var(--display);font-weight:700;font-size:clamp(24px,2.4vw,30px);line-height:1.2}
+.problem p{color:var(--texto-2);font-size:18px}
+.problem strong{color:var(--texto)}
+
+/* PASOS */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;list-style:none;margin:0;padding:0}
+.card{background:var(--isla);border:1px solid var(--borde);border-radius:var(--r-lg);padding:28px;display:flex;flex-direction:column;gap:12px}
+.card h3{font-size:21px;font-weight:800}
+.card p{color:var(--texto-2)}
+.num{font-family:var(--display);font-weight:800;font-size:40px;line-height:1;color:var(--ruta)}
+.card.final{border-color:var(--cian)}.card.final .num{color:var(--cian)}
+
+/* PERFILES */
+.tabs-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:20px;margin-bottom:32px}
+.tablist{display:flex;gap:6px;background:var(--oceano);border:1px solid var(--borde);border-radius:999px;padding:6px}
+.tab{border:0;cursor:pointer;min-height:44px;padding:10px 22px;border-radius:999px;font:800 15px var(--body);background:transparent;color:var(--texto-2)}
+.tab[aria-selected="true"]{background:var(--cian);color:var(--oceano)}
+.tab:hover:not([aria-selected="true"]){color:var(--texto)}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
+.feat h3{font-size:20px;font-weight:800}
+.panel-cta{margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:16px;color:var(--texto-2)}
+
+/* REGLAS */
+.rules{display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start}
+.rules-copy{flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.rules-copy p{color:var(--texto-2);font-size:18px}
+.table-box{flex:1 1 520px;min-width:0;overflow-x:auto;background:var(--isla);border:1px solid var(--borde);border-radius:var(--r-lg)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+caption{text-align:left;padding:20px 24px 8px;color:var(--apagado);font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+th,td{padding:14px 24px;border-top:1px solid var(--borde)}
+th{text-align:left;font-weight:700}
+td{text-align:right;font-weight:800;white-space:nowrap}
+.xp{color:var(--verde)}.vida{color:var(--rosa)}.meta{color:var(--ambar)}
+
+/* EVIDENCIA */
+.evidence{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:stretch}
+.quote{background:var(--isla);border:1px solid var(--borde);border-radius:var(--r-lg);padding:28px;display:flex;flex-direction:column;gap:14px}
+.quote p{color:var(--texto-2)}
+.quote cite{font-style:normal;color:var(--apagado);font-size:14px}
+
+/* TECNOLOGÍA */
+.tech{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:28px}
+.tech div{padding-top:18px;display:flex;flex-direction:column;gap:8px;border-top:2px solid var(--c)}
+.tech h3{font-size:19px;font-weight:800}
+.tech p{color:var(--texto-2)}
+
+/* FAQ */
+.faq{display:flex;flex-direction:column;gap:12px;max-width:860px}
+details{background:var(--isla);border:1px solid var(--borde);border-radius:18px}
+summary{cursor:pointer;list-style:none;padding:20px 24px;font-weight:800;font-size:18px;display:flex;justify-content:space-between;gap:16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--display);color:var(--cian);font-size:22px;line-height:1}
+details[open] summary::after{content:"−"}
+details p{padding:0 24px 22px;color:var(--texto-2)}
+
+/* EQUIPO */
+.team{display:flex;flex-wrap:wrap;gap:40px;align-items:center}
+.team-copy{flex:1 1 380px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.team-copy p{color:var(--texto-2);font-size:18px}
+.people{flex:1 1 480px;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.avatar{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;color:var(--oceano)}
+.person h3{font-size:19px;font-weight:800;margin-top:8px}
+.person p{color:var(--apagado)}
+
+/* CTA */
+.cta{background:var(--cian);color:var(--oceano);border-radius:var(--r-xl);padding:clamp(28px,5vw,64px);display:flex;flex-wrap:wrap;gap:32px;align-items:center;justify-content:space-between}
+.cta-copy{flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.cta h2{font-family:var(--display);font-weight:800;font-size:clamp(28px,3.8vw,50px);line-height:1.05;letter-spacing:-.03em}
+.cta p{font-size:18px;font-weight:600}
+.contacts{flex:0 1 400px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.contact{background:var(--oceano);color:var(--texto);border-radius:18px;padding:14px 16px 14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.contact div{display:flex;flex-direction:column;min-width:0}
+.contact small{font-size:12px;color:var(--apagado);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.contact span{font-weight:700;overflow-wrap:anywhere}
+.copy{flex:none;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--borde);background:var(--isla);color:var(--texto);font:800 14px var(--body);cursor:pointer}
+.copy:hover{border-color:var(--cian)}
+
+footer{padding-block:28px 40px;border-top:1px solid var(--borde);color:var(--apagado);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <nav class="wrap nav-in" aria-label="Principal">
+    <a href="#inicio" class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><polygon points="17,2 30,9.5 30,24.5 17,32 4,24.5 4,9.5" fill="#0E1533" stroke="#3AF2FF" stroke-width="2"/><path d="M12 19c2-5 6-7 10-7-1 3-2 6-5 8 2 0 3-1 4-2-1 4-4 6-8 6 0-2 0-3-1-5z" fill="#FFC14D"/></svg>
+      EduRacha
+    </a>
+    <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="links" aria-label="Abrir menú">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <div class="links" id="links">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#perfiles">Estudiantes y docentes</a>
+      <a href="#reglas">Reglas del juego</a>
+      <a href="#preguntas">Preguntas</a>
+      <a href="#contacto" class="btn btn-primary">Pide una demo</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+<!-- HERO -->
+<section id="inicio" class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="pill"><span class="dot" aria-hidden="true"></span>App Android de aprendizaje gamificado</p>
+      <h1 class="h1">Un tema por isla. <em>Una racha</em> que no quieres romper.</h1>
+      <p class="lead">EduRacha convierte cada curso en un mapa de islas. Tus estudiantes leen una explicación corta, responden un quiz de 10 preguntas y ganan experiencia, racha y lugar en el ranking. Tú apruebas cada contenido y ves en tiempo real quién avanza y quién necesita ayuda.</p>
+      <div class="ctas">
+        <a href="#contacto" class="btn btn-primary">Pide una demo para tu curso</a>
+        <a href="#como-funciona" class="btn btn-ghost">Ver cómo funciona</a>
+      </div>
+      <div class="facts" aria-label="Datos clave">
+        <div class="fact"><b style="color:var(--rosa)">5 vidas</b><span>y una nueva cada 30 min</span></div>
+        <div class="fact"><b style="color:var(--ambar)">80 %</b><span>para conquistar una isla</span></div>
+        <div class="fact"><b style="color:var(--verde)">10 XP</b><span>por respuesta correcta</span></div>
+      </div>
+    </div>
+
+    <div class="hero-art">
+      <div class="phone" role="img" aria-label="Pantalla de la app: mapa de islas del curso con vidas, racha y experiencia">
+        <div class="phone-top"><b>Bases de datos I</b><span>Mapa de islas</span></div>
+        <div class="stats">
+          <div class="stat"><b style="color:var(--rosa)">4/5</b><span>Vidas</span></div>
+          <div class="stat"><b style="color:var(--ambar)">6 días</b><span>Racha</span></div>
+          <div class="stat"><b style="color:var(--cian)">340</b><span>XP</span></div>
+        </div>
+        <svg viewBox="0 0 280 330" width="100%" aria-hidden="true">
+          <path d="M70 300 C 160 290, 210 250, 200 205 S 80 160, 90 120 S 200 80, 200 40" fill="none" stroke="#2B3A78" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round"/>
+          <polygon points="70,272 94,286 94,314 70,328 46,314 46,286" fill="#5CF29A"/><text x="70" y="305" text-anchor="middle" font-size="14" font-weight="800" fill="#070B1F" font-family="Nunito, sans-serif">1</text>
+          <polygon points="200,177 224,191 224,219 200,233 176,219 176,191" fill="#5CF29A"/><text x="200" y="210" text-anchor="middle" font-size="14" font-weight="800" fill="#070B1F" font-family="Nunito, sans-serif">2</text>
+          <polygon points="90,88 118,104 118,136 90,152 62,136 62,104" fill="#3AF2FF" stroke="#EEF2FF" stroke-width="3"/><text x="90" y="125" text-anchor="middle" font-size="15" font-weight="800" fill="#070B1F" font-family="Nunito, sans-serif">3</text>
+          <polygon points="200,12 224,26 224,54 200,68 176,54 176,26" fill="#1A2350" stroke="#2B3A78" stroke-width="2"/><text x="200" y="45" text-anchor="middle" font-size="14" font-weight="800" fill="#8E9BC7" font-family="Nunito, sans-serif">4</text>
+          <text x="130" y="122" font-size="12" font-weight="700" fill="#EEF2FF" font-family="Nunito, sans-serif">Normalización</text>
+          <text x="130" y="138" font-size="11" fill="#8E9BC7" font-family="Nunito, sans-serif">Tu siguiente isla</text>
+        </svg>
+        <div class="phone-cta" aria-hidden="true">Leer explicación y empezar quiz</div>
+      </div>
+      <svg class="robi" viewBox="0 0 150 170" aria-hidden="true">
+        <line x1="75" y1="10" x2="75" y2="30" stroke="#8E9BC7" stroke-width="4"/>
+        <circle class="orbe" cx="75" cy="10" r="8" fill="#3AF2FF"/>
+        <rect x="28" y="30" width="94" height="78" rx="30" fill="#E8ECFF"/>
+        <rect x="18" y="52" width="16" height="34" rx="8" fill="#A06BFF"/>
+        <rect x="116" y="52" width="16" height="34" rx="8" fill="#A06BFF"/>
+        <rect x="40" y="46" width="70" height="44" rx="20" fill="#0B1230"/>
+        <ellipse class="ojo" cx="61" cy="68" rx="7" ry="9" fill="#3AF2FF"/>
+        <ellipse class="ojo" cx="89" cy="68" rx="7" ry="9" fill="#3AF2FF"/>
+        <rect x="48" y="112" width="54" height="34" rx="16" fill="#E8ECFF"/>
+        <circle cx="75" cy="128" r="7" fill="#5CF29A"/>
+        <circle cx="24" cy="118" r="11" fill="#E8ECFF"/>
+        <circle cx="126" cy="118" r="11" fill="#E8ECFF"/>
+        <path d="M62 150 L75 168 L88 150 Z" fill="#FFC14D"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEMA -->
+<section class="band" aria-labelledby="problema-t">
+  <div class="wrap problem">
+    <h2 id="problema-t" class="h3">El estudio se acumula la noche antes del examen.</h2>
+    <p>El estudiante repasa tarde y sin saber si va bien. El docente dedica horas a armar bancos de preguntas y descubre quién se quedó atrás cuando ya es tarde para ayudarlo.</p>
+    <p>EduRacha cambia el ritmo: <strong>práctica corta todos los días</strong>, retroalimentación en el momento y un panel para que el docente vea el avance de su grupo tema por tema.</p>
+  </div>
+</section>
+
+<!-- CÓMO FUNCIONA -->
+<section id="como-funciona" aria-labelledby="como-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" style="color:var(--cian)">Cómo funciona</p>
+      <h2 id="como-t" class="h2">De la solicitud a la isla conquistada, en cuatro pasos.</h2>
+      <p class="lead">Cada tema es una isla. Para conquistarla hay que entenderla primero y demostrarla después.</p>
+    </div>
+    <ol class="steps">
+      <li class="card"><span class="num" aria-hidden="true">1</span><h3>Únete al curso</h3><p>Inicia sesión con tu correo o con Google, busca el curso de tu docente y envía la solicitud. Te avisamos en cuanto te acepte.</p></li>
+      <li class="card"><span class="num" aria-hidden="true">2</span><h3>Entiende el tema</h3><p>Antes de cada quiz hay una explicación por tarjetas, breve y aprobada por tu docente. Al terminarla se desbloquea el quiz.</p></li>
+      <li class="card"><span class="num" aria-hidden="true">3</span><h3>Responde el quiz</h3><p>Diez preguntas que priorizan las que aún no has visto. Cada error cuesta una vida y al final ves qué fallaste y por qué.</p></li>
+      <li class="card final"><span class="num" aria-hidden="true">4</span><h3>Conquista la isla</h3><p>Con 80 % de aciertos apruebas el tema y se abre la siguiente isla. Los temas aprobados quedan listos para repasar cuando quieras.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- PERFILES -->
+<section id="perfiles" class="band" aria-labelledby="perfiles-t">
+  <div class="wrap">
+    <div class="tabs-head">
+      <div class="head" style="margin-bottom:0">
+        <p class="eyebrow" style="color:var(--violeta)">Dos experiencias, una sola app</p>
+        <h2 id="perfiles-t" class="h2">Lúdica para quien aprende. Productiva para quien enseña.</h2>
+      </div>
+      <div class="tablist" role="tablist" aria-label="Elige un perfil">
+        <button class="tab" role="tab" type="button" id="tab-est" aria-selected="true" aria-controls="panel-est">Estudiante</button>
+        <button class="tab" role="tab" type="button" id="tab-doc" aria-selected="false" aria-controls="panel-doc" tabindex="-1">Docente</button>
+      </div>
+    </div>
+
+    <div id="panel-est" role="tabpanel" aria-labelledby="tab-est" tabindex="0">
+      <div class="grid4">
+        <div class="card feat"><h3 style="color:var(--cian)">Ves tu camino</h3><p>El curso es un mapa: islas conquistadas, la isla actual y las que vienen. Siempre sabes qué estudiar después.</p></div>
+        <div class="card feat"><h3 style="color:var(--ambar)">Racha y experiencia</h3><p>Cada quiz suma XP y mantiene viva tu racha de días practicando. Diez minutos al día cuentan.</p></div>
+        <div class="card feat"><h3 style="color:var(--verde)">Aprendes de tus errores</h3><p>Revisa cada pregunta que fallaste con la respuesta correcta y su explicación, justo cuando lo necesitas.</p></div>
+        <div class="card feat"><h3 style="color:var(--rosa)">Ranking del curso</h3><p>Compárate con tus compañeros por experiencia, racha o vidas, dentro del curso o en general.</p></div>
+      </div>
+      <div class="panel-cta"><span>Funciona en celulares con Android 7.0 o superior, en tema claro u oscuro.</span></div>
+    </div>
+
+    <div id="panel-doc" role="tabpanel" aria-labelledby="tab-doc" tabindex="0" hidden>
+      <div class="grid4">
+        <div class="card feat"><h3 style="color:var(--violeta)">Tu curso en minutos</h3><p>Crea el curso, sus temas y su duración, de 1 a 365 días. EduRacha propone un ritmo sugerido para cada tema.</p></div>
+        <div class="card feat"><h3 style="color:var(--cian)">Explicaciones desde tu PDF</h3><p>Sube tu material y la IA redacta un borrador basado solo en ese documento. Tú lo revisas y decides si se publica.</p></div>
+        <div class="card feat"><h3 style="color:var(--verde)">Preguntas con IA, bajo tu control</h3><p>Genera preguntas por lotes de 10, sin repetidas. Ninguna llega a tus estudiantes sin tu aprobación.</p></div>
+        <div class="card feat"><h3 style="color:var(--ambar)">Sabes quién necesita ayuda</h3><p>Estadísticas por tema, estudiantes en riesgo, un centro de pendientes y reportes en Excel listos para descargar.</p></div>
+      </div>
+      <div class="panel-cta"><a href="#contacto" class="btn btn-primary">Quiero probarlo con mi curso</a><span>Te acompañamos a crear tu primer curso.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- REGLAS -->
+<section id="reglas" aria-labelledby="reglas-t">
+  <div class="wrap rules">
+    <div class="rules-copy">
+      <p class="eyebrow" style="color:var(--ambar)">Reglas del juego</p>
+      <h2 id="reglas-t" class="h2">Reglas claras, calculadas en el servidor.</h2>
+      <p>Los puntos, las vidas y la racha los calcula el servidor; la app solo muestra lo que él confirma. Así nadie puede inflar sus resultados desde el celular y el ranking es justo para todos.</p>
+      <p>Las vidas equilibran el reto: si se acaban, toca descansar un rato y volver. El conocimiento se asienta mejor así que repitiendo sin pensar.</p>
+    </div>
+    <div class="table-box">
+      <table>
+        <caption>Experiencia y vidas en un quiz oficial</caption>
+        <tbody>
+          <tr><th scope="row">Cada respuesta correcta</th><td class="xp">+10 XP</td></tr>
+          <tr><th scope="row">Quiz sin errores</th><td class="xp">+15 XP</td></tr>
+          <tr><th scope="row">Respondes rápido (menos de 30 s en promedio)</th><td class="xp">+10 XP</td></tr>
+          <tr><th scope="row">Apruebas el tema por primera vez</th><td class="xp">+5 XP</td></tr>
+          <tr><th scope="row">Quiz final del curso</th><td class="xp">+100 XP</td></tr>
+          <tr><th scope="row">Vidas por curso</th><td class="vida">5 · +1 cada 30 min</td></tr>
+          <tr><th scope="row">Para aprobar el tema</th><td class="meta">≥ 80 % de aciertos</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- EVIDENCIA -->
+<section class="band" aria-labelledby="evidencia-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" style="color:var(--verde)">Por qué funciona</p>
+      <h2 id="evidencia-t" class="h2">Juego con propósito, respaldado por la investigación.</h2>
+      <p class="lead">EduRacha usa los elementos de juego más estudiados en educación y los pone al servicio del contenido que define el docente.</p>
+    </div>
+    <div class="evidence">
+      <div class="quote"><p>Un metaanálisis sobre gamificación del aprendizaje encontró efectos positivos en resultados cognitivos, motivacionales y de conducta de los estudiantes.</p><cite>Sailer y Homner, Educational Psychology Review, 2020</cite></div>
+      <div class="quote"><p>Puntos, tablas de clasificación y retroalimentación inmediata están entre los elementos de juego más usados en la enseñanza.</p><cite>Kalogiannakis et al., Education Sciences, 2021</cite></div>
+      <div class="quote"><p>La mayoría de estudios empíricos reporta efectos positivos de la gamificación, que dependen del contexto y de quien la usa. Por eso en EduRacha el docente tiene la última palabra.</p><cite>Hamari, Koivisto y Sarsa, HICSS, 2014</cite></div>
+    </div>
+  </div>
+</section>
+
+<!-- TECNOLOGÍA -->
+<section id="tecnologia" aria-labelledby="tec-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" style="color:var(--cian)">Hecho para durar</p>
+      <h2 id="tec-t" class="h2">Ingeniería real detrás del juego.</h2>
+    </div>
+    <div class="tech">
+      <div style="--c:var(--cian)"><h3>App nativa Android</h3><p>Construida con Kotlin y Jetpack Compose para que se sienta rápida y fluida en el celular.</p></div>
+      <div style="--c:var(--violeta)"><h3>Servidor propio</h3><p>API en Ktor con Firebase, empaquetada en un contenedor Docker lista para desplegar en la nube.</p></div>
+      <div style="--c:var(--ambar)"><h3>Seguridad por rol</h3><p>Cada petición se valida en el servidor según si eres estudiante o docente. Las claves nunca viajan dentro de la app.</p></div>
+      <div style="--c:var(--verde)"><h3>52 pruebas automatizadas</h3><p>Las reglas del quiz, la IA, los reportes y la programación de cursos se verifican con pruebas que hoy pasan todas.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="preguntas" class="band" aria-labelledby="faq-t">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow" style="color:var(--rosa)">Preguntas frecuentes</p>
+      <h2 id="faq-t" class="h2">Lo que suelen preguntarnos.</h2>
+    </div>
+    <div class="faq">
+      <details><summary>¿La inteligencia artificial reemplaza al docente?</summary><p>No. La IA prepara borradores de explicaciones y preguntas a partir del material del docente, pero nada llega a los estudiantes hasta que el docente lo aprueba.</p></details>
+      <details><summary>¿Qué pasa si un estudiante se queda sin vidas?</summary><p>Debe esperar: recupera una vida cada 30 minutos, hasta un máximo de 5. Es una pausa para repasar la retroalimentación antes de volver a intentarlo.</p></details>
+      <details><summary>¿Se pueden repasar temas ya aprobados?</summary><p>Sí. Los temas aprobados quedan disponibles en modo práctica para repasar cuantas veces se quiera.</p></details>
+      <details><summary>¿Las fechas del curso bloquean los temas?</summary><p>No. El curso propone un ritmo sugerido por tema, pero el avance lo marca el mapa de islas: aprobar un tema abre el siguiente.</p></details>
+      <details><summary>¿Qué se necesita para usarla?</summary><p>Un celular con Android 7.0 o superior y conexión a internet. El docente crea el curso y los estudiantes se unen desde la app.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- EQUIPO -->
+<section aria-labelledby="equipo-t">
+  <div class="wrap team">
+    <div class="team-copy">
+      <p class="eyebrow" style="color:var(--violeta)">Quién lo construye</p>
+      <h2 id="equipo-t" class="h2">Hecho en Popayán, con Scrum.</h2>
+      <p>EduRacha nace en el programa de Ingeniería de Software de la Corporación Universitaria Autónoma del Cauca. Lo construimos en entregas cortas que integran la app y el servidor de principio a fin, y lo mejoramos con lo que nos cuentan estudiantes y docentes.</p>
+    </div>
+    <div class="people">
+      <div class="card person"><span class="avatar" style="background:var(--cian)">LS</span><h3>Laura Valentina Solarte Muñoz</h3><p>Desarrollo frontend Android</p></div>
+      <div class="card person"><span class="avatar" style="background:var(--violeta)">BT</span><h3>Brayner Stiven Trochez Ordoñez</h3><p>Desarrollo backend y API</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="contacto" style="padding-top:0" aria-labelledby="cta-t">
+  <div class="wrap">
+    <div class="cta">
+      <div class="cta-copy">
+        <h2 id="cta-t">¿Quieres EduRacha en tu curso?</h2>
+        <p>Escríbenos y te mostramos la app con un curso de prueba: creación de temas, generación de preguntas con IA y el recorrido completo del estudiante, de la primera isla al ranking.</p>
+      </div>
+      <div class="contacts">
+        <div class="contact"><div><small>Frontend · Laura</small><span>laura.solarte.m@uniautonoma.edu.co</span></div><button class="copy" type="button" data-copy="laura.solarte.m@uniautonoma.edu.co">Copiar</button></div>
+        <div class="contact"><div><small>Backend · Brayner</small><span>brayner.trochez.o@uniautonoma.edu.co</span></div><button class="copy" type="button" data-copy="brayner.trochez.o@uniautonoma.edu.co">Copiar</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>EduRacha · Ingeniería de Software · Corporación Universitaria Autónoma del Cauca</span>
+    <span>Popayán, Cauca, Colombia · 2026</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Menú móvil
+  var btn = document.getElementById('menu-btn');
+  var links = document.getElementById('links');
+  function closeMenu() { links.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-label', 'Abrir menú'); }
+  btn.addEventListener('click', function () {
+    var open = links.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+  });
+  links.addEventListener('click', function (e) { if (e.target.closest('a')) closeMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+  // Pestañas Estudiante / Docente (con flechas del teclado)
+  var tabs = [document.getElementById('tab-est'), document.getElementById('tab-doc')];
+  function select(i, focus) {
+    tabs.forEach(function (t, j) {
+      var on = i === j;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tabs[i].focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(i, false); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); select(i === 0 ? 1 : 0, true); }
+    });
+  });
+
+  // Copiar correos
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      function done(ok) { b.textContent = ok ? 'Copiado' : 'Selecciónalo'; setTimeout(function () { b.textContent = 'Copiar'; }, 1800); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { selectText(b); done(false); });
+      } else { selectText(b); done(false); }
+    });
+  });
+  function selectText(b) {
+    var span = b.parentNode.querySelector('span');
+    var r = document.createRange(); r.selectNodeContents(span);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+})();
+</script>
+</body>
+</html>
